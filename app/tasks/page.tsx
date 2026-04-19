@@ -1,11 +1,11 @@
-import { AGENTS, TASK_STATUS, PRIORITY, CATEGORIES } from "@/lib/agents";
+import { AGENTS } from "@/lib/agents";
 import { Panel, Stat, AgentBadge } from "@/components/ui";
-import { relativeDay, formatDate } from "@/lib/utils";
-import { Clock, Flag } from "lucide-react";
+import { formatDate } from "@/lib/utils";
 import type { AgentId } from "@/lib/types";
 import { getTasks } from "@/lib/server/data";
 import { getAdminFields } from "@/lib/server/admin";
 import { InlineForm } from "@/components/inline-form";
+import { TaskRow } from "./task-row";
 
 export default async function TasksPage() {
   const [tasks, taskFields] = await Promise.all([getTasks(), Promise.resolve(getAdminFields("tasks"))]);
@@ -53,40 +53,9 @@ export default async function TasksPage() {
               </header>
               {list.length > 0 && (
                 <ul className="divide-y divide-edge/60">
-                  {list.map((t) => {
-                    const overdue = t.dueDate && new Date(t.dueDate).getTime() < Date.now();
-                    return (
-                      <li key={t.id} className="px-4 py-3 transition hover:bg-ink-900/40">
-                        <div className="flex items-start gap-3">
-                          <input
-                            type="checkbox"
-                            defaultChecked={t.status === "done"}
-                            className="mt-1 h-4 w-4 shrink-0 rounded border-edge bg-ink-800 text-signal-blue focus:ring-signal-blue/50"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="text-sm text-slate-100">{t.title}</div>
-                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                              <span className={TASK_STATUS[t.status].pillClass}>{TASK_STATUS[t.status].label}</span>
-                              <span className={CATEGORIES[t.category].pillClass}>{t.category}</span>
-                              {t.priority !== "low" && (
-                                <span className={PRIORITY[t.priority].pillClass}>
-                                  <Flag className="h-2.5 w-2.5" />
-                                  {PRIORITY[t.priority].label}
-                                </span>
-                              )}
-                              {t.dueDate && (
-                                <span className={overdue ? "pill-red" : "pill-ghost"}>
-                                  <Clock className="h-2.5 w-2.5" />
-                                  {relativeDay(t.dueDate)}
-                                </span>
-                              )}
-                            </div>
-                            {t.notes && <div className="mt-1.5 text-[11px] italic text-slate-500">{t.notes}</div>}
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
+                  {list.map((task) => (
+                    <TaskRow key={task.id} task={task} fields={taskFields} />
+                  ))}
                 </ul>
               )}
               <div className="px-4 pb-4">

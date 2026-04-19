@@ -1,21 +1,10 @@
 import { Panel, Stat, AgentBadge } from "@/components/ui";
 import { AGENTS } from "@/lib/agents";
-import { User, Heart, Baby, Dog, UserCircle } from "lucide-react";
 import { getHouseholdMembers, getRules } from "@/lib/server/data";
-
-const ROLE_META = {
-  principal: { label: "Principal", icon: UserCircle },
-  partner:   { label: "Partner",   icon: Heart },
-  child:     { label: "Child",     icon: Baby },
-  pet:       { label: "Pet",       icon: Dog },
-  guest:     { label: "Guest",     icon: User },
-};
-
-const PRIORITY_META = {
-  "must-follow": { pillClass: "pill-red",    label: "Must follow" },
-  "prefer":      { pillClass: "pill-blue",   label: "Prefer" },
-  "consider":    { pillClass: "pill-ghost",  label: "Consider" },
-};
+import { InlineForm } from "@/components/inline-form";
+import { getAdminFields } from "@/lib/server/admin";
+import { MemberCard } from "./member-card";
+import { RuleItem } from "./rule-item";
 
 const COLOR_MAP: Record<string, string> = {
   blue:   "from-signal-blue/80 to-signal-blue/40",
@@ -28,7 +17,12 @@ const COLOR_MAP: Record<string, string> = {
 };
 
 export default async function RosterPage() {
-  const [household, rules] = await Promise.all([getHouseholdMembers(), getRules()]);
+  const [household, rules, householdFields, ruleFields] = await Promise.all([
+    getHouseholdMembers(),
+    getRules(),
+    Promise.resolve(getAdminFields("household")),
+    Promise.resolve(getAdminFields("rules")),
+  ]);
   const humans = household.filter((h) => h.role !== "pet").length;
   const pets = household.filter((h) => h.role === "pet").length;
   const mustRules = rules.filter((r) => r.priority === "must-follow" && r.active).length;
@@ -39,6 +33,7 @@ export default async function RosterPage() {
     rulesByAgent[r.category] ??= [];
     rulesByAgent[r.category].push(r);
   });
+  const ruleCategories = ["general", ...Object.keys(AGENTS)];
 
   return (
     <div className="space-y-6">
@@ -51,21 +46,11 @@ export default async function RosterPage() {
 
       <Panel eyebrow="The House" title="Roster" action={<AgentBadge agent="roster" size="md" />}>
         <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
-          {household.map((m) => {
-            const R = ROLE_META[m.role];
-            const Icon = R.icon;
-            return (
-              <div key={m.id} className="rounded-lg border border-edge bg-ink-900/40 p-4">
-                <div className={`mb-3 grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br ${COLOR_MAP[m.avatarColor] ?? COLOR_MAP.blue}`}>
-                  <Icon className="h-5 w-5 text-ink-950" strokeWidth={2.5} />
-                </div>
-                <div className="text-base font-semibold text-white">{m.name}</div>
-                <div className="text-2xs font-semibold uppercase tracking-wider text-slate-500">{R.label}</div>
-                {m.notes && <div className="mt-2 text-[11px] leading-relaxed text-slate-400">{m.notes}</div>}
-              </div>
-            );
-          })}
+          {household.map((member) => (
+            <MemberCard key={member.id} member={member} fields={householdFields} colorMap={COLOR_MAP} />
+          ))}
         </div>
+        <InlineForm resource="household" fields={householdFields} />
       </Panel>
 
       {/* Rules */}
@@ -78,13 +63,11 @@ export default async function RosterPage() {
               The agents consult these before every proposal. Must-follow rules are enforced — the Chief of Staff won't route past them.
             </p>
           </div>
-          <button className="rounded-md border border-edge bg-ink-900 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-ink-800">
-            + New rule
-          </button>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          {Object.entries(rulesByAgent).map(([category, list]) => {
+          {ruleCategories.map((category) => {
+            const list = rulesByAgent[category] ?? [];
             const agent = category === "general" ? null : AGENTS[category as keyof typeof AGENTS];
             return (
               <Panel
@@ -93,22 +76,23 @@ export default async function RosterPage() {
                 title={agent ? agent.name : "General"}
                 action={agent && <AgentBadge agent={agent.id} />}
               >
-                <ul className="space-y-2.5">
-                  {list.map((r) => {
-                    const P = PRIORITY_META[r.priority];
-                    return (
-                      <li key={r.id} className="rounded-md border border-edge bg-ink-900/30 p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1">
-                            <div className="text-sm font-semibold text-slate-100">{r.title}</div>
-                            <div className="mt-1 text-xs leading-relaxed text-slate-400">{r.description}</div>
-                          </div>
-                          <span className={P.pillClass}>{P.label}</span>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
+                {list.length > 0 ? (
+                  <ul className="space-y-2.5">
+                    {list.map((rule) => (
+                      <RuleItem key={rule.id} rule={rule} fields={ruleFields} />
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="rounded-md border border-dashed border-edge px-4 py-6 text-sm text-slate-500">
+                    No rules yet for this group.
+                  </div>
+                )}
+                <InlineForm
+                  resource="rules"
+                  fields={ruleFields}
+                  defaults={{ category, priority: "prefer", active: true }}
+                  label={`Add ${agent ? agent.shortName : "general"} rule`}
+                />
               </Panel>
             );
           })}

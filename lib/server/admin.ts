@@ -294,7 +294,7 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
     fields: [
       { key: "name", label: "Name", type: "text" },
       { key: "role", label: "Role", type: "select", options: ["principal", "partner", "child", "pet", "guest"] },
-      { key: "avatarColor", label: "Avatar Color", type: "text" },
+      { key: "avatarColor", label: "Avatar Color", type: "select", options: ["blue", "purple", "green", "pink", "amber", "cyan", "red"] },
       { key: "notes", label: "Notes", type: "textarea" },
     ],
     toDbPatch(payload) {
@@ -384,8 +384,16 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
   },
 };
 
+const ADMIN_REVALIDATE_PATHS = ["/", "/inbox", "/tasks", "/home", "/money", "/schedule", "/roster", "/meals", "/data"];
+
 export function getAdminFields(resource: AdminResource): AdminField[] {
   return adminConfig[resource].fields;
+}
+
+export function revalidateAdminPaths() {
+  ADMIN_REVALIDATE_PATHS.forEach((path) => {
+    revalidatePath(path);
+  });
 }
 
 export function getAdminPassword() {
@@ -440,9 +448,7 @@ export async function createAdminResource(resource: AdminResource, payload: Reco
 
   if (error) throw new Error(error.message);
 
-  ["/", "/inbox", "/tasks", "/home", "/money", "/schedule", "/roster", "/meals", "/data"].forEach((path) => {
-    revalidatePath(path);
-  });
+  revalidateAdminPaths();
 
   return id;
 }
@@ -461,7 +467,22 @@ export async function updateAdminResource(resource: AdminResource, id: string, p
 
   if (error) throw new Error(error.message);
 
-  ["/", "/inbox", "/tasks", "/home", "/money", "/schedule", "/roster", "/meals", "/data"].forEach((path) => {
-    revalidatePath(path);
-  });
+  revalidateAdminPaths();
+}
+
+export async function deleteAdminResource(resource: AdminResource, id: string) {
+  const config = adminConfig[resource];
+  if (!config) throw new Error("Unknown resource.");
+
+  const supabase = getSupabaseAdmin();
+  if (!supabase) throw new Error("Supabase is not configured.");
+
+  const { error } = await supabase
+    .from(config.table)
+    .delete()
+    .eq(config.idKey, id);
+
+  if (error) throw new Error(error.message);
+
+  revalidateAdminPaths();
 }

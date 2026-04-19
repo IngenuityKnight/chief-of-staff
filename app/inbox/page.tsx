@@ -1,8 +1,9 @@
 import { AGENTS, INBOX_STATUS, CATEGORIES, PRIORITY } from "@/lib/agents";
 import { Panel, Stat, AgentBadge } from "@/components/ui";
 import { formatDate, relativeDay } from "@/lib/utils";
-import { Inbox as InboxIcon, Mail, Globe, MessageSquare, Mic, ArrowRight } from "lucide-react";
+import { Inbox as InboxIcon, Mail, Globe, MessageSquare, Mic } from "lucide-react";
 import { getInboxItems } from "@/lib/server/data";
+import { ApproveButton } from "./approve-button";
 
 const SOURCE_ICONS = {
   web: Globe,
@@ -97,9 +98,7 @@ export default async function InboxPage() {
                       ))}
                     </div>
                     {item.needsAction && (
-                      <button className="flex items-center gap-1 rounded-md border border-signal-blue/30 bg-signal-blue/10 px-2.5 py-1 text-xs font-semibold text-signal-blue transition hover:bg-signal-blue/20">
-                        Approve tasks <ArrowRight className="h-3 w-3" />
-                      </button>
+                      <ApproveButton inboxItemId={item.id} taskCount={item.proposedTasks.length} />
                     )}
                   </div>
 
