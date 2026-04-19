@@ -1,0 +1,244 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { Panel } from "@/components/ui";
+import { cn } from "@/lib/utils";
+import type { AdminField, AdminResource } from "@/lib/server/admin";
+
+type ResourcePayload = {
+  label: string;
+  fields: AdminField[];
+  records: Array<Record<string, unknown>>;
+};
+
+type EditorProps = {
+  resources: Record<AdminResource, ResourcePayload>;
+  editingEnabled: boolean;
+};
+
+type FormState = Record<string, string | boolean>;
+
+function summarizeRecord(record: Record<string, unknown>) {
+  if (typeof record.title === "string") return record.title;
+  if (typeof record.name === "string") return record.name;
+  if (typeof record.item === "string") return record.item;
+  if (typeof record.label === "string") return record.label;
+  return String(record.id ?? record.date ?? "record");
+}
+
+function fieldValue(field: AdminField, value: unknown): string | boolean {
+  if (field.type === "boolean") return Boolean(value);
+  if (field.type === "json") return JSON.stringify(value ?? null, null, 2);
+  if (value === null || value === undefined) return "";
+  return String(value);
+}
+
+function buildFormState(fields: AdminField[], record: Record<string, unknown>): FormState {
+  return Object.fromEntries(fields.map((field) => [field.key, fieldValue(field, record[field.key])]));
+}
+
+export function DataEditor({ resources, editingEnabled }: EditorProps) {
+  const resourceKeys = Object.keys(resources) as AdminResource[];
+  const [activeResource, setActiveResource] = useState<AdminResource>(resourceKeys[0]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [editorPassword, setEditorPassword] = useState("");
+  const [formState, setFormState] = useState<FormState>({});
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const resource = resources[activeResource];
+  const selectedRecord = useMemo(
+    () => resource.records.find((record) => String(record.id ?? record.date) === selectedId) ?? null,
+    [resource, selectedId]
+  );
+
+  function chooseRecord(id: string) {
+    const record = resource.records.find((item) => String(item.id ?? item.date) === id);
+    if (!record) return;
+    setSelectedId(id);
+    setFormState(buildFormState(resource.fields, record));
+    setMessage(null);
+  }
+
+  async function saveChanges() {
+    if (!selectedRecord) return;
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      const recordId = encodeURIComponent(String(selectedRecord.id ?? selectedRecord.date));
+      const response = await fetch(`/api/admin/${activeResource}/${recordId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "x-editor-password": editorPassword,
+        },
+        body: JSON.stringify({ values: formState }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Failed to save changes.");
+      }
+      setMessage("Saved. Refresh or navigate to see the updated data reflected elsewhere in the app.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Failed to save changes.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <Panel eyebrow="Control" title="Data Studio">
+        <div className="space-y-4">
+          <p className="max-w-3xl text-sm text-slate-400">
+            Edit the live records stored in Supabase from inside the app. This writes directly to the underlying tables.
+          </p>
+          <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+            <div className="flex flex-wrap gap-2">
+              {resourceKeys.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    setActiveResource(key);
+                    setSelectedId(null);
+                    setFormState({});
+                    setMessage(null);
+                  }}
+                  className={cn(
+                    "rounded-md border px-3 py-2 text-sm transition",
+                    activeResource === key
+                      ? "border-signal-blue/40 bg-signal-blue/10 text-signal-blue"
+                      : "border-edge bg-ink-900 text-slate-300 hover:bg-ink-800"
+                  )}
+                >
+                  {resources[key].label}
+                </button>
+              ))}
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                Editor Password
+              </label>
+              <input
+                type="password"
+                value={editorPassword}
+                onChange={(event) => setEditorPassword(event.target.value)}
+                placeholder={editingEnabled ? "Required to save" : "Set APP_EDITOR_PASSWORD first"}
+                className="w-full rounded-md border border-edge bg-ink-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-signal-blue/40 focus:outline-none"
+              />
+            </div>
+          </div>
+          {!editingEnabled && (
+            <div className="rounded-md border border-signal-amber/20 bg-signal-amber/5 px-3 py-2 text-sm text-signal-amber">
+              Editing is disabled until `APP_EDITOR_PASSWORD` is configured on the server.
+            </div>
+          )}
+        </div>
+      </Panel>
+
+      <div className="grid gap-6 xl:grid-cols-[360px_1fr]">
+        <Panel eyebrow="Records" title={resource.label}>
+          <div className="space-y-2">
+            {resource.records.map((record) => {
+              const id = String(record.id ?? record.date);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => chooseRecord(id)}
+                  className={cn(
+                    "w-full rounded-md border px-3 py-3 text-left transition",
+                    selectedId === id
+                      ? "border-signal-blue/40 bg-signal-blue/10"
+                      : "border-edge bg-ink-900/30 hover:bg-ink-900/60"
+                  )}
+                >
+                  <div className="text-sm font-medium text-slate-100">{summarizeRecord(record)}</div>
+                  <div className="mt-1 font-mono text-[11px] text-slate-500">{id}</div>
+                </button>
+              );
+            })}
+          </div>
+        </Panel>
+
+        <Panel eyebrow="Editor" title={selectedRecord ? `Edit ${String(selectedRecord.id ?? selectedRecord.date)}` : "Select a record"}>
+          {!selectedRecord ? (
+            <div className="py-10 text-sm text-slate-500">Select a record to edit it.</div>
+          ) : (
+            <div className="space-y-4">
+              {resource.fields.map((field) => (
+                <label key={field.key} className="block">
+                  <div className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    {field.label}
+                  </div>
+                  {field.type === "textarea" || field.type === "json" ? (
+                    <textarea
+                      value={String(formState[field.key] ?? "")}
+                      onChange={(event) => setFormState((current) => ({ ...current, [field.key]: event.target.value }))}
+                      rows={field.type === "json" ? 6 : 4}
+                      className="w-full rounded-md border border-edge bg-ink-950 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600 focus:border-signal-blue/40 focus:outline-none"
+                    />
+                  ) : field.type === "boolean" ? (
+                    <label className="inline-flex items-center gap-2 rounded-md border border-edge bg-ink-950 px-3 py-2 text-sm text-slate-200">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(formState[field.key])}
+                        onChange={(event) => setFormState((current) => ({ ...current, [field.key]: event.target.checked }))}
+                      />
+                      Enabled
+                    </label>
+                  ) : field.type === "select" ? (
+                    <select
+                      value={String(formState[field.key] ?? "")}
+                      onChange={(event) => setFormState((current) => ({ ...current, [field.key]: event.target.value }))}
+                      className="w-full rounded-md border border-edge bg-ink-950 px-3 py-2 text-sm text-slate-100 focus:border-signal-blue/40 focus:outline-none"
+                    >
+                      {field.options?.map((option) => (
+                        <option key={option} value={option}>
+                          {option || "None"}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type={field.type === "number" ? "number" : "text"}
+                      value={String(formState[field.key] ?? "")}
+                      onChange={(event) => setFormState((current) => ({ ...current, [field.key]: event.target.value }))}
+                      className="w-full rounded-md border border-edge bg-ink-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-signal-blue/40 focus:outline-none"
+                    />
+                  )}
+                </label>
+              ))}
+
+              {message && (
+                <div className="rounded-md border border-edge bg-ink-900/50 px-3 py-2 text-sm text-slate-300">
+                  {message}
+                </div>
+              )}
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={saveChanges}
+                  disabled={!editingEnabled || saving}
+                  className="rounded-md bg-signal-blue px-4 py-2 text-sm font-semibold text-ink-950 transition hover:bg-signal-blue/90 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {saving ? "Saving..." : "Save changes"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormState(buildFormState(resource.fields, selectedRecord))}
+                  className="rounded-md border border-edge bg-ink-900 px-4 py-2 text-sm text-slate-300 transition hover:bg-ink-800"
+                >
+                  Reset form
+                </button>
+              </div>
+            </div>
+          )}
+        </Panel>
+      </div>
+    </div>
+  );
+}

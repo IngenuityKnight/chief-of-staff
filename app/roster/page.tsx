@@ -1,7 +1,7 @@
-import { household, rules } from "@/lib/mock-data";
 import { Panel, Stat, AgentBadge } from "@/components/ui";
 import { AGENTS } from "@/lib/agents";
 import { User, Heart, Baby, Dog, UserCircle } from "lucide-react";
+import { getHouseholdMembers, getRules } from "@/lib/server/data";
 
 const ROLE_META = {
   principal: { label: "Principal", icon: UserCircle },
@@ -27,7 +27,8 @@ const COLOR_MAP: Record<string, string> = {
   red:    "from-signal-red/80 to-signal-red/40",
 };
 
-export default function RosterPage() {
+export default async function RosterPage() {
+  const [household, rules] = await Promise.all([getHouseholdMembers(), getRules()]);
   const humans = household.filter((h) => h.role !== "pet").length;
   const pets = household.filter((h) => h.role === "pet").length;
   const mustRules = rules.filter((r) => r.priority === "must-follow" && r.active).length;

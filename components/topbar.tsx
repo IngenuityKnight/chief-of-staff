@@ -12,6 +12,7 @@ const TITLES: Record<string, { eyebrow: string; title: string }> = {
   "/money":    { eyebrow: "Money Agent",        title: "Ledger" },
   "/schedule": { eyebrow: "Schedule Agent",     title: "Calendar" },
   "/roster":   { eyebrow: "Roster Agent",       title: "Household" },
+  "/data":     { eyebrow: "Command Center",     title: "Data Studio" },
 };
 
 export function Topbar() {

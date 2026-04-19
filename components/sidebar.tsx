@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Inbox, CheckSquare, UtensilsCrossed,
-  Wrench, Wallet, CalendarDays, Users, Settings, Radio,
+  Wrench, Wallet, CalendarDays, Users, Settings, Radio, Database,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +18,7 @@ const NAV = [
   { href: "/money",    label: "Money",     icon: Wallet,          hint: "Bills + budget" },
   { href: "/schedule", label: "Schedule",  icon: CalendarDays,    hint: "Calendar + time" },
   { href: "/roster",   label: "Roster",    icon: Users,           hint: "Household + rules" },
+  { href: "/data",     label: "Data",      icon: Database,        hint: "Edit live records" },
 ];
 
 export function Sidebar() {

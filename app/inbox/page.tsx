@@ -1,8 +1,8 @@
-import { inboxItems } from "@/lib/mock-data";
 import { AGENTS, INBOX_STATUS, CATEGORIES, PRIORITY } from "@/lib/agents";
 import { Panel, Stat, AgentBadge } from "@/components/ui";
 import { formatDate, relativeDay } from "@/lib/utils";
 import { Inbox as InboxIcon, Mail, Globe, MessageSquare, Mic, ArrowRight } from "lucide-react";
+import { getInboxItems } from "@/lib/server/data";
 
 const SOURCE_ICONS = {
   web: Globe,
@@ -12,7 +12,8 @@ const SOURCE_ICONS = {
   manual: InboxIcon,
 };
 
-export default function InboxPage() {
+export default async function InboxPage() {
+  const inboxItems = await getInboxItems();
   const total = inboxItems.length;
   const newCount = inboxItems.filter((i) => i.status === "new").length;
   const routed = inboxItems.filter((i) => i.status === "routed" || i.status === "processing").length;

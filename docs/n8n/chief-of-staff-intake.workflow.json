@@ -1,0 +1,82 @@
+{
+  "name": "Chief of Staff Intake",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "8ec029ae-1ed4-42e4-b6ea-b106612d1e9b",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "c75f7426-8354-4bdc-b95c-98f9c60e4ff7",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const incoming = $input.first().json;\nconst body = incoming.body ?? incoming;\nconst routing = body.routing ?? {};\nconst urgency = typeof body.urgency === 'string' ? body.urgency : 'medium';\nconst proposedTasks = Array.isArray(body.proposedTasks) ? body.proposedTasks : [];\nconst secondary = Array.isArray(routing.secondary) ? routing.secondary : [];\n\nreturn [{\n  json: {\n    ok: true,\n    eventType: 'chief_of_staff.intake.received',\n    id: body.id ?? '',\n    capturedAt: body.capturedAt ?? new Date().toISOString(),\n    text: body.text ?? '',\n    analysis: body.analysis ?? '',\n    routing: {\n      primary: routing.primary ?? 'chief',\n      secondary,\n      category: routing.category ?? 'Admin',\n    },\n    urgency,\n    proposedTasks,\n    needsEscalation: ['critical', 'high'].includes(urgency),\n    receivedAt: new Date().toISOString(),\n    source: 'vercel-app',\n  },\n}];"
+      },
+      "id": "ad984f0d-a048-4f51-98a7-5168f7c948fe",
+      "name": "Normalize Intake",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "f67f7710-a6e2-449b-b312-3f93c3c0047d",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        780,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Intake",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Intake": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2dbf0f90-ec11-44d2-85a0-cf6266d3b5e6",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "active": false
+}

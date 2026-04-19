@@ -1,11 +1,19 @@
 import Link from "next/link";
 import { ArrowRight, AlertTriangle, Sparkles, Clock, DollarSign, Wrench, CalendarDays } from "lucide-react";
-import { briefing, tasks, bills, maintenance, calendar } from "@/lib/mock-data";
 import { AGENTS, TASK_STATUS } from "@/lib/agents";
 import { Panel, Stat, AgentBadge, SectionHeading } from "@/components/ui";
 import { formatMoney, formatTime, relativeDay, daysUntil } from "@/lib/utils";
+import { getBills, getBriefingSummary, getCalendarEvents, getMaintenanceItems, getTasks } from "@/lib/server/data";
 
-export default function BriefingPage() {
+export default async function BriefingPage() {
+  const [briefing, tasks, bills, maintenance, calendar] = await Promise.all([
+    getBriefingSummary(),
+    getTasks(),
+    getBills(),
+    getMaintenanceItems(),
+    getCalendarEvents(),
+  ]);
+
   const topTasks = tasks
     .filter((t) => t.status !== "done")
     .sort((a, b) => {

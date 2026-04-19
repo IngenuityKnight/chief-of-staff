@@ -1,0 +1,259 @@
+{
+  "name": "Chief of Staff Intake Enrich + Supabase Update",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "8ec029ae-1ed4-42e4-b6ea-b106612d1e9b",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "570a4798-b932-4c43-b354-b6cfae79878f",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        240,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const incoming = $input.first().json;\nconst body = incoming.body ?? incoming;\nconst routing = body.routing ?? {};\nconst urgency = typeof body.urgency === 'string' ? body.urgency : 'medium';\nconst proposedTasks = Array.isArray(body.proposedTasks) ? body.proposedTasks : [];\nconst secondary = Array.isArray(routing.secondary) ? routing.secondary : [];\n\nreturn [{\n  json: {\n    id: body.id ?? '',\n    capturedAt: body.capturedAt ?? new Date().toISOString(),\n    text: body.text ?? '',\n    analysis: body.analysis ?? '',\n    routing: {\n      primary: routing.primary ?? 'chief',\n      secondary,\n      category: routing.category ?? 'Admin',\n    },\n    urgency,\n    proposedTasks,\n  },\n}];"
+      },
+      "id": "0d688dc7-b4f2-4460-a0cf-4e860f3a8626",
+      "name": "Normalize Intake",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst text = typeof item.text === 'string' ? item.text.trim() : '';\nconst words = text.split(/\\s+/).filter(Boolean);\nconst title = words.length <= 10 ? text : `${words.slice(0, 10).join(' ')}...`;\nconst primary = item.routing.primary;\nconst category = item.routing.category;\nconst urgency = item.urgency;\nconst escalation = ['critical', 'high'].includes(urgency);\n\nconst domainTemplates = {\n  meals: [\n    'Generate a practical meal plan for the next few days',\n    'Build or refine the grocery list',\n    'Block prep time and confirm constraints'\n  ],\n  home: [\n    'Confirm the failure mode and troubleshooting steps',\n    'Check warranty, vendor history, and next action',\n    'Escalate to quote gathering if unresolved'\n  ],\n  money: [\n    'Review the account or bill context',\n    'Draft the payment or budget adjustment',\n    'Escalate if spend or risk threshold is exceeded'\n  ],\n  schedule: [\n    'Find available windows and conflicts',\n    'Propose a concrete scheduling action',\n    'Confirm calendar updates after approval'\n  ],\n  roster: [\n    'Capture the people and relationships involved',\n    'Draft the follow-up plan',\n    'Coordinate communication across the household'\n  ],\n  chief: [\n    'Ask one clarifying question if context is incomplete',\n    'Prepare the item for human review',\n    'Hold pending approval or next routing decision'\n  ],\n};\n\nconst fallbackAnalysis = `n8n reviewed the intake and confirmed ${primary} as the primary domain.`;\nconst refinedAnalysis = item.analysis || fallbackAnalysis;\nconst proposedTasks = item.proposedTasks.length > 0 ? item.proposedTasks : (domainTemplates[primary] ?? domainTemplates.chief);\n\nreturn [{\n  json: {\n    ...item,\n    title: title || `${category} intake`,\n    refinedAnalysis,\n    proposedTasks,\n    needsAction: true,\n    inboxStatus: escalation ? 'processing' : 'processed',\n    escalation,\n    alertSummary: escalation ? `${urgency.toUpperCase()}: ${title || text}` : '',\n  },\n}];"
+      },
+      "id": "9afda1b3-80f2-4fdf-991f-1d09e039fe4f",
+      "name": "Enrich Intake",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/inbox_items?id=eq.' + encodeURIComponent($json.id) }}",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "={{ JSON.stringify({ apikey: $env.SUPABASE_SERVICE_ROLE_KEY, Authorization: 'Bearer ' + $env.SUPABASE_SERVICE_ROLE_KEY, 'Content-Type': 'application/json', Prefer: 'return=representation' }) }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ title: $json.title, analysis: $json.refinedAnalysis, proposed_tasks: $json.proposedTasks, needs_action: $json.needsAction, status: $json.inboxStatus }) }}",
+        "options": {}
+      },
+      "id": "5446301f-aa37-43ca-a893-f8298d21572a",
+      "name": "Update Inbox in Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "1302d128-5568-45c5-93ca-0dff7fc3b07f",
+              "leftValue": "={{ $json.escalation }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "eb3d7b80-f5cf-495a-bf70-3e7a5762349c",
+      "name": "Needs Escalation?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1300,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "998058e3-ae51-45ee-a1d6-e0f7cf03b6ee",
+              "name": "alertSummary",
+              "value": "={{ $json.alertSummary }}",
+              "type": "string"
+            },
+            {
+              "id": "7b6e8061-7c1f-414d-b5c1-446d9500f6f2",
+              "name": "alertRecommended",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "39ef398c-5a3c-42ef-b855-48aad2f3c30e",
+      "name": "Build Alert Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1560,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nreturn [{\n  json: {\n    ok: true,\n    eventType: 'chief_of_staff.intake.processed',\n    id: item.id,\n    inboxStatus: item.inboxStatus,\n    escalation: Boolean(item.escalation),\n    alertSummary: item.alertSummary || '',\n    supabaseUpdated: true,\n    routing: item.routing,\n    urgency: item.urgency,\n    proposedTasks: item.proposedTasks,\n    processedAt: new Date().toISOString(),\n  },\n}];"
+      },
+      "id": "8827aa2f-8369-4f58-9f88-b4d691a88fbc",
+      "name": "Prepare Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "1b427305-f0b0-49f2-b81b-ab1c5b613ee4",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1820,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Intake",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Intake": {
+      "main": [
+        [
+          {
+            "node": "Enrich Intake",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich Intake": {
+      "main": [
+        [
+          {
+            "node": "Update Inbox in Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Inbox in Supabase": {
+      "main": [
+        [
+          {
+            "node": "Needs Escalation?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Escalation?": {
+      "main": [
+        [
+          {
+            "node": "Build Alert Payload",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Alert Payload": {
+      "main": [
+        [
+          {
+            "node": "Prepare Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "cf1c7ea2-00a8-495c-b53c-d72e8749fd62",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "active": false
+}

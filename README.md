@@ -35,6 +35,36 @@ pnpm dev            # http://localhost:3000
 
 That's it. The prototype renders out of the box with mock data. No env vars required.
 
+## Backend setup
+
+The app now supports a real backend path with `Supabase` for persistence and an optional `n8n` handoff after intake capture.
+
+1. Copy `.env.example` to `.env.local`
+2. Set:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
+N8N_INTAKE_WEBHOOK_URL=...     # optional
+N8N_WEBHOOK_SECRET=...         # optional
+APP_EDITOR_PASSWORD=...        # required for in-app editing
+```
+
+3. Apply the Supabase schema in `supabase/migrations/20260419130000_initial_schema.sql`
+4. Seed the initial mock dataset into Supabase:
+
+```bash
+npm run seed:supabase
+```
+
+5. Start the app normally
+
+Behavior:
+- If Supabase is configured, server-rendered pages read from database tables.
+- If Supabase is not configured or tables are empty, the UI falls back to `lib/mock-data.ts`.
+- `POST /api/intake` always performs local routing, persists to Supabase when configured, and forwards the payload to `n8n` when `N8N_INTAKE_WEBHOOK_URL` is set.
+- `/data` provides a password-gated editor for updating live Supabase records in the app.
+
 ## The app
 
 - **Briefing** (`/`) — Situation report. Top priorities, cross-agent insights, tasks, calendar, bills, maintenance.
@@ -52,17 +82,15 @@ The **Chief of Staff dock** floats bottom-right on every page. Press `⌘K` / `C
 
 The UI is data-agnostic. Three ways to plug in the real stack:
 
-### Option A — Forward to n8n
+### Option A — Supabase + n8n
 
-Set `N8N_INTAKE_WEBHOOK` in `.env.local`. In `app/api/intake/route.ts`, replace the heuristic classifier with a `fetch()` to n8n. Your existing workflow (webhook → LLM → Notion Inbox) stays exactly as-is.
+Use the built-in adapter layer:
+- Supabase stores inbox items, tasks, rules, maintenance, bills, calendar events, household members, and meal plans.
+- n8n receives the same intake payload after persistence for LLM routing, approvals, notifications, or downstream automations.
 
-### Option B — Replace mock data with Notion
+### Option B — Direct LLM on the intake route
 
-Every page reads from `lib/mock-data.ts`. Create `lib/notion.ts` with the same function signatures, and swap imports. Types stay identical — no UI changes.
-
-### Option C — Direct LLM
-
-Call OpenAI/Anthropic from `/api/intake` and persist to Notion via their API. n8n becomes optional.
+Replace the heuristic analysis in `lib/server/intake.ts` and keep the rest of the persistence path intact.
 
 The UI doesn't care which one you choose.
 
