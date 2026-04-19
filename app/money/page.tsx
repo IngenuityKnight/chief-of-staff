@@ -4,9 +4,16 @@ import { Zap, Tv, CreditCard, AlertCircle } from "lucide-react";
 import { getBills } from "@/lib/server/data";
 import { getAdminFields } from "@/lib/server/admin";
 import { InlineForm } from "@/components/inline-form";
+import { getPlaidAccounts, getPlaidConnections } from "@/lib/server/plaid";
+import { PlaidConnect } from "@/components/plaid-connect";
 
 export default async function MoneyPage() {
-  const [bills, billFields] = await Promise.all([getBills(), Promise.resolve(getAdminFields("bills"))]);
+  const [bills, billFields, plaidAccounts, plaidConnections] = await Promise.all([
+    getBills(),
+    Promise.resolve(getAdminFields("bills")),
+    getPlaidAccounts(),
+    getPlaidConnections(),
+  ]);
   const due = bills.filter((b) => b.status === "due");
   const overdue = bills.filter((b) => b.status === "overdue");
   const subs = bills.filter((b) => b.kind === "subscription");
@@ -72,6 +79,58 @@ export default async function MoneyPage() {
             </div>
           ))}
         </div>
+      </Panel>
+
+      {/* Bank accounts from Plaid */}
+      <Panel
+        eyebrow="Connected Accounts"
+        title={plaidConnections.length ? `${plaidAccounts.length} account${plaidAccounts.length !== 1 ? "s" : ""}` : "No banks connected"}
+        action={<PlaidConnect />}
+      >
+        {plaidAccounts.length > 0 ? (
+          <ul className="divide-y divide-edge/60">
+            {plaidAccounts.map((acct) => {
+              const balance = acct.balance_available ?? acct.balance_current;
+              const isCredit = acct.type === "credit";
+              const usedPct = isCredit && acct.balance_limit
+                ? Math.min(100, ((acct.balance_current ?? 0) / acct.balance_limit) * 100)
+                : null;
+              return (
+                <li key={acct.id} className="flex items-center gap-4 py-3">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-ink-800 text-slate-400">
+                    <CreditCard className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-slate-100">{acct.name}</span>
+                      {acct.mask && <span className="font-mono text-xs text-slate-500">••{acct.mask}</span>}
+                    </div>
+                    <div className="text-[11px] capitalize text-slate-500">
+                      {acct.subtype ?? acct.type}
+                      {usedPct !== null && (
+                        <span className={` · ${usedPct > 80 ? "text-signal-red" : "text-slate-500"}`}>
+                          {usedPct.toFixed(0)}% used
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={`font-mono text-sm tabular-nums ${balance !== null && balance < 0 ? "text-signal-red" : "text-slate-100"}`}>
+                      {balance !== null ? formatMoney(balance) : "—"}
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      {isCredit ? "available" : "balance"}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="py-2 text-sm text-slate-500">
+            Connect a bank account to see real-time balances here.
+          </p>
+        )}
       </Panel>
 
       <div className="grid gap-4 lg:grid-cols-5">
