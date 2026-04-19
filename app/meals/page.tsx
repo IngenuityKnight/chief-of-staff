@@ -1,8 +1,10 @@
-import { mealPlan } from "@/lib/mock-data";
 import { Panel, Stat, AgentBadge } from "@/components/ui";
 import { formatMoney } from "@/lib/utils";
 import { ChefHat, Package, Utensils, Truck, Clock, Plus } from "lucide-react";
 import type { MealSlot } from "@/lib/types";
+import { getMealPlan } from "@/lib/server/data";
+import { getAdminFields } from "@/lib/server/admin";
+import { InlineForm } from "@/components/inline-form";
 
 const KIND_META = {
   cook:       { label: "Cook",       pillClass: "pill-amber", icon: ChefHat },
@@ -44,7 +46,11 @@ function MealCard({ slot }: { slot?: MealSlot }) {
   );
 }
 
-export default function MealsPage() {
+export default async function MealsPage() {
+  const [mealPlan, mealPlanFields] = await Promise.all([
+    getMealPlan(),
+    Promise.resolve(getAdminFields("meal-plan")),
+  ]);
   const totalCost = mealPlan.reduce((sum, d) => {
     return sum + [d.breakfast, d.lunch, d.dinner].reduce((s, m) => s + (m?.estCost ?? 0), 0);
   }, 0);
@@ -90,6 +96,12 @@ export default function MealsPage() {
             </div>
           ))}
         </div>
+        <InlineForm
+          resource="meal-plan"
+          fields={mealPlanFields}
+          defaults={{}}
+          label="Add meal plan day"
+        />
       </Panel>
 
       <div className="grid gap-4 lg:grid-cols-2">

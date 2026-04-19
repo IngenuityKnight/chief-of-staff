@@ -1,0 +1,23 @@
+{
+  "name": "Chief of Staff",
+  "short_name": "COS",
+  "description": "Household management command center",
+  "display": "standalone",
+  "start_url": "/mobile",
+  "scope": "/",
+  "theme_color": "#07090d",
+  "background_color": "#07090d",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

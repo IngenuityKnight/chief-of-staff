@@ -1,9 +1,12 @@
-import { bills } from "@/lib/mock-data";
 import { Panel, Stat, AgentBadge } from "@/components/ui";
 import { formatMoney, relativeDay, daysUntil } from "@/lib/utils";
 import { Zap, Tv, CreditCard, AlertCircle } from "lucide-react";
+import { getBills } from "@/lib/server/data";
+import { getAdminFields } from "@/lib/server/admin";
+import { InlineForm } from "@/components/inline-form";
 
-export default function MoneyPage() {
+export default async function MoneyPage() {
+  const [bills, billFields] = await Promise.all([getBills(), Promise.resolve(getAdminFields("bills"))]);
   const due = bills.filter((b) => b.status === "due");
   const overdue = bills.filter((b) => b.status === "overdue");
   const subs = bills.filter((b) => b.kind === "subscription");
@@ -101,6 +104,12 @@ export default function MoneyPage() {
               );
             })}
           </ul>
+          <InlineForm
+            resource="bills"
+            fields={billFields}
+            defaults={{ status: "due", frequency: "monthly" }}
+            label="Add bill"
+          />
         </Panel>
 
         <div className="space-y-4 lg:col-span-2">

@@ -1,7 +1,9 @@
-import { maintenance } from "@/lib/mock-data";
 import { Panel, Stat, AgentBadge } from "@/components/ui";
 import { formatMoney, relativeDay, daysUntil } from "@/lib/utils";
 import { AlertTriangle, CheckCircle2, Wrench, Clock } from "lucide-react";
+import { getMaintenanceItems } from "@/lib/server/data";
+import { getAdminFields } from "@/lib/server/admin";
+import { InlineForm } from "@/components/inline-form";
 
 const STATUS_META = {
   ok:            { pillClass: "pill-green", label: "OK",           icon: CheckCircle2 },
@@ -21,7 +23,11 @@ const SYSTEM_COLORS: Record<string, string> = {
   Other: "bg-slate-500/20 text-slate-400",
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  const [maintenance, maintenanceFields] = await Promise.all([
+    getMaintenanceItems(),
+    Promise.resolve(getAdminFields("maintenance")),
+  ]);
   const ok = maintenance.filter((m) => m.status === "ok").length;
   const soon = maintenance.filter((m) => m.status === "due-soon").length;
   const overdue = maintenance.filter((m) => m.status === "overdue").length;
@@ -88,6 +94,12 @@ export default function HomePage() {
             );
           })}
         </div>
+        <InlineForm
+          resource="maintenance"
+          fields={maintenanceFields}
+          defaults={{ status: "ok", frequency: "annual" }}
+          label="Add maintenance item"
+        />
       </Panel>
 
       <div className="grid gap-4 lg:grid-cols-2">

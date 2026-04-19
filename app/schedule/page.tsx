@@ -1,9 +1,11 @@
-import { calendar } from "@/lib/mock-data";
 import { Panel, Stat, AgentBadge } from "@/components/ui";
 import { formatTime, formatDate, relativeDay } from "@/lib/utils";
 import { AGENTS } from "@/lib/agents";
 import { MapPin, Clock } from "lucide-react";
 import type { CalendarEvent } from "@/lib/types";
+import { getCalendarEvents } from "@/lib/server/data";
+import { getAdminFields } from "@/lib/server/admin";
+import { InlineForm } from "@/components/inline-form";
 
 const TYPE_META = {
   appointment: { pillClass: "pill-pink",   label: "Appt" },
@@ -12,7 +14,11 @@ const TYPE_META = {
   meeting:     { pillClass: "pill-purple", label: "Meeting" },
 };
 
-export default function SchedulePage() {
+export default async function SchedulePage() {
+  const [calendar, calendarFields] = await Promise.all([
+    getCalendarEvents(),
+    Promise.resolve(getAdminFields("calendar")),
+  ]);
   const now = Date.now();
   const byDay: Record<string, CalendarEvent[]> = {};
   calendar.forEach((e) => {
@@ -109,6 +115,12 @@ export default function SchedulePage() {
                 </li>
               ))}
           </ul>
+          <InlineForm
+            resource="calendar"
+            fields={calendarFields}
+            defaults={{ type: "event", agent: "schedule" }}
+            label="Add event"
+          />
         </Panel>
 
         <Panel eyebrow="Schedule Agent" title="Time protection">

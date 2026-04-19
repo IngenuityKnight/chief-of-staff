@@ -7,14 +7,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "seed:supabase": "node --experimental-strip-types scripts/seed-supabase.ts"
   },
   "dependencies": {
-    "next": "14.2.5",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "@anthropic-ai/sdk": "^0.90.0",
+    "@supabase/supabase-js": "^2.57.4",
+    "clsx": "^2.1.1",
+    "googleapis": "^171.4.0",
     "lucide-react": "^0.424.0",
-    "clsx": "^2.1.1"
+    "next": "15.5.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",
