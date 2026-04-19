@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-grain: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/><feColorMatrix values='0 0 0 0 0.4 0 0 0 0 0.5 0 0 0 0 0.7 0 0 0 0.05 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+
+html,
+body {
+  background-color: #07090d;
+  color: #e6e8ef;
+  min-height: 100%;
+}
+
+body {
+  background-image:
+    radial-gradient(1200px 600px at 0% -10%, rgba(56, 89, 168, 0.08), transparent 60%),
+    radial-gradient(1000px 500px at 100% 110%, rgba(106, 56, 168, 0.06), transparent 60%),
+    var(--bg-grain);
+  background-attachment: fixed;
+}
+
+/* ── Utility layer ───────────────────────────────────────────── */
+@layer components {
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-2xs font-semibold uppercase tracking-wider;
+  }
+  .pill-green { @apply pill bg-signal-green/10 text-signal-green ring-1 ring-inset ring-signal-green/25; }
+  .pill-amber { @apply pill bg-signal-amber/10 text-signal-amber ring-1 ring-inset ring-signal-amber/25; }
+  .pill-red   { @apply pill bg-signal-red/10 text-signal-red ring-1 ring-inset ring-signal-red/25; }
+  .pill-purple{ @apply pill bg-signal-purple/10 text-signal-purple ring-1 ring-inset ring-signal-purple/25; }
+  .pill-blue  { @apply pill bg-signal-blue/10 text-signal-blue ring-1 ring-inset ring-signal-blue/25; }
+  .pill-cyan  { @apply pill bg-signal-cyan/10 text-signal-cyan ring-1 ring-inset ring-signal-cyan/25; }
+  .pill-pink  { @apply pill bg-signal-pink/10 text-signal-pink ring-1 ring-inset ring-signal-pink/25; }
+  .pill-ghost { @apply pill bg-ink-700/60 text-slate-300 ring-1 ring-inset ring-white/5; }
+
+  .panel {
+    @apply rounded-xl border border-edge bg-ink-900/70 backdrop-blur-sm;
+  }
+
+  .stat-block {
+    @apply flex flex-col items-start gap-1;
+  }
+  .stat-value {
+    @apply font-display text-3xl font-semibold tracking-tight tabular-nums;
+  }
+  .stat-label {
+    @apply text-2xs font-semibold uppercase tracking-[0.14em] text-slate-400;
+  }
+
+  .rule {
+    @apply h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent;
+  }
+
+  .kbd {
+    @apply inline-flex h-5 items-center rounded border border-edge bg-ink-800 px-1.5 font-mono text-[10px] text-slate-400;
+  }
+
+  .tab {
+    @apply relative inline-flex items-center gap-2 px-3 py-2 text-sm text-slate-400 transition hover:text-slate-100;
+  }
+  .tab-active {
+    @apply text-slate-100;
+  }
+  .tab-active::after {
+    content: "";
+    @apply absolute inset-x-2 -bottom-px h-px bg-signal-blue;
+  }
+
+  /* Scrollbar refinement */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #1f2638; border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: #2e3650; }
+}
+
+/* Subtle selection */
+::selection {
+  background: rgba(96, 165, 250, 0.35);
+  color: white;
+}
