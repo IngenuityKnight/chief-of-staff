@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireEditorPassword, revalidateAdminPaths } from "@/lib/server/admin";
+import { revalidateAdminPaths } from "@/lib/server/admin";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 
 function asStringArray(value: unknown): string[] {
@@ -9,9 +9,6 @@ function asStringArray(value: unknown): string[] {
 
 export async function POST(req: NextRequest) {
   try {
-    const password = req.headers.get("x-editor-password");
-    requireEditorPassword(password);
-
     const body = await req.json();
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       return NextResponse.json({ ok: false, error: "Invalid request body." }, { status: 400 });
@@ -71,7 +68,6 @@ export async function POST(req: NextRequest) {
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error.";
-    const status = message.includes("password") ? 401 : 400;
-    return NextResponse.json({ ok: false, error: message }, { status });
+    return NextResponse.json({ ok: false, error: message }, { status: 400 });
   }
 }

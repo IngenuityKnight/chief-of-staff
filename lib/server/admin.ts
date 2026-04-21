@@ -396,20 +396,6 @@ export function revalidateAdminPaths() {
   });
 }
 
-export function getAdminPassword() {
-  return process.env.APP_EDITOR_PASSWORD ?? "";
-}
-
-export function isAdminEditingEnabled() {
-  return Boolean(getAdminPassword());
-}
-
-export function requireEditorPassword(password?: string | null) {
-  const expected = getAdminPassword();
-  if (!expected) throw new Error("Editor password is not configured.");
-  if (!password || password !== expected) throw new Error("Invalid editor password.");
-}
-
 export async function getAdminCollections() {
   const entries = await Promise.all(
     (Object.keys(adminConfig) as AdminResource[]).map(async (resource) => {

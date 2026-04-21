@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, Flag } from "lucide-react";
 import { EditInline } from "@/components/edit-inline";
-import { getPassword } from "@/lib/client/editor-password";
 import { CATEGORIES, PRIORITY, TASK_STATUS } from "@/lib/agents";
 import { relativeDay } from "@/lib/utils";
 import type { AdminField } from "@/lib/server/admin";
@@ -17,23 +16,13 @@ export function TaskRow({ task, fields }: { task: Task; fields: AdminField[] }) 
   const overdue = Boolean(task.dueDate && new Date(task.dueDate).getTime() < Date.now());
 
   async function handleChecked(checked: boolean) {
-    const password = getPassword();
-    if (!password) {
-      setMessage("Set editor password first");
-      setTimeout(() => setMessage(null), 1800);
-      return;
-    }
-
     setSaving(true);
     setMessage(null);
 
     try {
       const response = await fetch("/api/admin/tasks", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-editor-password": password,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: task.id,
           values: { status: checked ? "done" : "todo" },

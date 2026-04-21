@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireEditorPassword } from "@/lib/server/admin";
 import { exchangePublicToken, syncAccounts, syncRecurringToBills } from "@/lib/server/plaid";
 import { revalidatePath } from "next/cache";
 
@@ -20,8 +19,6 @@ function json(body: Record<string, unknown>, status = 200) {
 
 export async function POST(req: NextRequest) {
   try {
-    requireEditorPassword(req.headers.get("x-editor-password"));
-
     const body = await req.json();
     const { publicToken } = body as { publicToken?: string };
 
@@ -48,6 +45,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error.";
-    return json({ ok: false, error: message }, message.includes("password") ? 401 : 500);
+    return json({ ok: false, error: message }, 500);
   }
 }

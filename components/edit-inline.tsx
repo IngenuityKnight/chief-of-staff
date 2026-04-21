@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getPassword, setPassword } from "@/lib/client/editor-password";
 import type { AdminField, AdminResource } from "@/lib/server/admin";
 
 type FormState = Record<string, string | boolean>;
@@ -37,7 +36,6 @@ export function EditInline({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [formState, setFormState] = useState<FormState>({});
-  const [password, setPasswordState] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -45,8 +43,6 @@ export function EditInline({
 
   useEffect(() => {
     if (!open) return;
-    const stored = getPassword();
-    if (stored) setPasswordState(stored);
     setFormState(buildFormState(fields, values));
     setDeleteConfirm(false);
     setMessage(null);
@@ -59,22 +55,13 @@ export function EditInline({
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!password) {
-      setMessage({ text: "Enter the editor password to save.", ok: false });
-      return;
-    }
-
     setSaving(true);
     setMessage(null);
 
     try {
-      setPassword(password);
       const response = await fetch(`/api/admin/${resource}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-editor-password": password,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, values: formState }),
       });
       const payload = await response.json();
@@ -98,22 +85,14 @@ export function EditInline({
       setDeleteConfirm(true);
       return;
     }
-    if (!password) {
-      setMessage({ text: "Enter the editor password to delete.", ok: false });
-      return;
-    }
 
     setSaving(true);
     setMessage(null);
 
     try {
-      setPassword(password);
       const response = await fetch(`/api/admin/${resource}`, {
         method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-          "x-editor-password": password,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
       const payload = await response.json();
@@ -199,13 +178,6 @@ export function EditInline({
           ))}
 
           <div className="flex flex-wrap items-center gap-3 pt-1">
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPasswordState(e.target.value)}
-              placeholder="Editor password"
-              className="w-40 rounded-lg border border-edge bg-ink-800 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-signal-blue/50"
-            />
             <button
               type="submit"
               disabled={saving}

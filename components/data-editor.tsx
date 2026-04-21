@@ -13,7 +13,6 @@ type ResourcePayload = {
 
 type EditorProps = {
   resources: Record<AdminResource, ResourcePayload>;
-  editingEnabled: boolean;
 };
 
 type FormState = Record<string, string | boolean>;
@@ -37,11 +36,10 @@ function buildFormState(fields: AdminField[], record: Record<string, unknown>): 
   return Object.fromEntries(fields.map((field) => [field.key, fieldValue(field, record[field.key])]));
 }
 
-export function DataEditor({ resources, editingEnabled }: EditorProps) {
+export function DataEditor({ resources }: EditorProps) {
   const resourceKeys = Object.keys(resources) as AdminResource[];
   const [activeResource, setActiveResource] = useState<AdminResource>(resourceKeys[0]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [editorPassword, setEditorPassword] = useState("");
   const [formState, setFormState] = useState<FormState>({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -69,10 +67,7 @@ export function DataEditor({ resources, editingEnabled }: EditorProps) {
       const recordId = encodeURIComponent(String(selectedRecord.id ?? selectedRecord.date));
       const response = await fetch(`/api/admin/${activeResource}/${recordId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-editor-password": editorPassword,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ values: formState }),
       });
       const payload = await response.json();
@@ -94,47 +89,28 @@ export function DataEditor({ resources, editingEnabled }: EditorProps) {
           <p className="max-w-3xl text-sm text-slate-400">
             Edit the live records stored in Supabase from inside the app. This writes directly to the underlying tables.
           </p>
-          <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-            <div className="flex flex-wrap gap-2">
-              {resourceKeys.map((key) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => {
-                    setActiveResource(key);
-                    setSelectedId(null);
-                    setFormState({});
-                    setMessage(null);
-                  }}
-                  className={cn(
-                    "rounded-md border px-3 py-2 text-sm transition",
-                    activeResource === key
-                      ? "border-signal-blue/40 bg-signal-blue/10 text-signal-blue"
-                      : "border-edge bg-ink-900 text-slate-300 hover:bg-ink-800"
-                  )}
-                >
-                  {resources[key].label}
-                </button>
-              ))}
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                Editor Password
-              </label>
-              <input
-                type="password"
-                value={editorPassword}
-                onChange={(event) => setEditorPassword(event.target.value)}
-                placeholder={editingEnabled ? "Required to save" : "Set APP_EDITOR_PASSWORD first"}
-                className="w-full rounded-md border border-edge bg-ink-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-signal-blue/40 focus:outline-none"
-              />
-            </div>
+          <div className="flex flex-wrap gap-2">
+            {resourceKeys.map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => {
+                  setActiveResource(key);
+                  setSelectedId(null);
+                  setFormState({});
+                  setMessage(null);
+                }}
+                className={cn(
+                  "rounded-md border px-3 py-2 text-sm transition",
+                  activeResource === key
+                    ? "border-signal-blue/40 bg-signal-blue/10 text-signal-blue"
+                    : "border-edge bg-ink-900 text-slate-300 hover:bg-ink-800"
+                )}
+              >
+                {resources[key].label}
+              </button>
+            ))}
           </div>
-          {!editingEnabled && (
-            <div className="rounded-md border border-signal-amber/20 bg-signal-amber/5 px-3 py-2 text-sm text-signal-amber">
-              Editing is disabled until `APP_EDITOR_PASSWORD` is configured on the server.
-            </div>
-          )}
         </div>
       </Panel>
 
@@ -222,7 +198,7 @@ export function DataEditor({ resources, editingEnabled }: EditorProps) {
                 <button
                   type="button"
                   onClick={saveChanges}
-                  disabled={!editingEnabled || saving}
+                  disabled={saving}
                   className="rounded-md bg-signal-blue px-4 py-2 text-sm font-semibold text-ink-950 transition hover:bg-signal-blue/90 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {saving ? "Saving..." : "Save changes"}

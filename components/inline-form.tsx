@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { getPassword, setPassword } from "@/lib/client/editor-password";
 import type { AdminField, AdminResource } from "@/lib/server/admin";
 
 type FormState = Record<string, string | boolean>;
@@ -35,16 +34,12 @@ export function InlineForm({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [formState, setFormState] = useState<FormState>({});
-  const [password, setPasswordState] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const firstInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null>(null);
 
-  // Restore password from session on open
   useEffect(() => {
     if (open) {
-      const stored = getPassword();
-      if (stored) setPasswordState(stored);
       setFormState(buildFormState(fields, defaults));
       setMessage(null);
       setTimeout(() => firstInputRef.current?.focus(), 50);
@@ -58,21 +53,13 @@ export function InlineForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!password) {
-      setMessage({ text: "Enter the editor password to save.", ok: false });
-      return;
-    }
     setSaving(true);
     setMessage(null);
 
     try {
-      setPassword(password);
       const response = await fetch(`/api/admin/${resource}`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-editor-password": password,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ values: formState }),
       });
       const payload = await response.json();
@@ -161,15 +148,7 @@ export function InlineForm({
             </div>
           ))}
 
-          {/* Password row */}
           <div className="flex items-center gap-3 pt-1">
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPasswordState(e.target.value)}
-              placeholder="Editor password"
-              className="w-40 rounded-lg border border-edge bg-ink-800 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-signal-blue/50"
-            />
             <button
               type="submit"
               disabled={saving}

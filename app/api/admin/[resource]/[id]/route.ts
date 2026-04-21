@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { AdminResource } from "@/lib/server/admin";
-import { requireEditorPassword, updateAdminResource } from "@/lib/server/admin";
+import { updateAdminResource } from "@/lib/server/admin";
 
 function response(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(body, {
@@ -18,7 +18,6 @@ export async function PATCH(
 ) {
   try {
     const { resource, id } = await params;
-    requireEditorPassword(req.headers.get("x-editor-password"));
 
     const body = await req.json();
     if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -34,7 +33,6 @@ export async function PATCH(
     return response({ ok: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Update failed.";
-    const status = message === "Invalid editor password." ? 401 : 400;
-    return response({ ok: false, error: message }, status);
+    return response({ ok: false, error: message }, 400);
   }
 }

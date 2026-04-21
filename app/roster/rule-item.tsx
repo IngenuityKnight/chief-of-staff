@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { EditInline } from "@/components/edit-inline";
-import { getPassword } from "@/lib/client/editor-password";
 import { cn } from "@/lib/utils";
 import type { AdminField } from "@/lib/server/admin";
 import type { Rule } from "@/lib/types";
@@ -28,12 +27,6 @@ export function RuleItem({ rule, fields }: { rule: Rule; fields: AdminField[] })
   async function handleToggle() {
     if (saving) return;
 
-    const password = getPassword();
-    if (!password) {
-      setMessage("Editor password required");
-      return;
-    }
-
     const nextActive = !active;
     setActive(nextActive);
     setSaving(true);
@@ -42,10 +35,7 @@ export function RuleItem({ rule, fields }: { rule: Rule; fields: AdminField[] })
     try {
       const response = await fetch("/api/admin/rules", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "x-editor-password": password,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: rule.id, values: { active: nextActive } }),
       });
       const payload = await response.json();

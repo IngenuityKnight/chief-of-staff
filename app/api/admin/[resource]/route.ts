@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   createAdminResource,
   deleteAdminResource,
-  requireEditorPassword,
   updateAdminResource,
   type AdminResource,
 } from "@/lib/server/admin";
@@ -13,8 +12,6 @@ export async function POST(
 ) {
   try {
     const { resource } = await params;
-    const password = req.headers.get("x-editor-password");
-    requireEditorPassword(password);
 
     const body = await req.json();
     if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -34,8 +31,7 @@ export async function POST(
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error.";
-    const status = message.includes("password") ? 401 : 400;
-    return NextResponse.json({ ok: false, error: message }, { status });
+    return NextResponse.json({ ok: false, error: message }, { status: 400 });
   }
 }
 
@@ -45,8 +41,6 @@ export async function PATCH(
 ) {
   try {
     const { resource } = await params;
-    const password = req.headers.get("x-editor-password");
-    requireEditorPassword(password);
 
     const body = await req.json();
     if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -69,8 +63,7 @@ export async function PATCH(
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error.";
-    const status = message.includes("password") ? 401 : 400;
-    return NextResponse.json({ ok: false, error: message }, { status });
+    return NextResponse.json({ ok: false, error: message }, { status: 400 });
   }
 }
 
@@ -80,8 +73,6 @@ export async function DELETE(
 ) {
   try {
     const { resource } = await params;
-    const password = req.headers.get("x-editor-password");
-    requireEditorPassword(password);
 
     const body = await req.json();
     if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -101,7 +92,6 @@ export async function DELETE(
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error.";
-    const status = message.includes("password") ? 401 : 400;
-    return NextResponse.json({ ok: false, error: message }, { status });
+    return NextResponse.json({ ok: false, error: message }, { status: 400 });
   }
 }

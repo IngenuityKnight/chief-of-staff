@@ -1,45 +1,28 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { getPassword } from "@/lib/client/editor-password";
 
 export function ApproveButton({
   inboxItemId,
   taskCount,
-  password: initialPassword = null,
 }: {
   inboxItemId: string;
   taskCount: number;
-  password?: string | null;
 }) {
   const router = useRouter();
-  const [password, setPassword] = useState<string | null>(initialPassword);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
-  useEffect(() => {
-    setPassword(initialPassword ?? getPassword());
-  }, [initialPassword]);
-
   async function handleClick() {
-    const storedPassword = password ?? getPassword();
-    if (!storedPassword) {
-      setMessage({ text: "Editor password required", ok: false });
-      return;
-    }
-
     setLoading(true);
     setMessage(null);
 
     try {
       const response = await fetch("/api/admin/inbox/approve", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-editor-password": storedPassword,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ inboxItemId }),
       });
       const payload = await response.json();
