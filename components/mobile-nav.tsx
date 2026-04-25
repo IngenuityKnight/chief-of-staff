@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { AGENTS } from "@/lib/agents";
 import type { AgentId } from "@/lib/types";
-import { Home } from "lucide-react";
+import { Home, ShoppingCart } from "lucide-react";
 
-const NAV_AGENTS: AgentId[] = ["meals", "home", "money", "schedule", "roster"];
+const NAV_AGENTS: AgentId[] = ["meals", "home", "money", "schedule"];
 
 const AGENT_ICONS: Record<AgentId, string> = {
   meals: "🍽",
@@ -60,6 +60,18 @@ export function MobileNav() {
             </Link>
           );
         })}
+
+        {/* Shopping shortcut */}
+        <Link
+          href="/shopping"
+          className={cn(
+            "flex flex-1 flex-col items-center gap-0.5 py-3 text-center transition",
+            pathname === "/shopping" ? "text-signal-green" : "text-slate-500 hover:text-slate-300"
+          )}
+        >
+          <ShoppingCart className="h-5 w-5" />
+          <span className="text-[10px] font-medium uppercase tracking-wider">Shop</span>
+        </Link>
       </div>
       {/* iOS safe area */}
       <div className="h-safe-area-inset-bottom" />

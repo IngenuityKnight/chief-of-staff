@@ -4,15 +4,19 @@ import { usePathname } from "next/navigation";
 import { Search, Bell, Command } from "lucide-react";
 
 const TITLES: Record<string, { eyebrow: string; title: string }> = {
-  "/":         { eyebrow: "Command Center",     title: "Briefing" },
-  "/inbox":    { eyebrow: "Command Center",     title: "Inbox" },
-  "/tasks":    { eyebrow: "Command Center",     title: "Tasks" },
-  "/meals":    { eyebrow: "Meals Agent",        title: "Kitchen Ops" },
-  "/home":     { eyebrow: "Home Agent",         title: "Maintenance" },
-  "/money":    { eyebrow: "Money Agent",        title: "Ledger" },
-  "/schedule": { eyebrow: "Schedule Agent",     title: "Calendar" },
-  "/roster":   { eyebrow: "Roster Agent",       title: "Household" },
-  "/data":     { eyebrow: "Command Center",     title: "Data Studio" },
+  "/":           { eyebrow: "Command Center",  title: "Briefing" },
+  "/inbox":      { eyebrow: "Command Center",  title: "Inbox" },
+  "/tasks":      { eyebrow: "Command Center",  title: "Tasks" },
+  "/inventory":  { eyebrow: "Household",       title: "Inventory" },
+  "/vehicles":   { eyebrow: "Household",       title: "Vehicles" },
+  "/appliances": { eyebrow: "Household",       title: "Appliances" },
+  "/shopping":   { eyebrow: "Household",       title: "Shopping List" },
+  "/meals":      { eyebrow: "Meals Agent",     title: "Kitchen Ops" },
+  "/home":       { eyebrow: "Home Agent",      title: "Maintenance" },
+  "/money":      { eyebrow: "Money Agent",     title: "Ledger" },
+  "/schedule":   { eyebrow: "Schedule Agent",  title: "Calendar" },
+  "/roster":     { eyebrow: "Roster Agent",    title: "Household" },
+  "/data":       { eyebrow: "Command Center",  title: "Data Studio" },
 };
 
 export function Topbar() {

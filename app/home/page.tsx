@@ -102,47 +102,6 @@ export default async function HomePage() {
         />
       </Panel>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Panel eyebrow="Vendor book" title="Trusted providers">
-          <ul className="space-y-2">
-            {[
-              { name: "Fixd Appliance", specialty: "Dishwashers, fridges",   last: "2024-05-02", rating: 4.5 },
-              { name: "ClearGutter",    specialty: "Gutters, exterior wash", last: "2024-11-18", rating: 5.0 },
-              { name: "GreenScape",     specialty: "Lawn + landscaping",     last: "2024-10-10", rating: 4.8 },
-              { name: "Valvoline",      specialty: "Quick-service auto",     last: "2025-02-01", rating: 4.2 },
-            ].map((v, i) => (
-              <li key={i} className="flex items-center justify-between rounded-md border border-edge bg-ink-900/30 p-3">
-                <div>
-                  <div className="text-sm font-medium text-slate-100">{v.name}</div>
-                  <div className="text-[11px] text-slate-500">{v.specialty} · last: {v.last}</div>
-                </div>
-                <span className="pill-amber">★ {v.rating}</span>
-              </li>
-            ))}
-          </ul>
-        </Panel>
-
-        <Panel eyebrow="Home Agent insight" title="Proactive recommendations">
-          <ul className="space-y-3 text-sm">
-            <li className="rounded-md border border-signal-amber/20 bg-signal-amber/5 p-3">
-              <div className="mb-1 flex items-center gap-2">
-                <AlertTriangle className="h-3.5 w-3.5 text-signal-amber" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-signal-amber">Action recommended</span>
-              </div>
-              <div className="text-slate-200">Refrigerator coils are 40 days overdue for cleaning. Estimated 5-8% efficiency loss.</div>
-              <div className="mt-1 text-xs text-slate-400">Self-service · 20 min · $0. Want me to block time Saturday?</div>
-            </li>
-            <li className="rounded-md border border-edge bg-ink-900/30 p-3">
-              <div className="mb-1 flex items-center gap-2">
-                <Wrench className="h-3.5 w-3.5 text-signal-blue" />
-                <span className="text-xs font-semibold uppercase tracking-wider text-signal-blue">Bundling opportunity</span>
-              </div>
-              <div className="text-slate-200">Gutter cleaning (30d) and lawn aeration (21d) could both be scheduled when GreenScape is out.</div>
-              <div className="mt-1 text-xs text-slate-400">Potential savings: $40 trip fee.</div>
-            </li>
-          </ul>
-        </Panel>
-      </div>
     </div>
   );
 }
