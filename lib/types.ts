@@ -125,6 +125,90 @@ export interface BriefingSummary {
   upcomingEvents: number;
   billsThisWeek: number;
   maintenanceDueSoon: number;
+  lowStockItems: number;
+  savingsRatePercent: number | null;
   priorities: Array<{ id: string; title: string; agent: AgentId; why: string }>;
   crossAgentInsights: Array<{ id: string; agents: AgentId[]; insight: string }>;
+}
+
+// ─── Inventory ────────────────────────────────────────────────────────────────
+
+export type InventoryCategory = "food" | "hygiene" | "cleaning" | "paper" | "garage" | "laundry" | "other";
+export type InventoryUnit = "count" | "rolls" | "lbs" | "oz" | "gallons" | "boxes" | "bags" | "bottles" | "cans";
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  category: InventoryCategory;
+  quantity: number;
+  unit: InventoryUnit;
+  minQuantity: number;
+  estWeeklyConsumption?: number;
+  location?: string;
+  pricePerUnit?: number;
+  preferredStore?: string;
+  lastRestockedAt?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+// ─── Vehicles ─────────────────────────────────────────────────────────────────
+
+export interface Vehicle {
+  id: string;
+  make: string;
+  model: string;
+  year: number;
+  color?: string;
+  vin?: string;
+  licensePlate?: string;
+  mileage?: number;
+  lastOilChangeMiles?: number;
+  oilChangeIntervalMiles: number;
+  nextServiceType?: string;
+  nextServiceMiles?: number;
+  insuranceExpires?: string;
+  registrationExpires?: string;
+  avgMpg?: number;
+  monthlyFuelCost?: number;
+  notes?: string;
+  createdAt: string;
+}
+
+// ─── Appliances ───────────────────────────────────────────────────────────────
+
+export interface Appliance {
+  id: string;
+  name: string;
+  brand?: string;
+  modelNumber?: string;
+  location?: string;
+  purchaseDate?: string;
+  purchasePrice?: number;
+  warrantyExpires?: string;
+  lastServiced?: string;
+  estLifespanYears?: number;
+  notes?: string;
+  createdAt: string;
+}
+
+// ─── Shopping List ────────────────────────────────────────────────────────────
+
+export type ShoppingStatus = "needed" | "in-cart" | "purchased" | "skipped";
+export type ShoppingSource = "manual" | "auto" | "ai";
+
+export interface ShoppingListItem {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  estCost?: number;
+  storePreference?: string;
+  source: ShoppingSource;
+  inventoryItemId?: string;
+  priority: Priority;
+  status: ShoppingStatus;
+  category?: string;
+  notes?: string;
+  createdAt: string;
 }

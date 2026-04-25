@@ -1,23 +1,31 @@
 import { revalidatePath } from "next/cache";
 import type {
+  Appliance,
   BillItem,
   CalendarEvent,
   HouseMember,
   InboxItem,
+  InventoryItem,
   MaintenanceItem,
   MealPlanDay,
   Rule,
+  ShoppingListItem,
   Task,
+  Vehicle,
 } from "@/lib/types";
 import {
+  getAppliances,
   getBills,
   getCalendarEvents,
   getHouseholdMembers,
   getInboxItems,
+  getInventoryItems,
   getMaintenanceItems,
   getMealPlan,
   getRules,
+  getShoppingList,
   getTasks,
+  getVehicles,
 } from "@/lib/server/data";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 
@@ -29,7 +37,11 @@ export type AdminResource =
   | "calendar"
   | "household"
   | "rules"
-  | "meal-plan";
+  | "meal-plan"
+  | "inventory"
+  | "vehicles"
+  | "appliances"
+  | "shopping";
 
 type FieldType = "text" | "textarea" | "boolean" | "number" | "select" | "json";
 
@@ -373,7 +385,7 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
     },
     toDbInsert(payload, id) {
       return {
-        date: id, // meal-plan uses date as the primary key
+        date: id,
         label: toNullableString(payload.label) ?? null,
         theme: toNullableString(payload.theme) ?? null,
         breakfast: parseJsonField(payload.breakfast as string) ?? null,
@@ -382,9 +394,224 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
       };
     },
   },
+
+  inventory: {
+    label: "Inventory",
+    table: "inventory_items",
+    idKey: "id",
+    load: getInventoryItems,
+    fields: [
+      { key: "name",             label: "Name",             type: "text" },
+      { key: "category",         label: "Category",         type: "select", options: ["food", "hygiene", "cleaning", "paper", "garage", "laundry", "other"] },
+      { key: "quantity",         label: "Quantity",         type: "number" },
+      { key: "unit",             label: "Unit",             type: "select", options: ["count", "rolls", "lbs", "oz", "gallons", "boxes", "bags", "bottles", "cans"] },
+      { key: "minQuantity",      label: "Min Quantity",     type: "number" },
+      { key: "estWeeklyConsumption", label: "Est. Weekly Use", type: "number" },
+      { key: "location",         label: "Location",         type: "select", options: ["pantry", "bathroom", "kitchen", "garage", "basement", "laundry", "other"] },
+      { key: "pricePerUnit",     label: "Price/Unit ($)",   type: "number" },
+      { key: "preferredStore",   label: "Preferred Store",  type: "text" },
+      { key: "notes",            label: "Notes",            type: "textarea" },
+    ],
+    toDbPatch(payload) {
+      const patch = pickAllowed(payload, ["name", "category", "quantity", "unit", "minQuantity", "estWeeklyConsumption", "location", "pricePerUnit", "preferredStore", "notes"]);
+      return {
+        ...(patch.name !== undefined ? { name: toNullableString(patch.name) } : {}),
+        ...(patch.category !== undefined ? { category: patch.category } : {}),
+        ...(patch.quantity !== undefined ? { quantity: toNumberOrNull(patch.quantity) } : {}),
+        ...(patch.unit !== undefined ? { unit: patch.unit } : {}),
+        ...(patch.minQuantity !== undefined ? { min_quantity: toNumberOrNull(patch.minQuantity) } : {}),
+        ...(patch.estWeeklyConsumption !== undefined ? { est_weekly_consumption: toNumberOrNull(patch.estWeeklyConsumption) } : {}),
+        ...(patch.location !== undefined ? { location: toNullableString(patch.location) } : {}),
+        ...(patch.pricePerUnit !== undefined ? { price_per_unit: toNumberOrNull(patch.pricePerUnit) } : {}),
+        ...(patch.preferredStore !== undefined ? { preferred_store: toNullableString(patch.preferredStore) } : {}),
+        ...(patch.notes !== undefined ? { notes: toNullableString(patch.notes) } : {}),
+      };
+    },
+    toDbInsert(payload, id) {
+      return {
+        id,
+        name: toNullableString(payload.name) ?? "",
+        category: payload.category ?? "other",
+        quantity: toNumberOrNull(payload.quantity) ?? 0,
+        unit: payload.unit ?? "count",
+        min_quantity: toNumberOrNull(payload.minQuantity) ?? 1,
+        est_weekly_consumption: toNumberOrNull(payload.estWeeklyConsumption) ?? null,
+        location: toNullableString(payload.location) ?? null,
+        price_per_unit: toNumberOrNull(payload.pricePerUnit) ?? null,
+        preferred_store: toNullableString(payload.preferredStore) ?? null,
+        last_restocked_at: null,
+        notes: toNullableString(payload.notes) ?? null,
+        created_at: new Date().toISOString(),
+      };
+    },
+  },
+
+  vehicles: {
+    label: "Vehicles",
+    table: "vehicles",
+    idKey: "id",
+    load: getVehicles,
+    fields: [
+      { key: "make",                  label: "Make",                  type: "text" },
+      { key: "model",                 label: "Model",                 type: "text" },
+      { key: "year",                  label: "Year",                  type: "number" },
+      { key: "color",                 label: "Color",                 type: "text" },
+      { key: "licensePlate",          label: "License Plate",         type: "text" },
+      { key: "mileage",               label: "Current Mileage",       type: "number" },
+      { key: "lastOilChangeMiles",    label: "Last Oil Change Miles",  type: "number" },
+      { key: "oilChangeIntervalMiles",label: "Oil Change Interval",   type: "number" },
+      { key: "nextServiceType",       label: "Next Service Type",     type: "text" },
+      { key: "nextServiceMiles",      label: "Next Service Miles",    type: "number" },
+      { key: "insuranceExpires",      label: "Insurance Expires",     type: "text" },
+      { key: "registrationExpires",   label: "Registration Expires",  type: "text" },
+      { key: "avgMpg",                label: "Avg MPG",               type: "number" },
+      { key: "monthlyFuelCost",       label: "Monthly Fuel Cost ($)", type: "number" },
+      { key: "notes",                 label: "Notes",                 type: "textarea" },
+    ],
+    toDbPatch(payload) {
+      const patch = pickAllowed(payload, ["make", "model", "year", "color", "licensePlate", "mileage", "lastOilChangeMiles", "oilChangeIntervalMiles", "nextServiceType", "nextServiceMiles", "insuranceExpires", "registrationExpires", "avgMpg", "monthlyFuelCost", "notes"]);
+      return {
+        ...(patch.make !== undefined ? { make: toNullableString(patch.make) } : {}),
+        ...(patch.model !== undefined ? { model: toNullableString(patch.model) } : {}),
+        ...(patch.year !== undefined ? { year: toNumberOrNull(patch.year) } : {}),
+        ...(patch.color !== undefined ? { color: toNullableString(patch.color) } : {}),
+        ...(patch.licensePlate !== undefined ? { license_plate: toNullableString(patch.licensePlate) } : {}),
+        ...(patch.mileage !== undefined ? { mileage: toNumberOrNull(patch.mileage) } : {}),
+        ...(patch.lastOilChangeMiles !== undefined ? { last_oil_change_miles: toNumberOrNull(patch.lastOilChangeMiles) } : {}),
+        ...(patch.oilChangeIntervalMiles !== undefined ? { oil_change_interval_miles: toNumberOrNull(patch.oilChangeIntervalMiles) } : {}),
+        ...(patch.nextServiceType !== undefined ? { next_service_type: toNullableString(patch.nextServiceType) } : {}),
+        ...(patch.nextServiceMiles !== undefined ? { next_service_miles: toNumberOrNull(patch.nextServiceMiles) } : {}),
+        ...(patch.insuranceExpires !== undefined ? { insurance_expires: toNullableString(patch.insuranceExpires) } : {}),
+        ...(patch.registrationExpires !== undefined ? { registration_expires: toNullableString(patch.registrationExpires) } : {}),
+        ...(patch.avgMpg !== undefined ? { avg_mpg: toNumberOrNull(patch.avgMpg) } : {}),
+        ...(patch.monthlyFuelCost !== undefined ? { monthly_fuel_cost: toNumberOrNull(patch.monthlyFuelCost) } : {}),
+        ...(patch.notes !== undefined ? { notes: toNullableString(patch.notes) } : {}),
+      };
+    },
+    toDbInsert(payload, id) {
+      return {
+        id,
+        make: toNullableString(payload.make) ?? "",
+        model: toNullableString(payload.model) ?? "",
+        year: toNumberOrNull(payload.year) ?? new Date().getFullYear(),
+        color: toNullableString(payload.color) ?? null,
+        license_plate: toNullableString(payload.licensePlate) ?? null,
+        mileage: toNumberOrNull(payload.mileage) ?? null,
+        last_oil_change_miles: toNumberOrNull(payload.lastOilChangeMiles) ?? null,
+        oil_change_interval_miles: toNumberOrNull(payload.oilChangeIntervalMiles) ?? 5000,
+        next_service_type: toNullableString(payload.nextServiceType) ?? null,
+        next_service_miles: toNumberOrNull(payload.nextServiceMiles) ?? null,
+        insurance_expires: toNullableString(payload.insuranceExpires) ?? null,
+        registration_expires: toNullableString(payload.registrationExpires) ?? null,
+        avg_mpg: toNumberOrNull(payload.avgMpg) ?? null,
+        monthly_fuel_cost: toNumberOrNull(payload.monthlyFuelCost) ?? null,
+        notes: toNullableString(payload.notes) ?? null,
+        created_at: new Date().toISOString(),
+      };
+    },
+  },
+
+  appliances: {
+    label: "Appliances",
+    table: "appliances",
+    idKey: "id",
+    load: getAppliances,
+    fields: [
+      { key: "name",             label: "Name",                  type: "text" },
+      { key: "brand",            label: "Brand",                 type: "text" },
+      { key: "modelNumber",      label: "Model Number",          type: "text" },
+      { key: "location",         label: "Location",              type: "select", options: ["kitchen", "laundry", "garage", "basement", "attic", "bathroom", "other"] },
+      { key: "purchaseDate",     label: "Purchase Date",         type: "text" },
+      { key: "purchasePrice",    label: "Purchase Price ($)",    type: "number" },
+      { key: "warrantyExpires",  label: "Warranty Expires",      type: "text" },
+      { key: "lastServiced",     label: "Last Serviced",         type: "text" },
+      { key: "estLifespanYears", label: "Est. Lifespan (years)", type: "number" },
+      { key: "notes",            label: "Notes",                 type: "textarea" },
+    ],
+    toDbPatch(payload) {
+      const patch = pickAllowed(payload, ["name", "brand", "modelNumber", "location", "purchaseDate", "purchasePrice", "warrantyExpires", "lastServiced", "estLifespanYears", "notes"]);
+      return {
+        ...(patch.name !== undefined ? { name: toNullableString(patch.name) } : {}),
+        ...(patch.brand !== undefined ? { brand: toNullableString(patch.brand) } : {}),
+        ...(patch.modelNumber !== undefined ? { model_number: toNullableString(patch.modelNumber) } : {}),
+        ...(patch.location !== undefined ? { location: toNullableString(patch.location) } : {}),
+        ...(patch.purchaseDate !== undefined ? { purchase_date: toNullableString(patch.purchaseDate) } : {}),
+        ...(patch.purchasePrice !== undefined ? { purchase_price: toNumberOrNull(patch.purchasePrice) } : {}),
+        ...(patch.warrantyExpires !== undefined ? { warranty_expires: toNullableString(patch.warrantyExpires) } : {}),
+        ...(patch.lastServiced !== undefined ? { last_serviced: toNullableString(patch.lastServiced) } : {}),
+        ...(patch.estLifespanYears !== undefined ? { est_lifespan_years: toNumberOrNull(patch.estLifespanYears) } : {}),
+        ...(patch.notes !== undefined ? { notes: toNullableString(patch.notes) } : {}),
+      };
+    },
+    toDbInsert(payload, id) {
+      return {
+        id,
+        name: toNullableString(payload.name) ?? "",
+        brand: toNullableString(payload.brand) ?? null,
+        model_number: toNullableString(payload.modelNumber) ?? null,
+        location: toNullableString(payload.location) ?? null,
+        purchase_date: toNullableString(payload.purchaseDate) ?? null,
+        purchase_price: toNumberOrNull(payload.purchasePrice) ?? null,
+        warranty_expires: toNullableString(payload.warrantyExpires) ?? null,
+        last_serviced: toNullableString(payload.lastServiced) ?? null,
+        est_lifespan_years: toNumberOrNull(payload.estLifespanYears) ?? null,
+        notes: toNullableString(payload.notes) ?? null,
+        created_at: new Date().toISOString(),
+      };
+    },
+  },
+
+  shopping: {
+    label: "Shopping List",
+    table: "shopping_list_items",
+    idKey: "id",
+    load: getShoppingList,
+    fields: [
+      { key: "name",            label: "Item Name",         type: "text" },
+      { key: "quantity",        label: "Quantity",          type: "number" },
+      { key: "unit",            label: "Unit",              type: "select", options: ["count", "rolls", "lbs", "oz", "gallons", "boxes", "bags", "bottles", "cans"] },
+      { key: "estCost",         label: "Est. Cost ($)",     type: "number" },
+      { key: "storePreference", label: "Store",             type: "text" },
+      { key: "category",        label: "Category",          type: "select", options: ["food", "hygiene", "cleaning", "paper", "garage", "laundry", "other"] },
+      { key: "priority",        label: "Priority",          type: "select", options: ["low", "medium", "high", "critical"] },
+      { key: "status",          label: "Status",            type: "select", options: ["needed", "in-cart", "purchased", "skipped"] },
+      { key: "notes",           label: "Notes",             type: "textarea" },
+    ],
+    toDbPatch(payload) {
+      const patch = pickAllowed(payload, ["name", "quantity", "unit", "estCost", "storePreference", "category", "priority", "status", "notes"]);
+      return {
+        ...(patch.name !== undefined ? { name: toNullableString(patch.name) } : {}),
+        ...(patch.quantity !== undefined ? { quantity: toNumberOrNull(patch.quantity) } : {}),
+        ...(patch.unit !== undefined ? { unit: patch.unit } : {}),
+        ...(patch.estCost !== undefined ? { est_cost: toNumberOrNull(patch.estCost) } : {}),
+        ...(patch.storePreference !== undefined ? { store_preference: toNullableString(patch.storePreference) } : {}),
+        ...(patch.category !== undefined ? { category: toNullableString(patch.category) } : {}),
+        ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
+        ...(patch.status !== undefined ? { status: patch.status } : {}),
+        ...(patch.notes !== undefined ? { notes: toNullableString(patch.notes) } : {}),
+      };
+    },
+    toDbInsert(payload, id) {
+      return {
+        id,
+        name: toNullableString(payload.name) ?? "",
+        quantity: toNumberOrNull(payload.quantity) ?? 1,
+        unit: payload.unit ?? "count",
+        est_cost: toNumberOrNull(payload.estCost) ?? null,
+        store_preference: toNullableString(payload.storePreference) ?? null,
+        source: "manual",
+        inventory_item_id: null,
+        category: toNullableString(payload.category) ?? null,
+        priority: payload.priority ?? "medium",
+        status: payload.status ?? "needed",
+        notes: toNullableString(payload.notes) ?? null,
+        created_at: new Date().toISOString(),
+      };
+    },
+  },
 };
 
-const ADMIN_REVALIDATE_PATHS = ["/", "/inbox", "/tasks", "/home", "/money", "/schedule", "/roster", "/meals", "/data"];
+const ADMIN_REVALIDATE_PATHS = ["/", "/inbox", "/tasks", "/home", "/money", "/schedule", "/roster", "/meals", "/data", "/inventory", "/vehicles", "/appliances", "/shopping"];
 
 export function getAdminFields(resource: AdminResource): AdminField[] {
   return adminConfig[resource].fields;

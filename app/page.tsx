@@ -1,18 +1,21 @@
 import Link from "next/link";
-import { ArrowRight, AlertTriangle, Sparkles, Clock, DollarSign, Wrench, CalendarDays } from "lucide-react";
+import { ArrowRight, AlertTriangle, Sparkles, Clock, DollarSign, Wrench, CalendarDays, Package, TrendingUp } from "lucide-react";
 import { AGENTS, TASK_STATUS } from "@/lib/agents";
 import { Panel, Stat, AgentBadge, SectionHeading } from "@/components/ui";
 import { formatMoney, formatTime, relativeDay, daysUntil } from "@/lib/utils";
-import { getBills, getBriefingSummary, getCalendarEvents, getMaintenanceItems, getTasks } from "@/lib/server/data";
+import { getBills, getBriefingSummary, getCalendarEvents, getInventoryItems, getMaintenanceItems, getTasks } from "@/lib/server/data";
 
 export default async function BriefingPage() {
-  const [briefing, tasks, bills, maintenance, calendar] = await Promise.all([
+  const [briefing, tasks, bills, maintenance, calendar, inventory] = await Promise.all([
     getBriefingSummary(),
     getTasks(),
     getBills(),
     getMaintenanceItems(),
     getCalendarEvents(),
+    getInventoryItems(),
   ]);
+
+  const lowStockItems = inventory.filter((i) => i.quantity <= i.minQuantity);
 
   const topTasks = tasks
     .filter((t) => t.status !== "done")
@@ -51,11 +54,15 @@ export default async function BriefingPage() {
             </h2>
             <p className="mt-2 max-w-xl text-base text-slate-300">{briefing.headline}</p>
 
-            <div className="mt-5 grid grid-cols-2 gap-5 md:grid-cols-4">
+            <div className="mt-5 grid grid-cols-2 gap-5 md:grid-cols-4 lg:grid-cols-6">
               <Stat value={briefing.tasksOpen} label="Open Tasks" />
               <Stat value={briefing.tasksDue} label="Due ≤3d" tone="amber" />
               <Stat value={briefing.tasksOverdue} label="Overdue" tone="red" />
               <Stat value={briefing.upcomingEvents} label="On Calendar" tone="cyan" />
+              <Stat value={briefing.lowStockItems} label="Low Stock" tone={briefing.lowStockItems > 0 ? "amber" : "green"} />
+              {briefing.savingsRatePercent !== null && (
+                <Stat value={`${briefing.savingsRatePercent}%`} label="Net Equity" tone="purple" />
+              )}
             </div>
           </div>
 
@@ -94,6 +101,39 @@ export default async function BriefingPage() {
           ))}
         </div>
       </Panel>
+
+      {/* Inventory low-stock alert */}
+      {lowStockItems.length > 0 && (
+        <Panel eyebrow="Inventory" title="Low Stock Alert" action={
+          <Link href="/shopping" className="flex items-center gap-1 text-xs font-semibold text-signal-amber hover:underline">
+            Shopping list <ArrowRight className="h-3 w-3" />
+          </Link>
+        }>
+          <div className="flex flex-wrap gap-2">
+            {lowStockItems.slice(0, 12).map((item) => (
+              <Link key={item.id} href="/inventory" className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition hover:bg-ink-900/60 border-signal-amber/20 bg-signal-amber/5 text-signal-amber">
+                <Package className="h-3 w-3" />
+                <span className="font-medium">{item.name}</span>
+                <span className="font-mono text-signal-amber/60">{item.quantity}/{item.minQuantity} {item.unit}</span>
+              </Link>
+            ))}
+            {lowStockItems.length > 12 && (
+              <Link href="/inventory" className="flex items-center rounded-md border border-edge px-2.5 py-1.5 text-xs text-slate-400 hover:text-slate-200">
+                +{lowStockItems.length - 12} more →
+              </Link>
+            )}
+          </div>
+          {briefing.savingsRatePercent !== null && (
+            <div className="mt-4 flex items-center gap-3 rounded-lg border border-signal-green/20 bg-signal-green/5 px-4 py-2.5">
+              <TrendingUp className="h-4 w-4 text-signal-green" />
+              <div className="text-sm text-slate-300">
+                Net equity position: <span className="font-semibold text-signal-green">{briefing.savingsRatePercent}%</span>
+                <span className="ml-2 text-xs text-slate-500">assets vs. liabilities from linked accounts</span>
+              </div>
+            </div>
+          )}
+        </Panel>
+      )}
 
       {/* Grid: tasks + events + bills + maintenance */}
       <div className="grid gap-6 lg:grid-cols-2">

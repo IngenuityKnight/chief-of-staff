@@ -11,15 +11,19 @@ import {
 } from "@/lib/mock-data";
 import { unstable_noStore as noStore } from "next/cache";
 import type {
+  Appliance,
   BillItem,
   BriefingSummary,
   CalendarEvent,
   HouseMember,
   InboxItem,
+  InventoryItem,
   MaintenanceItem,
   MealPlanDay,
   Rule,
+  ShoppingListItem,
   Task,
+  Vehicle,
 } from "@/lib/types";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 
@@ -254,12 +258,128 @@ export async function getMealPlan() {
   return selectRows("meal_plan_days", mockMealPlan, mapMealPlanDay, { column: "date" });
 }
 
+function mapInventoryItem(row: Record<string, unknown>): InventoryItem {
+  return {
+    id: String(row.id),
+    name: String(row.name),
+    category: row.category as InventoryItem["category"],
+    quantity: Number(row.quantity ?? 0),
+    unit: (row.unit as InventoryItem["unit"]) ?? "count",
+    minQuantity: Number(row.min_quantity ?? 1),
+    estWeeklyConsumption: typeof row.est_weekly_consumption === "number" ? row.est_weekly_consumption : undefined,
+    location: typeof row.location === "string" ? row.location : undefined,
+    pricePerUnit: typeof row.price_per_unit === "number" ? row.price_per_unit : undefined,
+    preferredStore: typeof row.preferred_store === "string" ? row.preferred_store : undefined,
+    lastRestockedAt: typeof row.last_restocked_at === "string" ? row.last_restocked_at : undefined,
+    notes: typeof row.notes === "string" ? row.notes : undefined,
+    createdAt: String(row.created_at),
+  };
+}
+
+function mapVehicle(row: Record<string, unknown>): Vehicle {
+  return {
+    id: String(row.id),
+    make: String(row.make),
+    model: String(row.model),
+    year: Number(row.year),
+    color: typeof row.color === "string" ? row.color : undefined,
+    vin: typeof row.vin === "string" ? row.vin : undefined,
+    licensePlate: typeof row.license_plate === "string" ? row.license_plate : undefined,
+    mileage: typeof row.mileage === "number" ? row.mileage : undefined,
+    lastOilChangeMiles: typeof row.last_oil_change_miles === "number" ? row.last_oil_change_miles : undefined,
+    oilChangeIntervalMiles: Number(row.oil_change_interval_miles ?? 5000),
+    nextServiceType: typeof row.next_service_type === "string" ? row.next_service_type : undefined,
+    nextServiceMiles: typeof row.next_service_miles === "number" ? row.next_service_miles : undefined,
+    insuranceExpires: typeof row.insurance_expires === "string" ? row.insurance_expires : undefined,
+    registrationExpires: typeof row.registration_expires === "string" ? row.registration_expires : undefined,
+    avgMpg: typeof row.avg_mpg === "number" ? row.avg_mpg : undefined,
+    monthlyFuelCost: typeof row.monthly_fuel_cost === "number" ? row.monthly_fuel_cost : undefined,
+    notes: typeof row.notes === "string" ? row.notes : undefined,
+    createdAt: String(row.created_at),
+  };
+}
+
+function mapAppliance(row: Record<string, unknown>): Appliance {
+  return {
+    id: String(row.id),
+    name: String(row.name),
+    brand: typeof row.brand === "string" ? row.brand : undefined,
+    modelNumber: typeof row.model_number === "string" ? row.model_number : undefined,
+    location: typeof row.location === "string" ? row.location : undefined,
+    purchaseDate: typeof row.purchase_date === "string" ? row.purchase_date : undefined,
+    purchasePrice: typeof row.purchase_price === "number" ? row.purchase_price : undefined,
+    warrantyExpires: typeof row.warranty_expires === "string" ? row.warranty_expires : undefined,
+    lastServiced: typeof row.last_serviced === "string" ? row.last_serviced : undefined,
+    estLifespanYears: typeof row.est_lifespan_years === "number" ? row.est_lifespan_years : undefined,
+    notes: typeof row.notes === "string" ? row.notes : undefined,
+    createdAt: String(row.created_at),
+  };
+}
+
+function mapShoppingListItem(row: Record<string, unknown>): ShoppingListItem {
+  return {
+    id: String(row.id),
+    name: String(row.name),
+    quantity: Number(row.quantity ?? 1),
+    unit: String(row.unit ?? "count"),
+    estCost: typeof row.est_cost === "number" ? row.est_cost : undefined,
+    storePreference: typeof row.store_preference === "string" ? row.store_preference : undefined,
+    source: row.source as ShoppingListItem["source"],
+    inventoryItemId: typeof row.inventory_item_id === "string" ? row.inventory_item_id : undefined,
+    priority: row.priority as ShoppingListItem["priority"],
+    status: row.status as ShoppingListItem["status"],
+    category: typeof row.category === "string" ? row.category : undefined,
+    notes: typeof row.notes === "string" ? row.notes : undefined,
+    createdAt: String(row.created_at),
+  };
+}
+
+export async function getInventoryItems() {
+  return selectRows<InventoryItem>("inventory_items", [], mapInventoryItem, { column: "name" });
+}
+
+export async function getVehicles() {
+  return selectRows<Vehicle>("vehicles", [], mapVehicle, { column: "year", ascending: false });
+}
+
+export async function getAppliances() {
+  return selectRows<Appliance>("appliances", [], mapAppliance, { column: "name" });
+}
+
+export async function getShoppingList() {
+  return selectRows<ShoppingListItem>("shopping_list_items", [], mapShoppingListItem, { column: "created_at", ascending: false });
+}
+
+async function getPlaidSavingsRate(): Promise<number | null> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return null;
+  try {
+    const { data } = await supabase
+      .from("plaid_accounts")
+      .select("type, balance_current");
+    if (!data || data.length === 0) return null;
+    const savings = data
+      .filter((a: Record<string, unknown>) => a.type === "depository")
+      .reduce((sum: number, a: Record<string, unknown>) => sum + Number(a.balance_current ?? 0), 0);
+    const debt = data
+      .filter((a: Record<string, unknown>) => a.type === "credit" || a.type === "loan")
+      .reduce((sum: number, a: Record<string, unknown>) => sum + Number(a.balance_current ?? 0), 0);
+    const net = savings - debt;
+    // Return net-worth-positive percentage as a proxy savings metric (capped 0-100)
+    if (net <= 0) return 0;
+    return Math.min(100, Math.round((net / (net + Math.abs(debt) + 1)) * 100));
+  } catch {
+    return null;
+  }
+}
+
 export async function getBriefingSummary(): Promise<BriefingSummary> {
-  const [tasks, bills, maintenance, calendar] = await Promise.all([
+  const [tasks, bills, maintenance, calendar, inventory] = await Promise.all([
     getTasks(),
     getBills(),
     getMaintenanceItems(),
     getCalendarEvents(),
+    getInventoryItems(),
   ]);
 
   if (
@@ -270,6 +390,9 @@ export async function getBriefingSummary(): Promise<BriefingSummary> {
   ) {
     return mockBriefing;
   }
+
+  const lowStockItems = inventory.filter((i) => i.quantity <= i.minQuantity).length;
+  const savingsRatePercent = await getPlaidSavingsRate();
 
   const now = Date.now();
   const threeDays = now + 3 * 86_400_000;
@@ -302,6 +425,8 @@ export async function getBriefingSummary(): Promise<BriefingSummary> {
     upcomingEvents: calendar.filter((event) => new Date(event.start).getTime() > now).length,
     billsThisWeek,
     maintenanceDueSoon: maintenance.filter((item) => item.status === "due-soon" || item.status === "overdue").length,
+    lowStockItems,
+    savingsRatePercent,
     priorities: priorities.length > 0 ? priorities : mockBriefing.priorities,
     crossAgentInsights: buildCrossAgentInsights(tasks, bills, maintenance),
   };

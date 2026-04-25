@@ -1,5 +1,5 @@
 import type { AgentId, Category, Priority } from "@/lib/types";
-import { getN8nIntakeWebhookUrl, getN8nWebhookSecret, getSupabaseAdmin } from "@/lib/server/supabase";
+import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { getAnthropicClient } from "@/lib/server/anthropic";
 
 export type IntakeAnalysis = {
@@ -16,103 +16,117 @@ export type IntakeAnalysis = {
   proposedTasks: string[];
 };
 
+export type CreatedTask = {
+  id: string;
+  title: string;
+  agent: AgentId;
+};
+
+// ─── Keyword routing (fallback when Claude is unavailable) ────────────────────
+
 const KEYWORDS: Record<AgentId, string[]> = {
-  meals: ["meal", "dinner", "lunch", "breakfast", "grocery", "cook", "recipe", "food", "eat", "hungry", "prep", "takeout", "delivery"],
-  home: ["dishwasher", "hvac", "filter", "repair", "broken", "fix", "leak", "plumb", "maintenance", "contractor", "appliance", "lawn", "gutter", "roof"],
-  money: ["bill", "budget", "subscription", "spend", "cost", "pay", "invoice", "expense", "save", "money", "bank", "card"],
-  schedule: ["schedule", "calendar", "appointment", "meeting", "book", "time", "busy", "when", "date", "reschedule", "conflict"],
-  roster: ["kids", "child", "spouse", "partner", "mom", "dad", "family", "guest", "party", "birthday", "anniversary"],
-  chief: [],
+  meals:    ["meal", "dinner", "lunch", "breakfast", "grocery", "cook", "recipe", "food", "eat", "hungry", "prep", "takeout", "delivery", "pantry", "ingredients"],
+  home:     ["dishwasher", "hvac", "filter", "repair", "broken", "fix", "leak", "plumb", "maintenance", "contractor", "appliance", "lawn", "gutter", "roof", "furnace"],
+  money:    ["bill", "budget", "subscription", "spend", "cost", "pay", "invoice", "expense", "save", "money", "bank", "card", "insurance", "fee"],
+  schedule: ["schedule", "calendar", "appointment", "meeting", "book", "time", "busy", "when", "date", "reschedule", "conflict", "remind"],
+  roster:   ["kids", "child", "spouse", "partner", "mom", "dad", "family", "guest", "party", "birthday", "anniversary", "dog", "pet"],
+  chief:    [],
 };
 
 const CATEGORY_MAP: Record<AgentId, Category> = {
-  meals: "Meals",
-  home: "Household",
-  money: "Finance",
+  meals:    "Meals",
+  home:     "Household",
+  money:    "Finance",
   schedule: "Planning",
-  roster: "Social",
-  chief: "Admin",
+  roster:   "Social",
+  chief:    "Admin",
 };
 
 const URGENCY_SIGNALS: Record<Priority, string[]> = {
-  critical: ["emergency", "asap", "right now", "urgent", "broken", "leaking", "flooding"],
-  high: ["today", "overdue", "overwhelmed", "stressed", "behind", "slipping"],
-  medium: ["this week", "soon", "need to", "should", "planning"],
-  low: ["eventually", "someday", "think about", "explore"],
+  critical: ["emergency", "asap", "right now", "urgent", "broken", "leaking", "flooding", "out of"],
+  high:     ["today", "overdue", "overwhelmed", "stressed", "behind", "slipping", "running low"],
+  medium:   ["this week", "soon", "need to", "should", "planning", "want to"],
+  low:      ["eventually", "someday", "think about", "explore", "maybe"],
 };
 
 function classify(text: string): AgentId {
   const lower = text.toLowerCase();
-  const scores: Record<AgentId, number> = {
-    meals: 0,
-    home: 0,
-    money: 0,
-    schedule: 0,
-    roster: 0,
-    chief: 0,
-  };
-
-  (Object.keys(KEYWORDS) as AgentId[]).forEach((agent) => {
-    for (const keyword of KEYWORDS[agent]) {
-      if (lower.includes(keyword)) scores[agent] += 1;
-    }
-  });
-
-  const winner = (Object.entries(scores) as Array<[AgentId, number]>).sort((a, b) => b[1] - a[1])[0];
+  const scores = Object.fromEntries(
+    (Object.keys(KEYWORDS) as AgentId[]).map((agent) => [
+      agent,
+      KEYWORDS[agent].filter((kw) => lower.includes(kw)).length,
+    ])
+  ) as Record<AgentId, number>;
+  const [winner] = (Object.entries(scores) as Array<[AgentId, number]>).sort((a, b) => b[1] - a[1]);
   return winner[1] > 0 ? winner[0] : "chief";
 }
 
 function secondaryAgents(text: string, primary: AgentId): AgentId[] {
   const lower = text.toLowerCase();
-  const secondary: AgentId[] = [];
-
-  (Object.keys(KEYWORDS) as AgentId[]).forEach((agent) => {
-    if (agent === primary || agent === "chief") return;
-    const hits = KEYWORDS[agent].filter((keyword) => lower.includes(keyword)).length;
-    if (hits > 0) secondary.push(agent);
-  });
-
-  return secondary.slice(0, 2);
+  return (Object.keys(KEYWORDS) as AgentId[])
+    .filter((a) => a !== primary && a !== "chief")
+    .filter((a) => KEYWORDS[a].some((kw) => lower.includes(kw)))
+    .slice(0, 2);
 }
 
 function gaugeUrgency(text: string): Priority {
   const lower = text.toLowerCase();
   for (const priority of ["critical", "high", "medium", "low"] as Priority[]) {
-    if (URGENCY_SIGNALS[priority].some((signal) => lower.includes(signal))) return priority;
+    if (URGENCY_SIGNALS[priority].some((s) => lower.includes(s))) return priority;
   }
   return "medium";
 }
 
 function synthesizeAnalysis(primary: AgentId, secondary: AgentId[]) {
-  const primaryName = primary === "chief"
-    ? "not yet clear — routing to the Chief of Staff for clarification"
-    : `${primary[0].toUpperCase() + primary.slice(1)} Agent`;
-
-  const secondaryText = secondary.length > 0
-    ? ` Cross-domain signal — looping in ${secondary.map((agent) => agent[0].toUpperCase() + agent.slice(1)).join(" + ")} for coordination.`
+  const name = primary === "chief" ? "Chief of Staff" : `${primary[0].toUpperCase()}${primary.slice(1)} Agent`;
+  const cross = secondary.length > 0
+    ? ` Also looping in ${secondary.map((a) => `${a[0].toUpperCase()}${a.slice(1)}`).join(" + ")}.`
     : "";
-
-  return `Captured. Primary domain: ${primaryName}.${secondaryText}`;
+  return `Routed to ${name}.${cross}`;
 }
 
-function proposeTasks(primary: AgentId): string[] {
-  const base: Record<AgentId, string[]> = {
-    meals: ["Draft meal plan for the upcoming window", "Build grocery list with cost estimate", "Block time for prep"],
-    home: ["Diagnose and document the issue", "Check warranty + service history", "If unresolved: gather 3 quotes"],
-    money: ["Confirm account + balance context", "Draft payment or adjustment", "Flag for budget review if > $200"],
-    schedule: ["Find available time windows", "Propose 2-3 options for approval", "Send calendar invite once confirmed"],
-    roster: ["Capture context + relationships", "Coordinate across affected household members", "Propose follow-up touchpoints"],
-    chief: ["Ask one clarifying question", "Hold briefly pending input"],
-  };
+function proposeTasks(primary: AgentId, text: string): string[] {
+  const lower = text.toLowerCase();
 
-  return base[primary];
+  // Context-aware task suggestions
+  if (primary === "home") {
+    if (lower.includes("repair") || lower.includes("broken") || lower.includes("fix"))
+      return ["Diagnose and document the issue", "Check warranty + service history", "Get 2–3 repair quotes if > $100"];
+    if (lower.includes("maintenance") || lower.includes("filter") || lower.includes("hvac"))
+      return ["Schedule the maintenance service", "Update maintenance log when done"];
+  }
+  if (primary === "money") {
+    if (lower.includes("bill") || lower.includes("pay"))
+      return ["Verify the bill amount + due date", "Pay or schedule autopay", "Update the bills tracker"];
+    return ["Review the budget impact", "Log the expense", "Flag if over budget threshold"];
+  }
+  if (primary === "meals") {
+    return ["Plan meals for the week", "Build grocery list from pantry gaps", "Block prep time on calendar"];
+  }
+  if (primary === "schedule") {
+    return ["Find available time windows", "Send calendar invite once confirmed", "Set a reminder 24h before"];
+  }
+  if (primary === "roster") {
+    return ["Note the context for relevant household members", "Follow up on any coordination needed"];
+  }
+
+  const defaults: Record<AgentId, string[]> = {
+    meals:    ["Plan meals for the week", "Build grocery list from pantry gaps"],
+    home:     ["Document the issue", "Check warranty + service history"],
+    money:    ["Review budget impact", "Log the expense"],
+    schedule: ["Find open time slots", "Confirm and send invite"],
+    roster:   ["Capture context", "Coordinate with household members"],
+    chief:    ["Clarify the request", "Route to the right agent once clear"],
+  };
+  return defaults[primary];
 }
 
 function buildTitle(text: string) {
   const normalized = text.replace(/\s+/g, " ").trim();
-  if (normalized.length <= 72) return normalized;
-  return `${normalized.slice(0, 69).trimEnd()}...`;
+  return normalized.length <= 72 ? normalized : `${normalized.slice(0, 69).trimEnd()}…`;
 }
+
+// ─── Claude analysis ──────────────────────────────────────────────────────────
 
 const AGENT_IDS: AgentId[] = ["meals", "home", "money", "schedule", "roster", "chief"];
 const CATEGORIES_LIST = ["Meals", "Cleaning", "Household", "Admin", "Planning", "Finance", "Social"];
@@ -122,33 +136,32 @@ async function analyzeWithClaude(text: string): Promise<Omit<IntakeAnalysis, "id
   const anthropic = getAnthropicClient();
   if (!anthropic) return null;
 
-  const prompt = `You are the Chief of Staff routing engine for a household management system. Analyze this household input and return a JSON object.
+  const prompt = `You are the Chief of Staff routing engine for a frugal household management system. Analyze this household input and return JSON.
 
 Input: "${text.replace(/"/g, '\\"')}"
 
 Agents: ${AGENT_IDS.join(", ")}
 Categories: ${CATEGORIES_LIST.join(", ")}
-Urgency levels: ${PRIORITIES_LIST.join(", ")}
+Urgency: ${PRIORITIES_LIST.join(", ")}
 
-Return ONLY valid JSON with this exact shape:
+Return ONLY valid JSON — no markdown, no explanation:
 {
   "primary": "<agent>",
-  "secondary": ["<agent>", ...],
+  "secondary": ["<agent>"],
   "category": "<category>",
   "urgency": "<urgency>",
-  "analysis": "<1-2 sentence summary of what was captured and why it was routed this way>",
-  "proposedTasks": ["<task 1>", "<task 2>", "<task 3>"]
+  "analysis": "<1-2 sentence summary — what was captured, why routed this way, any frugal angle>",
+  "proposedTasks": ["<concrete actionable task 1>", "<task 2>", "<task 3>"]
 }
 
 Rules:
-- primary: the single best-fit agent
-- secondary: 0-2 other agents that need to coordinate (exclude primary)
-- proposedTasks: 2-3 concrete, actionable next steps for the primary agent
-- analysis: brief, decisive — no hedging`;
+- proposedTasks: 2-3 specific, actionable tasks — not generic placeholders
+- If the input mentions money or costs, note the frugal angle in analysis
+- urgency=critical only for genuine emergencies`;
 
   try {
     const message = await anthropic.messages.create({
-      model: "claude-haiku-4-5",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 512,
       messages: [{ role: "user", content: prompt }],
     });
@@ -156,72 +169,56 @@ Rules:
     const content = message.content[0];
     if (content.type !== "text") return null;
 
-    // Extract JSON from the response (handle markdown code blocks)
     const jsonMatch = content.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
 
     const parsed = JSON.parse(jsonMatch[0]);
-
     const primary: AgentId = AGENT_IDS.includes(parsed.primary) ? parsed.primary : "chief";
     const secondary: AgentId[] = Array.isArray(parsed.secondary)
-      ? parsed.secondary.filter((a: string) => AGENT_IDS.includes(a as AgentId) && a !== primary).slice(0, 2)
+      ? parsed.secondary.filter((a: string) => AGENT_IDS.includes(a as AgentId) && a !== primary).slice(0, 2) as AgentId[]
       : [];
-    const category: Category = CATEGORIES_LIST.includes(parsed.category) ? parsed.category : CATEGORY_MAP[primary];
-    const urgency: Priority = PRIORITIES_LIST.includes(parsed.urgency) ? parsed.urgency : "medium";
-    const analysis = typeof parsed.analysis === "string" ? parsed.analysis : synthesizeAnalysis(primary, secondary);
-    const proposedTasks = Array.isArray(parsed.proposedTasks)
-      ? parsed.proposedTasks.filter((t: unknown) => typeof t === "string").slice(0, 3)
-      : proposeTasks(primary);
 
-    return { analysis, routing: { primary, secondary, category }, urgency, proposedTasks };
+    return {
+      analysis:      typeof parsed.analysis === "string" ? parsed.analysis : synthesizeAnalysis(primary, secondary),
+      routing:       { primary, secondary, category: CATEGORIES_LIST.includes(parsed.category) ? parsed.category : CATEGORY_MAP[primary] },
+      urgency:       PRIORITIES_LIST.includes(parsed.urgency) ? parsed.urgency as Priority : "medium",
+      proposedTasks: Array.isArray(parsed.proposedTasks)
+        ? parsed.proposedTasks.filter((t: unknown) => typeof t === "string").slice(0, 3) as string[]
+        : proposeTasks(primary, text),
+    };
   } catch {
     return null;
   }
 }
 
-export async function analyzeIntake(text: string, source = "web"): Promise<IntakeAnalysis & { source: string }> {
-  const capturedAt = new Date().toISOString();
-  const id = `inb_${Date.now().toString(36)}`;
+// ─── Public API ───────────────────────────────────────────────────────────────
 
-  // Try Claude first; fall back to heuristics
+export async function analyzeIntake(text: string, source = "web"): Promise<IntakeAnalysis & { source: string }> {
+  const id = `inb_${Date.now().toString(36)}`;
+  const capturedAt = new Date().toISOString();
   const llm = await analyzeWithClaude(text);
 
   if (llm) {
-    return {
-      id,
-      capturedAt,
-      text,
-      source,
-      analysis: llm.analysis,
-      routing: llm.routing,
-      urgency: llm.urgency,
-      proposedTasks: llm.proposedTasks,
-    };
+    return { id, capturedAt, text, source, ...llm };
   }
 
-  // Heuristic fallback
   const primary = classify(text);
   const secondary = secondaryAgents(text, primary);
-  const urgency = gaugeUrgency(text);
-  const category = CATEGORY_MAP[primary];
-
   return {
     id,
     capturedAt,
     text,
     source,
     analysis: synthesizeAnalysis(primary, secondary),
-    routing: { primary, secondary, category },
-    urgency,
-    proposedTasks: proposeTasks(primary),
+    routing: { primary, secondary, category: CATEGORY_MAP[primary] },
+    urgency: gaugeUrgency(text),
+    proposedTasks: proposeTasks(primary, text),
   };
 }
 
 export async function persistIntake(analysis: IntakeAnalysis & { source?: string }) {
   const supabase = getSupabaseAdmin();
-  if (!supabase) {
-    return { persisted: false as const, backend: "mock" as const };
-  }
+  if (!supabase) return { persisted: false as const };
 
   const { error } = await supabase.from("inbox_items").insert({
     id: analysis.id,
@@ -241,42 +238,32 @@ export async function persistIntake(analysis: IntakeAnalysis & { source?: string
 
   if (error) {
     console.error("Supabase intake insert failed:", error);
-    return { persisted: false as const, backend: "supabase" as const, error: error.message };
+    return { persisted: false as const, error: error.message };
   }
 
-  return { persisted: true as const, backend: "supabase" as const };
+  return { persisted: true as const };
 }
 
-export async function forwardIntakeToN8n(analysis: IntakeAnalysis) {
-  const webhookUrl = getN8nIntakeWebhookUrl();
-  if (!webhookUrl) {
-    return { forwarded: false as const, backend: "disabled" as const };
+export async function createTasksFromIntake(analysis: IntakeAnalysis): Promise<CreatedTask[]> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase || analysis.proposedTasks.length === 0) return [];
+
+  const rows = analysis.proposedTasks.map((title) => ({
+    id: crypto.randomUUID(),
+    title,
+    agent: analysis.routing.primary,
+    category: analysis.routing.category,
+    status: "todo",
+    priority: analysis.urgency,
+    inbox_item_id: analysis.id,
+    created_at: new Date().toISOString(),
+  }));
+
+  const { error } = await supabase.from("tasks").insert(rows);
+  if (error) {
+    console.error("Task creation from intake failed:", error);
+    return [];
   }
 
-  const secret = getN8nWebhookSecret();
-  const response = await fetch(webhookUrl, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(secret ? { "x-webhook-secret": secret } : {}),
-    },
-    body: JSON.stringify({
-      id: analysis.id,
-      capturedAt: analysis.capturedAt,
-      text: analysis.text,
-      analysis: analysis.analysis,
-      routing: analysis.routing,
-      urgency: analysis.urgency,
-      proposedTasks: analysis.proposedTasks,
-    }),
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    console.error("n8n intake webhook failed:", response.status, body);
-    return { forwarded: false as const, backend: "n8n" as const, status: response.status };
-  }
-
-  return { forwarded: true as const, backend: "n8n" as const };
+  return rows.map((r) => ({ id: r.id, title: r.title, agent: r.agent as AgentId }));
 }

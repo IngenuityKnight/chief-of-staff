@@ -5,20 +5,26 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Inbox, CheckSquare, UtensilsCrossed,
   Wrench, Wallet, CalendarDays, Users, Settings, Radio, Database,
+  Package, Car, Zap, ShoppingCart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/",         label: "Briefing",  icon: LayoutDashboard, hint: "Today's command surface" },
-  { href: "/inbox",    label: "Inbox",     icon: Inbox,           hint: "Unrouted + recent intake" },
-  { href: "/tasks",    label: "Tasks",     icon: CheckSquare,     hint: "Active queue across agents" },
+  { href: "/",           label: "Briefing",   icon: LayoutDashboard, hint: "Today's command surface" },
+  { href: "/inbox",      label: "Inbox",      icon: Inbox,           hint: "Unrouted + recent intake" },
+  { href: "/tasks",      label: "Tasks",      icon: CheckSquare,     hint: "Active queue across agents" },
+  { type: "divider", label: "Household" } as const,
+  { href: "/inventory",  label: "Inventory",  icon: Package,         hint: "Pantry, consumables, supplies" },
+  { href: "/vehicles",   label: "Vehicles",   icon: Car,             hint: "Vehicles + maintenance" },
+  { href: "/appliances", label: "Appliances", icon: Zap,             hint: "Appliances + warranties" },
+  { href: "/shopping",   label: "Shopping",   icon: ShoppingCart,    hint: "AI-generated shopping list" },
   { type: "divider", label: "Agents" } as const,
-  { href: "/meals",    label: "Meals",     icon: UtensilsCrossed, hint: "Plans, groceries, prep" },
-  { href: "/home",     label: "Home",      icon: Wrench,          hint: "Maintenance + repairs" },
-  { href: "/money",    label: "Money",     icon: Wallet,          hint: "Bills + budget" },
-  { href: "/schedule", label: "Schedule",  icon: CalendarDays,    hint: "Calendar + time" },
-  { href: "/roster",   label: "Roster",    icon: Users,           hint: "Household + rules" },
-  { href: "/data",     label: "Data",      icon: Database,        hint: "Edit live records" },
+  { href: "/meals",      label: "Meals",      icon: UtensilsCrossed, hint: "Plans, groceries, prep" },
+  { href: "/home",       label: "Home",       icon: Wrench,          hint: "Maintenance + repairs" },
+  { href: "/money",      label: "Money",      icon: Wallet,          hint: "Bills + budget" },
+  { href: "/schedule",   label: "Schedule",   icon: CalendarDays,    hint: "Calendar + time" },
+  { href: "/roster",     label: "Roster",     icon: Users,           hint: "Household + rules" },
+  { href: "/data",       label: "Data",       icon: Database,        hint: "Edit live records" },
 ];
 
 export function Sidebar() {

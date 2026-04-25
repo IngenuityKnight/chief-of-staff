@@ -241,6 +241,8 @@ export const briefing: BriefingSummary = {
   upcomingEvents: calendar.length,
   billsThisWeek: bills.filter(b => b.dueDate && new Date(b.dueDate).getTime() - TODAY.getTime() < 7 * 86400000 && b.status !== "paid").length,
   maintenanceDueSoon: maintenance.filter(m => m.status === "due-soon" || m.status === "overdue").length,
+  lowStockItems: 0,
+  savingsRatePercent: null,
   priorities: [
     { id: "p1", title: "Dishwasher — try filter clear before booking repair", agent: "home",     why: "Blocks next task; 15 min effort could save a $180 service call." },
     { id: "p2", title: "Gas bill overdue — 2 days",                            agent: "money",    why: "Autopay is off. Late fee hits at day 5." },

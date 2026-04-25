@@ -4,9 +4,9 @@ import { getPlaidConnections, syncAccounts, syncRecurringToBills } from "@/lib/s
 
 // POST /api/plaid/sync
 //
-// Syncs all connected Plaid institutions: refreshes account balances and
-// pulls recurring transactions into the bills table. Called by the nightly
-// n8n workflow (authenticated via x-webhook-secret) or manually via the UI.
+// Manual Plaid sync — refreshes account balances and pulls recurring
+// transactions into the bills table. For scheduled runs use /api/cron/plaid.
+// Authenticated via CRON_SECRET bearer token.
 
 function json(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(body, {
@@ -16,9 +16,10 @@ function json(body: Record<string, unknown>, status = 200) {
 }
 
 function verifySecret(req: NextRequest): boolean {
-  const expected = process.env.N8N_PLAID_SYNC_SECRET;
-  if (!expected) return true; // no secret configured — allow (dev mode)
-  return req.headers.get("x-webhook-secret") === expected;
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return true; // dev: no secret configured
+  const auth = req.headers.get("authorization");
+  return auth === `Bearer ${secret}`;
 }
 
 export async function POST(req: NextRequest) {

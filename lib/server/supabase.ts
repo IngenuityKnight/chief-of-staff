@@ -39,14 +39,4 @@ export function getSupabaseAdmin() {
   return adminClient;
 }
 
-export function getN8nIntakeWebhookUrl() {
-  return process.env.N8N_INTAKE_WEBHOOK_URL ?? process.env.N8N_INTAKE_WEBHOOK ?? "";
-}
 
-export function getN8nWebhookSecret() {
-  return process.env.N8N_WEBHOOK_SECRET ?? "";
-}
-
-export function isN8nConfigured() {
-  return Boolean(getN8nIntakeWebhookUrl());
-}
