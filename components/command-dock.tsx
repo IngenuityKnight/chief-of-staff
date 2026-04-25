@@ -9,6 +9,7 @@ import type { AgentId } from "@/lib/types";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type CreatedTask = { id: string; title: string; agent: AgentId };
+type AppliedChange = { id: string; resource: "calendar" | "shopping"; label: string };
 
 type Msg = {
   id: string;
@@ -17,6 +18,7 @@ type Msg = {
   routing?: { primary: AgentId; secondary: AgentId[]; category: string };
   urgency?: string;
   createdTasks?: CreatedTask[];
+  appliedChanges?: AppliedChange[];
   error?: boolean;
 };
 
@@ -91,6 +93,39 @@ function TaskList({ tasks }: { tasks: CreatedTask[] }) {
   );
 }
 
+function AppliedChangeList({ changes }: { changes: AppliedChange[] }) {
+  if (changes.length === 0) return null;
+  const hrefByResource: Record<AppliedChange["resource"], string> = {
+    calendar: "/schedule",
+    shopping: "/shopping",
+  };
+
+  return (
+    <div className="mt-3 space-y-1.5 border-t border-white/10 pt-2.5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-signal-blue">
+          <Sparkles className="h-3 w-3" />
+          {changes.length} data change{changes.length !== 1 ? "s" : ""} applied
+        </div>
+        <a
+          href={hrefByResource[changes[0].resource]}
+          className="flex items-center gap-1 text-[10px] font-semibold text-signal-blue hover:underline"
+        >
+          View <ArrowRight className="h-2.5 w-2.5" />
+        </a>
+      </div>
+      <ul className="space-y-1">
+        {changes.map((change) => (
+          <li key={change.id} className="flex items-start gap-2 rounded-md bg-white/5 px-2.5 py-1.5">
+            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-signal-blue" />
+            <span className="flex-1 text-xs leading-relaxed text-slate-300">{change.label}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function ChiefBubble({ msg }: { msg: Msg }) {
   return (
     <div className="flex justify-start">
@@ -102,6 +137,7 @@ function ChiefBubble({ msg }: { msg: Msg }) {
       )}>
         <div>{msg.text}</div>
         {msg.routing && <RoutingBadge routing={msg.routing} urgency={msg.urgency} />}
+        {msg.appliedChanges && <AppliedChangeList changes={msg.appliedChanges} />}
         {msg.createdTasks && <TaskList tasks={msg.createdTasks} />}
       </div>
     </div>
@@ -183,6 +219,7 @@ export function CommandDock() {
         body: JSON.stringify({ text: msg }),
       });
       const data = await res.json();
+      if (!res.ok || data.ok === false) throw new Error(data.error ?? "The request could not be saved.");
 
       setMessages((m) => [...m, {
         id: crypto.randomUUID(),
@@ -191,12 +228,13 @@ export function CommandDock() {
         routing: data.routing,
         urgency: data.urgency,
         createdTasks: data.createdTasks ?? [],
+        appliedChanges: data.appliedChanges ?? [],
       }]);
-    } catch {
+    } catch (error) {
       setMessages((m) => [...m, {
         id: crypto.randomUUID(),
         role: "chief",
-        text: "Couldn't reach the intake endpoint. Try again.",
+        text: error instanceof Error ? error.message : "Couldn't reach the intake endpoint. Try again.",
         error: true,
       }]);
     } finally {

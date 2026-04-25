@@ -22,6 +22,12 @@ export type CreatedTask = {
   agent: AgentId;
 };
 
+export type AppliedChange = {
+  id: string;
+  resource: "calendar" | "shopping";
+  label: string;
+};
+
 // ─── Keyword routing (fallback when Claude is unavailable) ────────────────────
 
 const KEYWORDS: Record<AgentId, string[]> = {
@@ -124,6 +130,106 @@ function proposeTasks(primary: AgentId, text: string): string[] {
 function buildTitle(text: string) {
   const normalized = text.replace(/\s+/g, " ").trim();
   return normalized.length <= 72 ? normalized : `${normalized.slice(0, 69).trimEnd()}…`;
+}
+
+function startOfToday() {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function nextWeekday(target: number) {
+  const date = startOfToday();
+  const diff = (target - date.getDay() + 7) % 7 || 7;
+  date.setDate(date.getDate() + diff);
+  return date;
+}
+
+function parseRequestedDate(text: string) {
+  const lower = text.toLowerCase();
+  const today = startOfToday();
+  if (lower.includes("today")) return today;
+  if (lower.includes("tomorrow")) {
+    const date = startOfToday();
+    date.setDate(date.getDate() + 1);
+    return date;
+  }
+
+  const weekdays: Record<string, number> = {
+    sunday: 0,
+    monday: 1,
+    tuesday: 2,
+    wednesday: 3,
+    thursday: 4,
+    friday: 5,
+    saturday: 6,
+  };
+  for (const [day, index] of Object.entries(weekdays)) {
+    if (lower.includes(day)) return nextWeekday(index);
+  }
+
+  const dateMatch = lower.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+  if (!dateMatch) return null;
+
+  const month = Number(dateMatch[1]) - 1;
+  const day = Number(dateMatch[2]);
+  const year = dateMatch[3]
+    ? Number(dateMatch[3].length === 2 ? `20${dateMatch[3]}` : dateMatch[3])
+    : today.getFullYear();
+  const parsed = new Date(year, month, day);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function parseRequestedTime(text: string) {
+  const lower = text.toLowerCase();
+  const match =
+    lower.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/) ??
+    lower.match(/\b(\d{1,2})(?::(\d{2}))\s*(am|pm)?\b/);
+  const hourOnlyMatch = match ? null : lower.match(/\b(\d{1,2})\s*(am|pm)\b/);
+  if (!match && !hourOnlyMatch) return { hours: 9, minutes: 0 };
+
+  let hours = Number((match ?? hourOnlyMatch)![1]);
+  const minutes = match ? Number(match[2] ?? 0) : 0;
+  const meridiem = match ? match[3] : hourOnlyMatch![2];
+  if (meridiem === "pm" && hours < 12) hours += 12;
+  if (meridiem === "am" && hours === 12) hours = 0;
+  if (!meridiem && hours < 7) hours += 12;
+  return { hours, minutes };
+}
+
+function parseDurationMinutes(text: string) {
+  const lower = text.toLowerCase();
+  const hourMatch = lower.match(/\b(\d+(?:\.\d+)?)\s*(?:hour|hr|hrs|hours)\b/);
+  if (hourMatch) return Math.max(15, Math.round(Number(hourMatch[1]) * 60));
+  const minuteMatch = lower.match(/\b(\d+)\s*(?:minute|min|mins|minutes)\b/);
+  if (minuteMatch) return Math.max(15, Number(minuteMatch[1]));
+  return 60;
+}
+
+function cleanEventTitle(text: string) {
+  return buildTitle(
+    text
+      .replace(/\b(add|create|schedule|book|block|put|set up)\b/gi, "")
+      .replace(/\b(on|for|at)\s+(today|tomorrow|sunday|monday|tuesday|wednesday|thursday|friday|saturday|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\b/gi, "")
+      .replace(/\bat\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?\b/gi, "")
+      .replace(/\bfor\s+\d+(?:\.\d+)?\s*(?:hour|hr|hrs|hours|minute|min|mins|minutes)s?\b/gi, "")
+      .trim()
+  );
+}
+
+function parseShoppingItems(text: string) {
+  const lower = text.toLowerCase();
+  const marker =
+    lower.match(/\b(?:add|buy|get|need|pick up)\b([\s\S]+?)(?:\bto (?:the )?shopping list\b|\bfrom\b|$)/) ??
+    lower.match(/\b(?:out of|running low on|low on)\b([\s\S]+)$/);
+  if (!marker) return [];
+
+  return marker[1]
+    .replace(/\b(?:to|the|shopping|list|please)\b/gi, " ")
+    .split(/,|\band\b|\+/i)
+    .map((item) => item.trim().replace(/^[\s.:-]+|[\s.:-]+$/g, ""))
+    .filter((item) => item.length > 1)
+    .slice(0, 5);
 }
 
 // ─── Claude analysis ──────────────────────────────────────────────────────────
@@ -266,4 +372,68 @@ export async function createTasksFromIntake(analysis: IntakeAnalysis): Promise<C
   }
 
   return rows.map((r) => ({ id: r.id, title: r.title, agent: r.agent as AgentId }));
+}
+
+export async function applyIntakeChanges(analysis: IntakeAnalysis): Promise<AppliedChange[]> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return [];
+
+  const changes: AppliedChange[] = [];
+  const lower = analysis.text.toLowerCase();
+
+  if (
+    analysis.routing.primary === "schedule" &&
+    /\b(add|create|schedule|book|block|put|set up)\b/.test(lower)
+  ) {
+    const date = parseRequestedDate(analysis.text);
+    if (date) {
+      const { hours, minutes } = parseRequestedTime(analysis.text);
+      const start = new Date(date);
+      start.setHours(hours, minutes, 0, 0);
+      const end = new Date(start.getTime() + parseDurationMinutes(analysis.text) * 60_000);
+      const title = cleanEventTitle(analysis.text) || buildTitle(analysis.text);
+      const id = crypto.randomUUID();
+
+      const { error } = await supabase.from("calendar_events").insert({
+        id,
+        title,
+        start_at: start.toISOString(),
+        end_at: end.toISOString(),
+        type: lower.includes("block") ? "block" : lower.includes("meeting") ? "meeting" : "event",
+        location: null,
+        notes: `Created by Chief of Staff from: ${analysis.text}`,
+        agent: "schedule",
+      });
+
+      if (!error) changes.push({ id, resource: "calendar", label: `Created calendar event: ${title}` });
+      else console.error("Calendar change from intake failed:", error);
+    }
+  }
+
+  if (analysis.routing.primary === "meals" || /\b(shopping list|buy|get|out of|running low|low on)\b/.test(lower)) {
+    const items = parseShoppingItems(analysis.text);
+    if (items.length > 0) {
+      const rows = items.map((name) => ({
+        id: crypto.randomUUID(),
+        name,
+        quantity: 1,
+        unit: "count",
+        source: "ai",
+        priority: analysis.urgency,
+        status: "needed",
+        category: "food",
+        notes: `Created by Chief of Staff from: ${analysis.text}`,
+        created_at: new Date().toISOString(),
+      }));
+
+      const { error } = await supabase.from("shopping_list_items").insert(rows);
+      if (!error) {
+        changes.push(...rows.map((row) => ({ id: row.id, resource: "shopping" as const, label: `Added shopping item: ${row.name}` })));
+      } else {
+        console.error("Shopping change from intake failed:", error);
+      }
+    }
+  }
+
+  return changes;
 }

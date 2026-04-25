@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { analyzeIntake, createTasksFromIntake, persistIntake } from "@/lib/server/intake";
+import { analyzeIntake, applyIntakeChanges, createTasksFromIntake, persistIntake } from "@/lib/server/intake";
 import { isSupabaseConfigured } from "@/lib/server/supabase";
 import { isAnthropicConfigured } from "@/lib/server/anthropic";
 
@@ -48,10 +48,26 @@ export async function POST(req: NextRequest) {
 
     const intake = await analyzeIntake(text, source);
 
-    // Persist inbox item and create tasks in parallel
-    const [persistence, createdTasks] = await Promise.all([
-      persistIntake(intake),
+    const persistence = await persistIntake(intake);
+    if (!persistence.persisted) {
+      return json(
+        {
+          ok: false,
+          error: persistence.error ?? "Supabase is not configured, so the request was analyzed but no data was changed.",
+          meta: {
+            supabaseConfigured: isSupabaseConfigured(),
+            anthropicConfigured: isAnthropicConfigured(),
+            persisted: false,
+            tasksCreated: 0,
+          },
+        },
+        isSupabaseConfigured() ? 500 : 503
+      );
+    }
+
+    const [createdTasks, appliedChanges] = await Promise.all([
       createTasksFromIntake(intake),
+      applyIntakeChanges(intake),
     ]);
 
     return json({
@@ -63,6 +79,7 @@ export async function POST(req: NextRequest) {
       urgency: intake.urgency,
       proposedTasks: intake.proposedTasks,
       createdTasks,
+      appliedChanges,
       meta: {
         supabaseConfigured: isSupabaseConfigured(),
         anthropicConfigured: isAnthropicConfigured(),

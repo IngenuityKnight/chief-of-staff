@@ -6,6 +6,7 @@ import type { CalendarEvent } from "@/lib/types";
 import { getCalendarEvents } from "@/lib/server/data";
 import { getAdminFields } from "@/lib/server/admin";
 import { InlineForm } from "@/components/inline-form";
+import { EditInline } from "@/components/edit-inline";
 
 const TYPE_META = {
   appointment: { pillClass: "pill-pink",   label: "Appt" },
@@ -69,11 +70,30 @@ export default async function SchedulePage() {
                         className="rounded-md border-l-2 bg-ink-950/60 p-2.5"
                         style={{ borderLeftColor: e.agent ? AGENTS[e.agent].accent : "#60a5fa" }}
                       >
-                        <div className="flex items-center gap-2 font-mono text-[11px] text-slate-400">
-                          <Clock className="h-2.5 w-2.5" />
-                          {formatTime(e.start)} — {formatTime(e.end)}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 font-mono text-[11px] text-slate-400">
+                              <Clock className="h-2.5 w-2.5" />
+                              {formatTime(e.start)} — {formatTime(e.end)}
+                            </div>
+                            <div className="mt-1 text-sm font-medium text-slate-100">{e.title}</div>
+                          </div>
+                          <EditInline
+                            resource="calendar"
+                            id={e.id}
+                            fields={calendarFields}
+                            values={{
+                              title: e.title,
+                              type: e.type,
+                              location: e.location ?? "",
+                              agent: e.agent ?? "",
+                              start: e.start,
+                              end: e.end,
+                              notes: e.notes ?? "",
+                            }}
+                            label={`Edit ${e.title}`}
+                          />
                         </div>
-                        <div className="mt-1 text-sm font-medium text-slate-100">{e.title}</div>
                         <div className="mt-1 flex items-center gap-2">
                           <span className={M.pillClass}>{M.label}</span>
                           {e.agent && <AgentBadge agent={e.agent} />}
@@ -112,6 +132,21 @@ export default async function SchedulePage() {
                     {e.location && <div className="text-[11px] text-slate-500">{e.location}</div>}
                   </div>
                   {e.agent && <AgentBadge agent={e.agent} />}
+                  <EditInline
+                    resource="calendar"
+                    id={e.id}
+                    fields={calendarFields}
+                    values={{
+                      title: e.title,
+                      type: e.type,
+                      location: e.location ?? "",
+                      agent: e.agent ?? "",
+                      start: e.start,
+                      end: e.end,
+                      notes: e.notes ?? "",
+                    }}
+                    label={`Edit ${e.title}`}
+                  />
                 </li>
               ))}
           </ul>

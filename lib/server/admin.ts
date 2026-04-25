@@ -82,6 +82,10 @@ function toNumberOrNull(value: unknown) {
   return numeric;
 }
 
+function defaultEndAt(startAt: string) {
+  return new Date(new Date(startAt).getTime() + 60 * 60_000).toISOString();
+}
+
 function pickAllowed(payload: Record<string, unknown>, allowed: string[]) {
   return Object.fromEntries(Object.entries(payload).filter(([key]) => allowed.includes(key)));
 }
@@ -286,12 +290,13 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
       };
     },
     toDbInsert(payload, id) {
+      const startAt = toNullableString(payload.start) ?? new Date().toISOString();
       return {
         id,
         title: toNullableString(payload.title) ?? "",
         type: payload.type ?? "event",
-        start_at: toNullableString(payload.start) ?? new Date().toISOString(),
-        end_at: toNullableString(payload.end) ?? null,
+        start_at: startAt,
+        end_at: toNullableString(payload.end) ?? defaultEndAt(startAt),
         location: toNullableString(payload.location) ?? null,
         agent: toNullableString(payload.agent) ?? null,
         notes: toNullableString(payload.notes) ?? null,
