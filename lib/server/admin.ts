@@ -3,6 +3,7 @@ import type {
   Appliance,
   BillItem,
   CalendarEvent,
+  Decision,
   HouseMember,
   InboxItem,
   InventoryItem,
@@ -17,6 +18,7 @@ import {
   getAppliances,
   getBills,
   getCalendarEvents,
+  getDecisions,
   getHouseholdMembers,
   getInboxItems,
   getInventoryItems,
@@ -32,6 +34,7 @@ import { getSupabaseAdmin } from "@/lib/server/supabase";
 export type AdminResource =
   | "inbox"
   | "tasks"
+  | "decisions"
   | "maintenance"
   | "bills"
   | "calendar"
@@ -176,6 +179,56 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
         priority: payload.priority ?? "medium",
         due_date: toNullableString(payload.dueDate) ?? null,
         notes: toNullableString(payload.notes) ?? null,
+      };
+    },
+  },
+  decisions: {
+    label: "Decisions",
+    table: "decisions",
+    idKey: "id",
+    load: getDecisions,
+    fields: [
+      { key: "title", label: "Title", type: "text" },
+      { key: "context", label: "Context", type: "textarea" },
+      { key: "status", label: "Status", type: "select", options: ["open", "approved", "deferred", "dismissed"] },
+      { key: "priority", label: "Priority", type: "select", options: ["low", "medium", "high", "critical"] },
+      { key: "category", label: "Category", type: "select", options: ["Meals", "Cleaning", "Household", "Admin", "Planning", "Finance", "Social"] },
+      { key: "recommendation", label: "Recommendation", type: "textarea" },
+      { key: "options", label: "Options JSON", type: "json" },
+      { key: "costEstimate", label: "Cost Estimate", type: "number" },
+      { key: "timeEstimateMinutes", label: "Time Estimate Minutes", type: "number" },
+      { key: "dueDate", label: "Due Date ISO", type: "text" },
+    ],
+    toDbPatch(payload) {
+      const patch = pickAllowed(payload, ["title", "context", "status", "priority", "category", "recommendation", "options", "costEstimate", "timeEstimateMinutes", "dueDate"]);
+      return {
+        ...(patch.title !== undefined ? { title: toNullableString(patch.title) } : {}),
+        ...(patch.context !== undefined ? { context: toNullableString(patch.context) } : {}),
+        ...(patch.status !== undefined ? { status: patch.status, resolved_at: patch.status === "open" ? null : new Date().toISOString() } : {}),
+        ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
+        ...(patch.category !== undefined ? { category: patch.category } : {}),
+        ...(patch.recommendation !== undefined ? { recommendation: toNullableString(patch.recommendation) } : {}),
+        ...(patch.options !== undefined ? { options: parseJsonField(patch.options) ?? [] } : {}),
+        ...(patch.costEstimate !== undefined ? { cost_estimate: toNumberOrNull(patch.costEstimate) } : {}),
+        ...(patch.timeEstimateMinutes !== undefined ? { time_estimate_minutes: toNumberOrNull(patch.timeEstimateMinutes) } : {}),
+        ...(patch.dueDate !== undefined ? { due_date: toNullableString(patch.dueDate) } : {}),
+      };
+    },
+    toDbInsert(payload, id) {
+      return {
+        id,
+        title: toNullableString(payload.title) ?? "",
+        context: toNullableString(payload.context) ?? null,
+        status: payload.status ?? "open",
+        priority: payload.priority ?? "medium",
+        category: payload.category ?? "Admin",
+        recommendation: toNullableString(payload.recommendation) ?? null,
+        options: parseJsonField(payload.options as string) ?? [],
+        cost_estimate: toNumberOrNull(payload.costEstimate) ?? null,
+        time_estimate_minutes: toNumberOrNull(payload.timeEstimateMinutes) ?? null,
+        due_date: toNullableString(payload.dueDate) ?? null,
+        created_at: new Date().toISOString(),
+        resolved_at: payload.status && payload.status !== "open" ? new Date().toISOString() : null,
       };
     },
   },
@@ -616,7 +669,7 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
   },
 };
 
-const ADMIN_REVALIDATE_PATHS = ["/", "/inbox", "/tasks", "/home", "/money", "/schedule", "/roster", "/meals", "/data", "/inventory", "/vehicles", "/appliances", "/shopping"];
+const ADMIN_REVALIDATE_PATHS = ["/", "/inbox", "/tasks", "/decisions", "/home", "/money", "/schedule", "/roster", "/meals", "/data", "/inventory", "/vehicles", "/appliances", "/shopping"];
 
 export function getAdminFields(resource: AdminResource): AdminField[] {
   return adminConfig[resource].fields;

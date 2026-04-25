@@ -9,7 +9,7 @@ import type { AgentId } from "@/lib/types";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type CreatedTask = { id: string; title: string; agent: AgentId };
-type AppliedChange = { id: string; resource: "calendar" | "shopping"; label: string };
+type AppliedChange = { id: string; resource: "calendar" | "decisions" | "shopping"; label: string };
 
 type Msg = {
   id: string;
@@ -97,6 +97,7 @@ function AppliedChangeList({ changes }: { changes: AppliedChange[] }) {
   if (changes.length === 0) return null;
   const hrefByResource: Record<AppliedChange["resource"], string> = {
     calendar: "/schedule",
+    decisions: "/decisions",
     shopping: "/shopping",
   };
 
@@ -258,7 +259,7 @@ export function CommandDock() {
           className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-br from-signal-blue to-signal-purple px-4 py-3 text-sm font-semibold text-ink-950 shadow-2xl shadow-signal-blue/30 transition hover:scale-105 active:scale-95"
         >
           <Radio className="h-4 w-4" />
-          Brief the Chief
+          Capture
           <kbd className="hidden rounded border border-ink-950/20 bg-white/20 px-1.5 py-0.5 font-mono text-[10px] text-ink-950/60 sm:block">⌘K</kbd>
         </button>
       )}
@@ -274,10 +275,10 @@ export function CommandDock() {
                 <Sparkles className="h-4 w-4 text-ink-950" strokeWidth={2.5} />
               </div>
               <div>
-                <div className="text-sm font-semibold text-white">Chief of Staff</div>
+                <div className="text-sm font-semibold text-white">Household Capture</div>
                 <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
                   <span className="h-1.5 w-1.5 rounded-full bg-signal-green animate-pulse" />
-                  Ready · Tasks auto-created
+                  Ready · Saves tasks, decisions, and records
                 </div>
               </div>
             </div>
@@ -314,9 +315,9 @@ export function CommandDock() {
               // Empty state — show quick prompts
               <div className="space-y-4">
                 <div className="rounded-xl bg-ink-900/60 px-4 py-4 text-sm text-slate-400 ring-1 ring-inset ring-white/5">
-                  <p className="font-medium text-slate-300">What's on your mind?</p>
+                  <p className="font-medium text-slate-300">What needs to be handled?</p>
                   <p className="mt-1 text-xs text-slate-500">
-                    Tell me anything about the house — I'll route it to the right agent and create tasks automatically.
+                    Capture a task, decision, shopping need, calendar item, or household note.
                   </p>
                 </div>
                 <div>

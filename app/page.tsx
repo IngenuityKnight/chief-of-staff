@@ -1,21 +1,29 @@
 import Link from "next/link";
-import { ArrowRight, AlertTriangle, Sparkles, Clock, DollarSign, Wrench, CalendarDays, Package, TrendingUp } from "lucide-react";
+import { ArrowRight, AlertTriangle, Clock, DollarSign, Wrench, CalendarDays, Package, TrendingUp, HelpCircle } from "lucide-react";
 import { AGENTS, TASK_STATUS } from "@/lib/agents";
 import { Panel, Stat, AgentBadge, SectionHeading } from "@/components/ui";
 import { formatMoney, formatTime, relativeDay, daysUntil } from "@/lib/utils";
-import { getBills, getBriefingSummary, getCalendarEvents, getInventoryItems, getMaintenanceItems, getTasks } from "@/lib/server/data";
+import { getBills, getBriefingSummary, getCalendarEvents, getDecisions, getInventoryItems, getMaintenanceItems, getTasks } from "@/lib/server/data";
 
 export default async function BriefingPage() {
-  const [briefing, tasks, bills, maintenance, calendar, inventory] = await Promise.all([
+  const [briefing, tasks, bills, maintenance, calendar, inventory, decisions] = await Promise.all([
     getBriefingSummary(),
     getTasks(),
     getBills(),
     getMaintenanceItems(),
     getCalendarEvents(),
     getInventoryItems(),
+    getDecisions(),
   ]);
 
   const lowStockItems = inventory.filter((i) => i.quantity <= i.minQuantity);
+  const openDecisions = decisions
+    .filter((decision) => decision.status === "open")
+    .sort((a, b) => {
+      const order = { critical: 0, high: 1, medium: 2, low: 3 };
+      return order[a.priority] - order[b.priority];
+    })
+    .slice(0, 4);
 
   const topTasks = tasks
     .filter((t) => t.status !== "done")
@@ -55,6 +63,7 @@ export default async function BriefingPage() {
             <p className="mt-2 max-w-xl text-base text-slate-300">{briefing.headline}</p>
 
             <div className="mt-5 grid grid-cols-2 gap-5 md:grid-cols-4 lg:grid-cols-6">
+              <Stat value={openDecisions.length} label="Decisions" tone={openDecisions.length > 0 ? "amber" : "green"} />
               <Stat value={briefing.tasksOpen} label="Open Tasks" />
               <Stat value={briefing.tasksDue} label="Due ≤3d" tone="amber" />
               <Stat value={briefing.tasksOverdue} label="Overdue" tone="red" />
@@ -68,13 +77,13 @@ export default async function BriefingPage() {
 
           <div className="space-y-2.5">
             <SectionHeading>Top Priorities</SectionHeading>
-            {briefing.priorities.map((p) => (
-              <div key={p.id} className="rounded-lg border border-edge bg-ink-900/60 p-3">
+            {briefing.priorities.map((priority) => (
+              <div key={priority.id} className="rounded-lg border border-edge bg-ink-900/60 p-3">
                 <div className="flex items-start gap-3">
-                  <AgentBadge agent={p.agent} />
+                  <AgentBadge agent={priority.agent} />
                   <div className="flex-1">
-                    <div className="text-sm font-medium text-slate-100">{p.title}</div>
-                    <div className="mt-0.5 text-xs text-slate-400">{p.why}</div>
+                    <div className="text-sm font-medium text-slate-100">{priority.title}</div>
+                    <div className="mt-0.5 text-xs text-slate-400">{priority.why}</div>
                   </div>
                 </div>
               </div>
@@ -83,19 +92,55 @@ export default async function BriefingPage() {
         </div>
       </section>
 
-      {/* Cross-agent insights */}
-      <Panel eyebrow="Synthesis" title="Cross-Agent Insights" action={<AgentBadge agent="chief" size="md" />}>
+      <Panel
+        eyebrow="Decision Support"
+        title="Choices Waiting On You"
+        action={
+          <Link href="/decisions" className="flex items-center gap-1 text-xs font-semibold text-signal-blue hover:underline">
+            Decision queue <ArrowRight className="h-3 w-3" />
+          </Link>
+        }
+      >
+        {openDecisions.length === 0 ? (
+          <div className="flex items-center gap-3 rounded-lg border border-edge bg-ink-900/40 px-4 py-3 text-sm text-slate-400">
+            <HelpCircle className="h-4 w-4 text-slate-500" />
+            No open decisions. New captures that require a choice will appear here.
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {openDecisions.map((decision) => (
+              <Link key={decision.id} href="/decisions" className="rounded-lg border border-edge bg-ink-900/40 p-4 transition hover:border-signal-blue/30 hover:bg-ink-900/70">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-2xs font-semibold uppercase tracking-[0.16em] text-slate-500">{decision.category}</span>
+                  <span className={decision.priority === "critical" ? "pill-red" : decision.priority === "high" ? "pill-amber" : "pill-blue"}>
+                    {decision.priority}
+                  </span>
+                </div>
+                <div className="mt-2 text-sm font-semibold text-slate-100">{decision.title}</div>
+                {decision.recommendation && (
+                  <div className="mt-2 text-xs text-slate-400">{decision.recommendation}</div>
+                )}
+                <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500">
+                  {decision.dueDate ? <span>{relativeDay(decision.dueDate)}</span> : <span>No deadline</span>}
+                  {decision.costEstimate !== undefined && <span>{formatMoney(decision.costEstimate)}</span>}
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </Panel>
+
+      <Panel eyebrow="Household Signals" title="Where Time Or Money Can Be Saved">
         <div className="grid gap-3 md:grid-cols-3">
-          {briefing.crossAgentInsights.map((x) => (
-            <div key={x.id} className="rounded-lg border border-edge bg-ink-900/40 p-4">
+          {briefing.crossAgentInsights.map((insight) => (
+            <div key={insight.id} className="rounded-lg border border-edge bg-ink-900/40 p-4">
               <div className="mb-2 flex gap-1.5">
-                {x.agents.map((a) => (
-                  <AgentBadge key={a} agent={a} />
+                {insight.agents.map((agent) => (
+                  <AgentBadge key={agent} agent={agent} />
                 ))}
               </div>
-              <div className="flex gap-2 text-sm text-slate-300">
-                <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-signal-blue" />
-                <span>{x.insight}</span>
+              <div className="text-sm text-slate-300">
+                {insight.insight}
               </div>
             </div>
           ))}
@@ -201,7 +246,7 @@ export default async function BriefingPage() {
           title="Bills on deck"
           action={
             <Link href="/money" className="flex items-center gap-1 text-xs font-semibold text-signal-blue hover:underline">
-              Ledger <ArrowRight className="h-3 w-3" />
+              Bills <ArrowRight className="h-3 w-3" />
             </Link>
           }
         >

@@ -5,13 +5,13 @@ import { Topbar } from "@/components/topbar";
 import { CommandDock } from "@/components/command-dock";
 
 export const metadata: Metadata = {
-  title: "Chief of Staff — Home Command",
-  description: "A general-purpose Chief of Staff platform for the home. Coordinates meals, maintenance, money, and schedule.",
+  title: "Burden House — Household OS",
+  description: "A household operating system for decisions, tasks, money, meals, maintenance, and schedule.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Chief of Staff",
+    title: "Burden House",
   },
   other: {
     "mobile-web-app-capable": "yes",

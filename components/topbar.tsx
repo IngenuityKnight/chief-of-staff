@@ -4,19 +4,20 @@ import { usePathname } from "next/navigation";
 import { Search, Bell, Command } from "lucide-react";
 
 const TITLES: Record<string, { eyebrow: string; title: string }> = {
-  "/":           { eyebrow: "Command Center",  title: "Briefing" },
-  "/inbox":      { eyebrow: "Command Center",  title: "Inbox" },
-  "/tasks":      { eyebrow: "Command Center",  title: "Tasks" },
+  "/":           { eyebrow: "Burden House",    title: "Today" },
+  "/decisions":  { eyebrow: "Burden House",    title: "Decision Queue" },
+  "/inbox":      { eyebrow: "Burden House",    title: "Inbox" },
+  "/tasks":      { eyebrow: "Burden House",    title: "Tasks" },
   "/inventory":  { eyebrow: "Household",       title: "Inventory" },
   "/vehicles":   { eyebrow: "Household",       title: "Vehicles" },
   "/appliances": { eyebrow: "Household",       title: "Appliances" },
   "/shopping":   { eyebrow: "Household",       title: "Shopping List" },
-  "/meals":      { eyebrow: "Meals Agent",     title: "Kitchen Ops" },
-  "/home":       { eyebrow: "Home Agent",      title: "Maintenance" },
-  "/money":      { eyebrow: "Money Agent",     title: "Ledger" },
-  "/schedule":   { eyebrow: "Schedule Agent",  title: "Calendar" },
-  "/roster":     { eyebrow: "Roster Agent",    title: "Household" },
-  "/data":       { eyebrow: "Command Center",  title: "Data Studio" },
+  "/meals":      { eyebrow: "Meals",           title: "Meal Planning" },
+  "/home":       { eyebrow: "Home",            title: "Maintenance" },
+  "/money":      { eyebrow: "Money",           title: "Bills & Budget" },
+  "/schedule":   { eyebrow: "Schedule",        title: "Calendar" },
+  "/roster":     { eyebrow: "Household",       title: "People & Rules" },
+  "/data":       { eyebrow: "Burden House",    title: "Data Studio" },
 };
 
 export function Topbar() {
@@ -42,7 +43,7 @@ export function Topbar() {
           className="hidden items-center gap-2 rounded-md border border-edge bg-ink-900 px-3 py-1.5 text-xs text-slate-400 transition hover:text-slate-200 md:flex"
         >
           <Search className="h-3.5 w-3.5" />
-          <span>Search across everything…</span>
+          <span>Capture or search…</span>
           <span className="kbd ml-4">⌘K</span>
         </button>
         <button
@@ -59,7 +60,7 @@ export function Topbar() {
           className="flex items-center gap-2 rounded-md bg-signal-blue/90 px-3 py-1.5 text-xs font-semibold text-ink-950 transition hover:bg-signal-blue"
         >
           <Command className="h-3.5 w-3.5" />
-          New capture
+          Capture
         </button>
       </div>
     </header>

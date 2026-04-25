@@ -14,6 +14,7 @@ export type Priority = "low" | "medium" | "high" | "critical";
 export type Status = "new" | "routed" | "processing" | "processed" | "completed" | "blocked";
 
 export type TaskStatus = "todo" | "in_progress" | "blocked" | "done";
+export type DecisionStatus = "open" | "approved" | "deferred" | "dismissed";
 
 export interface InboxItem {
   id: string;
@@ -42,6 +43,23 @@ export interface Task {
   inboxItemId?: string;
   notes?: string;
   createdAt: string;
+}
+
+export interface Decision {
+  id: string;
+  title: string;
+  context?: string;
+  status: DecisionStatus;
+  priority: Priority;
+  category: Category;
+  recommendation?: string;
+  options: string[];
+  costEstimate?: number;
+  timeEstimateMinutes?: number;
+  dueDate?: string;
+  sourceInboxItemId?: string;
+  createdAt: string;
+  resolvedAt?: string;
 }
 
 export interface MealPlanDay {

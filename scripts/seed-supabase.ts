@@ -1,6 +1,7 @@
 import {
   bills,
   calendar,
+  decisions,
   household,
   inboxItems,
   maintenance,
@@ -69,6 +70,27 @@ async function main() {
       inbox_item_id: task.inboxItemId ?? null,
       notes: task.notes ?? null,
       created_at: task.createdAt,
+    })),
+    "id"
+  );
+
+  await upsert(
+    "decisions",
+    decisions.map((decision) => ({
+      id: decision.id,
+      title: decision.title,
+      context: decision.context ?? null,
+      status: decision.status,
+      priority: decision.priority,
+      category: decision.category,
+      recommendation: decision.recommendation ?? null,
+      options: decision.options,
+      cost_estimate: decision.costEstimate ?? null,
+      time_estimate_minutes: decision.timeEstimateMinutes ?? null,
+      due_date: decision.dueDate ?? null,
+      source_inbox_item_id: decision.sourceInboxItemId ?? null,
+      created_at: decision.createdAt,
+      resolved_at: decision.resolvedAt ?? null,
     })),
     "id"
   );

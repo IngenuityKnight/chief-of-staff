@@ -2,6 +2,7 @@ import {
   bills as mockBills,
   briefing as mockBriefing,
   calendar as mockCalendar,
+  decisions as mockDecisions,
   household as mockHousehold,
   inboxItems as mockInboxItems,
   maintenance as mockMaintenance,
@@ -15,6 +16,7 @@ import type {
   BillItem,
   BriefingSummary,
   CalendarEvent,
+  Decision,
   HouseMember,
   InboxItem,
   InventoryItem,
@@ -108,6 +110,30 @@ function mapTask(row: Record<string, unknown>): Task {
     inboxItemId: typeof row.inbox_item_id === "string" ? row.inbox_item_id : undefined,
     notes: typeof row.notes === "string" ? row.notes : undefined,
     createdAt: String(row.created_at),
+  };
+}
+
+function asDecisionOptions(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string");
+}
+
+function mapDecision(row: Record<string, unknown>): Decision {
+  return {
+    id: String(row.id),
+    title: String(row.title),
+    context: typeof row.context === "string" ? row.context : undefined,
+    status: row.status as Decision["status"],
+    priority: row.priority as Decision["priority"],
+    category: row.category as Decision["category"],
+    recommendation: typeof row.recommendation === "string" ? row.recommendation : undefined,
+    options: asDecisionOptions(row.options),
+    costEstimate: row.cost_estimate === null || row.cost_estimate === undefined ? undefined : Number(row.cost_estimate),
+    timeEstimateMinutes: row.time_estimate_minutes === null || row.time_estimate_minutes === undefined ? undefined : Number(row.time_estimate_minutes),
+    dueDate: typeof row.due_date === "string" ? row.due_date : undefined,
+    sourceInboxItemId: typeof row.source_inbox_item_id === "string" ? row.source_inbox_item_id : undefined,
+    createdAt: String(row.created_at),
+    resolvedAt: typeof row.resolved_at === "string" ? row.resolved_at : undefined,
   };
 }
 
@@ -232,6 +258,10 @@ export async function getInboxItems() {
 
 export async function getTasks() {
   return selectRows("tasks", mockTasks, mapTask, { column: "created_at", ascending: false });
+}
+
+export async function getDecisions() {
+  return selectRows("decisions", mockDecisions, mapDecision, { column: "created_at", ascending: false });
 }
 
 export async function getMaintenanceItems() {

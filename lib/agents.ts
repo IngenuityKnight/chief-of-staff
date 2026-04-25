@@ -12,9 +12,9 @@ export const AGENTS: Record<AgentId, {
 }> = {
   chief: {
     id: "chief",
-    name: "Chief of Staff",
-    shortName: "Chief",
-    role: "Triage · Coordinate · Synthesize",
+    name: "Capture",
+    shortName: "Capture",
+    role: "Triage · Decide · Track",
     color: "blue",
     pillClass: "pill-blue",
     dotClass: "bg-signal-blue",
@@ -22,7 +22,7 @@ export const AGENTS: Record<AgentId, {
   },
   meals: {
     id: "meals",
-    name: "Meals Agent",
+    name: "Meals",
     shortName: "Meals",
     role: "Plan · Shop · Prep",
     color: "amber",
@@ -32,7 +32,7 @@ export const AGENTS: Record<AgentId, {
   },
   home: {
     id: "home",
-    name: "Home Agent",
+    name: "Home",
     shortName: "Home",
     role: "Maintain · Repair · Project",
     color: "green",
@@ -42,7 +42,7 @@ export const AGENTS: Record<AgentId, {
   },
   money: {
     id: "money",
-    name: "Money Agent",
+    name: "Money",
     shortName: "Money",
     role: "Bills · Budget · Audit",
     color: "purple",
@@ -52,7 +52,7 @@ export const AGENTS: Record<AgentId, {
   },
   schedule: {
     id: "schedule",
-    name: "Schedule Agent",
+    name: "Schedule",
     shortName: "Schedule",
     role: "Calendar · Time · Appointments",
     color: "cyan",
@@ -62,7 +62,7 @@ export const AGENTS: Record<AgentId, {
   },
   roster: {
     id: "roster",
-    name: "Roster Agent",
+    name: "Roster",
     shortName: "Roster",
     role: "Household · Guests · Relationships",
     color: "pink",

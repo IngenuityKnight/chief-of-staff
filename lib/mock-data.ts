@@ -1,6 +1,6 @@
 import type {
   InboxItem, Task, MealPlanDay, MaintenanceItem, BillItem,
-  CalendarEvent, HouseMember, Rule, BriefingSummary,
+  CalendarEvent, Decision, HouseMember, Rule, BriefingSummary,
 } from "./types";
 
 // Today anchor — everything dates relative so the demo always looks "live"
@@ -144,6 +144,55 @@ export const tasks: Task[] = [
   { id: "tsk_14", title: "Renew passport — start application", agent: "home",     category: "Admin",     status: "todo",        priority: "medium",   dueDate: iso(14, 0), createdAt: iso(-6, 0, 0) },
 ];
 
+// ── DECISIONS ────────────────────────────────────────────────
+export const decisions: Decision[] = [
+  {
+    id: "dec_01",
+    title: "Choose dishwasher path",
+    context: "Standing water started two days ago. Try the filter/drain hose first, then decide whether repair quotes are worth it.",
+    status: "open",
+    priority: "high",
+    category: "Household",
+    recommendation: "Spend 15 minutes on the filter and drain hose before authorizing a service call.",
+    options: ["Try basic fix today", "Book repair quote", "Replace if quote is over $500"],
+    costEstimate: 180,
+    timeEstimateMinutes: 15,
+    dueDate: iso(0, 20),
+    sourceInboxItemId: "inb_002",
+    createdAt: iso(-1, 19, 52),
+  },
+  {
+    id: "dec_02",
+    title: "Pick summer camp registration plan",
+    context: "Registration opens Monday at 9am and sold out quickly last year.",
+    status: "open",
+    priority: "critical",
+    category: "Planning",
+    recommendation: "Block 8:55am and pre-authorize the deposit before registration opens.",
+    options: ["Register both kids", "Register one kid", "Skip this camp and find backup options"],
+    costEstimate: 900,
+    timeEstimateMinutes: 20,
+    dueDate: iso(2, 8, 55),
+    sourceInboxItemId: "inb_006",
+    createdAt: iso(-1, 9, 25),
+  },
+  {
+    id: "dec_03",
+    title: "Review Spotify Family plan",
+    context: "Two accounts appear dormant. Downgrading could save about $84/year if that usage is truly inactive.",
+    status: "open",
+    priority: "low",
+    category: "Finance",
+    recommendation: "Confirm inactive users before changing the plan.",
+    options: ["Keep family plan", "Downgrade to Duo", "Cancel and move to free tier"],
+    costEstimate: 84,
+    timeEstimateMinutes: 10,
+    dueDate: iso(5, 18),
+    sourceInboxItemId: "inb_005",
+    createdAt: iso(-4, 11, 36),
+  },
+];
+
 // ── MEAL PLAN ────────────────────────────────────────────────
 export const mealPlan: MealPlanDay[] = [
   { date: isoDate(0), label: "Today",     theme: "Light / Leftovers",
@@ -233,8 +282,8 @@ export const rules: Rule[] = [
 // ── BRIEFING (synthesized) ───────────────────────────────────
 export const briefing: BriefingSummary = {
   date: new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" }),
-  greeting: "Good morning, Ben",
-  headline: "Busy week ahead — three cross-agent moves are queued for your approval.",
+  greeting: "Good morning",
+  headline: "The Burden house has a few choices waiting: one repair, one registration window, and one subscription review.",
   tasksOpen: tasks.filter(t => t.status !== "done").length,
   tasksDue: tasks.filter(t => t.dueDate && new Date(t.dueDate).getTime() - TODAY.getTime() < 3 * 86400000 && t.status !== "done").length,
   tasksOverdue: 1,
@@ -244,12 +293,12 @@ export const briefing: BriefingSummary = {
   lowStockItems: 0,
   savingsRatePercent: null,
   priorities: [
-    { id: "p1", title: "Dishwasher — try filter clear before booking repair", agent: "home",     why: "Blocks next task; 15 min effort could save a $180 service call." },
+    { id: "p1", title: "Decide dishwasher path",                               agent: "home",     why: "15 minutes of basic troubleshooting could avoid a $180 service call." },
     { id: "p2", title: "Gas bill overdue — 2 days",                            agent: "money",    why: "Autopay is off. Late fee hits at day 5." },
-    { id: "p3", title: "Approve Mon 8:55am camp-registration block",           agent: "schedule", why: "Last year sold out in under an hour. Money pre-auth ready." },
+    { id: "p3", title: "Confirm summer camp registration plan",                agent: "schedule", why: "Last year sold out in under an hour. Deposit needs to be ready." },
   ],
   crossAgentInsights: [
-    { id: "x1", agents: ["meals", "schedule"], insight: "Wednesday's late call landed in your dinner window. Meals agent proposed Thai delivery — no prep required." },
+    { id: "x1", agents: ["meals", "schedule"], insight: "Wednesday's late call lands in the dinner window. Pick a no-cook dinner or prep ahead." },
     { id: "x2", agents: ["home", "money"],     insight: "Dishwasher repair quotes incoming this week. Home-repair reserve: $1,840 available." },
     { id: "x3", agents: ["money", "roster"],   insight: "Spotify Family review pending — 2 dormant seats across household could save $84/yr if downgraded." },
   ],

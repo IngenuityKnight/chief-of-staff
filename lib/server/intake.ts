@@ -24,7 +24,7 @@ export type CreatedTask = {
 
 export type AppliedChange = {
   id: string;
-  resource: "calendar" | "shopping";
+  resource: "calendar" | "decisions" | "shopping";
   label: string;
 };
 
@@ -232,6 +232,36 @@ function parseShoppingItems(text: string) {
     .slice(0, 5);
 }
 
+function shouldCreateDecision(text: string) {
+  const lower = text.toLowerCase();
+  return /\b(decide|decision|choose|pick|figure out|should we|which|approve|quote|option|compare)\b/.test(lower);
+}
+
+function buildDecisionTitle(text: string) {
+  const normalized = text
+    .replace(/\b(we need to|need to|can you|please|help me|help us)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const title = normalized.length > 0 ? normalized : text;
+  return buildTitle(title[0]?.toUpperCase() + title.slice(1));
+}
+
+function decisionRecommendation(text: string, category: Category) {
+  const lower = text.toLowerCase();
+  if (lower.includes("quote") || lower.includes("repair")) return "Compare cost, urgency, and whether a lower-effort fix is worth trying first.";
+  if (lower.includes("subscription") || lower.includes("cancel")) return "Check usage before canceling so savings do not create household friction.";
+  if (category === "Finance") return "Estimate the cash impact before committing.";
+  if (category === "Planning") return "Choose the lowest-friction option that protects the deadline.";
+  return "Capture the options, pick a next action, and set a deadline if timing matters.";
+}
+
+function decisionOptionsFor(text: string) {
+  const lower = text.toLowerCase();
+  if (lower.includes("quote") || lower.includes("repair")) return ["Try a low-cost fix first", "Approve the best quote", "Defer and monitor"];
+  if (lower.includes("subscription") || lower.includes("cancel")) return ["Keep as-is", "Downgrade", "Cancel"];
+  return ["Approve", "Defer", "Dismiss"];
+}
+
 // ─── Claude analysis ──────────────────────────────────────────────────────────
 
 const AGENT_IDS: AgentId[] = ["meals", "home", "money", "schedule", "roster", "chief"];
@@ -380,6 +410,26 @@ export async function applyIntakeChanges(analysis: IntakeAnalysis): Promise<Appl
 
   const changes: AppliedChange[] = [];
   const lower = analysis.text.toLowerCase();
+
+  if (shouldCreateDecision(analysis.text)) {
+    const id = crypto.randomUUID();
+    const title = buildDecisionTitle(analysis.text);
+    const { error } = await supabase.from("decisions").insert({
+      id,
+      title,
+      context: analysis.text,
+      status: "open",
+      priority: analysis.urgency,
+      category: analysis.routing.category,
+      recommendation: decisionRecommendation(analysis.text, analysis.routing.category),
+      options: decisionOptionsFor(analysis.text),
+      source_inbox_item_id: analysis.id,
+      created_at: new Date().toISOString(),
+    });
+
+    if (!error) changes.push({ id, resource: "decisions", label: `Created decision: ${title}` });
+    else console.error("Decision creation from intake failed:", error);
+  }
 
   if (
     analysis.routing.primary === "schedule" &&

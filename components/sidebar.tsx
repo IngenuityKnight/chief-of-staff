@@ -5,20 +5,21 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Inbox, CheckSquare, UtensilsCrossed,
   Wrench, Wallet, CalendarDays, Users, Settings, Radio,
-  Package, Car, Zap, ShoppingCart,
+  Package, Car, Zap, ShoppingCart, HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/",           label: "Briefing",   icon: LayoutDashboard, hint: "Today's command surface" },
-  { href: "/inbox",      label: "Inbox",      icon: Inbox,           hint: "Unrouted + recent intake" },
-  { href: "/tasks",      label: "Tasks",      icon: CheckSquare,     hint: "Active queue across agents" },
+  { href: "/",           label: "Today",      icon: LayoutDashboard, hint: "What needs attention now" },
+  { href: "/decisions",  label: "Decisions",  icon: HelpCircle,      hint: "Choices waiting on you" },
+  { href: "/tasks",      label: "Tasks",      icon: CheckSquare,     hint: "Household work queue" },
+  { href: "/inbox",      label: "Inbox",      icon: Inbox,           hint: "Recent captures and imports" },
   { type: "divider", label: "Household" } as const,
   { href: "/inventory",  label: "Inventory",  icon: Package,         hint: "Pantry, consumables, supplies" },
   { href: "/vehicles",   label: "Vehicles",   icon: Car,             hint: "Vehicles + maintenance" },
   { href: "/appliances", label: "Appliances", icon: Zap,             hint: "Appliances + warranties" },
   { href: "/shopping",   label: "Shopping",   icon: ShoppingCart,    hint: "AI-generated shopping list" },
-  { type: "divider", label: "Agents" } as const,
+  { type: "divider", label: "Areas" } as const,
   { href: "/meals",      label: "Meals",      icon: UtensilsCrossed, hint: "Plans, groceries, prep" },
   { href: "/home",       label: "Home",       icon: Wrench,          hint: "Maintenance + repairs" },
   { href: "/money",      label: "Money",      icon: Wallet,          hint: "Bills + budget" },
@@ -43,14 +44,14 @@ export function Sidebar() {
               </span>
             </div>
             <div>
-              <div className="text-2xs font-semibold uppercase tracking-[0.18em] text-slate-500">Home Command</div>
-              <div className="font-display text-sm font-semibold leading-tight text-white">Chief of Staff</div>
+              <div className="text-2xs font-semibold uppercase tracking-[0.18em] text-slate-500">Burden House</div>
+              <div className="font-display text-sm font-semibold leading-tight text-white">Household OS</div>
             </div>
           </div>
           <div className="mt-4 rounded-md border border-edge bg-ink-900/60 px-3 py-2">
-            <div className="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">Theater</div>
-            <div className="mt-0.5 text-sm font-medium text-slate-200">The Merrick House</div>
-            <div className="mt-0.5 text-xs text-slate-500">Columbia · MD</div>
+            <div className="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-500">Household</div>
+            <div className="mt-0.5 text-sm font-medium text-slate-200">The Burden House</div>
+            <div className="mt-0.5 text-xs text-slate-500">Time, money, decisions</div>
           </div>
         </div>
 
