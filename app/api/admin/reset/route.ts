@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resetInboxAndTasks } from "@/lib/server/admin";
+import { resetAdminTarget, type AdminResetTarget } from "@/lib/server/admin";
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,12 +8,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Invalid request body." }, { status: 400 });
     }
 
-    const { target } = body as { target?: string };
-    if (target !== "inbox-and-tasks") {
-      return NextResponse.json({ ok: false, error: "Unknown reset target." }, { status: 400 });
+    const { target, confirm } = body as { target?: string; confirm?: string };
+    if (!target || confirm !== target) {
+      return NextResponse.json({ ok: false, error: "Reset confirmation did not match the target." }, { status: 400 });
     }
 
-    const result = await resetInboxAndTasks();
+    const result = await resetAdminTarget(target as AdminResetTarget);
 
     return NextResponse.json(
       { ok: true, ...result },

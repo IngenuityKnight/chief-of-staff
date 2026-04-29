@@ -1,7 +1,11 @@
 import { DataEditor } from "@/components/data-editor";
-import { getAdminCollections } from "@/lib/server/admin";
+import { getAdminCollections, getAdminResetTargets } from "@/lib/server/admin";
 
 export default async function DataPage() {
-  const resources = await getAdminCollections();
-  return <DataEditor resources={resources} />;
+  const [resources, resetTargets] = await Promise.all([
+    getAdminCollections(),
+    Promise.resolve(getAdminResetTargets()),
+  ]);
+
+  return <DataEditor resources={resources} resetTargets={resetTargets} />;
 }

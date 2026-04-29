@@ -55,6 +55,8 @@ export type AdminField = {
   options?: string[];
 };
 
+export type AdminResetTarget = AdminResource | "inbox-and-tasks" | "all";
+
 type AdminConfig<T> = {
   label: string;
   table: string;
@@ -678,6 +680,19 @@ export function getAdminFields(resource: AdminResource): AdminField[] {
   return adminConfig[resource].fields;
 }
 
+export function getAdminResetTargets() {
+  const resources = Object.entries(adminConfig).map(([resource, config]) => ({
+    target: resource as AdminResource,
+    label: config.label,
+  }));
+
+  return [
+    { target: "all" as const, label: "All Data Groups" },
+    { target: "inbox-and-tasks" as const, label: "Inbox + Tasks" },
+    ...resources,
+  ];
+}
+
 export function revalidateAdminPaths() {
   ADMIN_REVALIDATE_PATHS.forEach((path) => {
     revalidatePath(path);
@@ -779,11 +794,64 @@ async function deleteAllRows(table: string) {
   return data?.length ?? 0;
 }
 
-export async function resetInboxAndTasks() {
-  const tasksDeleted = await deleteAllRows("tasks");
-  const inboxDeleted = await deleteAllRows("inbox_items");
+export async function resetAdminTarget(target: AdminResetTarget) {
+  if (target === "all") {
+    const deleteOrder: AdminResource[] = [
+      "tasks",
+      "decisions",
+      "shopping",
+      "inbox",
+      "maintenance",
+      "bills",
+      "calendar",
+      "household",
+      "rules",
+      "meal-plan",
+      "inventory",
+      "vehicles",
+      "appliances",
+    ];
+    const details: Record<string, number> = {};
+    let deleted = 0;
+
+    for (const resource of deleteOrder) {
+      const count = await deleteAllRows(adminConfig[resource].table);
+      details[`${resource}Deleted`] = count;
+      deleted += count;
+    }
+
+    revalidateAdminPaths();
+
+    return {
+      label: "All Data Groups",
+      deleted,
+      details,
+    };
+  }
+
+  if (target === "inbox-and-tasks") {
+    const tasksDeleted = await deleteAllRows("tasks");
+    const inboxDeleted = await deleteAllRows("inbox_items");
+
+    revalidateAdminPaths();
+
+    return {
+      label: "Inbox + Tasks",
+      deleted: tasksDeleted + inboxDeleted,
+      details: { tasksDeleted, inboxDeleted },
+    };
+  }
+
+  const config = adminConfig[target];
+  if (!config) throw new Error("Unknown reset target.");
+
+  const deleted = await deleteAllRows(config.table);
 
   revalidateAdminPaths();
 
-  return { tasksDeleted, inboxDeleted };
+  return {
+    label: config.label,
+    deleted,
+    details: { [`${target}Deleted`]: deleted },
+  };
 }

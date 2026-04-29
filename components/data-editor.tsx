@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import type { AdminField, AdminResource } from "@/lib/server/admin";
+import type { AdminField, AdminResetTarget, AdminResource } from "@/lib/server/admin";
 
 type ResourcePayload = {
   label: string;
@@ -14,6 +14,7 @@ type ResourcePayload = {
 
 type EditorProps = {
   resources: Record<AdminResource, ResourcePayload>;
+  resetTargets: Array<{ target: AdminResetTarget; label: string }>;
 };
 
 type FormState = Record<string, string | boolean>;
@@ -37,10 +38,11 @@ function buildFormState(fields: AdminField[], record: Record<string, unknown>): 
   return Object.fromEntries(fields.map((field) => [field.key, fieldValue(field, record[field.key])]));
 }
 
-export function DataEditor({ resources }: EditorProps) {
+export function DataEditor({ resources, resetTargets }: EditorProps) {
   const router = useRouter();
   const resourceKeys = Object.keys(resources) as AdminResource[];
   const [activeResource, setActiveResource] = useState<AdminResource>(resourceKeys[0]);
+  const [resetTarget, setResetTarget] = useState<AdminResetTarget>("inbox-and-tasks");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [formState, setFormState] = useState<FormState>({});
   const [saving, setSaving] = useState(false);
@@ -49,6 +51,7 @@ export function DataEditor({ resources }: EditorProps) {
   const [message, setMessage] = useState<string | null>(null);
 
   const resource = resources[activeResource];
+  const selectedResetTarget = resetTargets.find((item) => item.target === resetTarget) ?? resetTargets[0];
   const selectedRecord = useMemo(
     () => resource.records.find((record) => String(record.id ?? record.date) === selectedId) ?? null,
     [resource, selectedId]
@@ -86,10 +89,10 @@ export function DataEditor({ resources }: EditorProps) {
     }
   }
 
-  async function resetInboxAndTasks() {
+  async function resetDataGroup() {
     if (!resetConfirm) {
       setResetConfirm(true);
-      setMessage("Click again to permanently clear inbox and tasks.");
+      setMessage(`This permanently deletes ${selectedResetTarget.label}. Click confirm only if you are sure.`);
       return;
     }
 
@@ -100,18 +103,18 @@ export function DataEditor({ resources }: EditorProps) {
       const response = await fetch("/api/admin/reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ target: "inbox-and-tasks" }),
+        body: JSON.stringify({ target: resetTarget, confirm: resetTarget }),
       });
       const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error ?? "Failed to clear inbox and tasks.");
+      if (!response.ok) throw new Error(payload.error ?? "Failed to clear data group.");
 
       setSelectedId(null);
       setFormState({});
       setResetConfirm(false);
-      setMessage(`Cleared ${payload.tasksDeleted} tasks and ${payload.inboxDeleted} inbox items.`);
+      setMessage(`Cleared ${payload.deleted} ${payload.label} records.`);
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Failed to clear inbox and tasks.");
+      setMessage(error instanceof Error ? error.message : "Failed to clear data group.");
       setResetConfirm(false);
     } finally {
       setResetting(false);
@@ -148,9 +151,25 @@ export function DataEditor({ resources }: EditorProps) {
             ))}
           </div>
           <div className="flex flex-wrap items-center gap-3 border-t border-edge pt-4">
+            <select
+              value={resetTarget}
+              onChange={(event) => {
+                setResetTarget(event.target.value as AdminResetTarget);
+                setResetConfirm(false);
+                setMessage(null);
+              }}
+              disabled={resetting}
+              className="rounded-md border border-edge bg-ink-950 px-3 py-2 text-sm text-slate-100 focus:border-signal-blue/40 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {resetTargets.map((item) => (
+                <option key={item.target} value={item.target}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
             <button
               type="button"
-              onClick={resetInboxAndTasks}
+              onClick={resetDataGroup}
               disabled={resetting}
               className={cn(
                 "rounded-md border px-3 py-2 text-sm font-semibold transition",
@@ -160,9 +179,9 @@ export function DataEditor({ resources }: EditorProps) {
                 resetting && "cursor-not-allowed opacity-50"
               )}
             >
-              {resetting ? "Clearing..." : resetConfirm ? "Confirm clear inbox + tasks" : "Clear inbox + tasks"}
+              {resetting ? "Clearing..." : resetConfirm ? `Yes, clear ${selectedResetTarget.label}` : `Clear ${selectedResetTarget.label}`}
             </button>
-            <span className="text-xs text-slate-500">Deletes task rows and inbox rows only.</span>
+            <span className="text-xs text-slate-500">Requires a second confirm click before deleting records.</span>
           </div>
         </div>
       </Panel>
