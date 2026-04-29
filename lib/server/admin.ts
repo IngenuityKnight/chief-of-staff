@@ -114,7 +114,7 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
       const patch = pickAllowed(payload, ["title", "analysis", "primaryAgent", "secondaryAgents", "category", "needsAction", "proposedTasks", "status", "urgency"]);
       return {
         ...(patch.title !== undefined ? { title: toNullableString(patch.title) } : {}),
-        ...(patch.analysis !== undefined ? { analysis: toNullableString(patch.analysis) } : {}),
+        ...(patch.analysis !== undefined ? { analysis: toNullableString(patch.analysis) ?? "" } : {}),
         ...(patch.primaryAgent !== undefined ? { primary_agent: patch.primaryAgent } : {}),
         ...(patch.secondaryAgents !== undefined ? { secondary_agents: parseJsonField(patch.secondaryAgents) ?? [] } : {}),
         ...(patch.category !== undefined ? { category: patch.category } : {}),
@@ -130,7 +130,7 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
         created_at: new Date().toISOString(),
         title: toNullableString(payload.title) ?? "",
         raw_input: "",
-        analysis: toNullableString(payload.analysis) ?? null,
+        analysis: toNullableString(payload.analysis) ?? "",
         primary_agent: payload.primaryAgent ?? "chief",
         secondary_agents: parseJsonField(payload.secondaryAgents as string) ?? [],
         category: payload.category ?? "Admin",
@@ -244,11 +244,12 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
       { key: "status", label: "Status", type: "select", options: ["ok", "due-soon", "overdue", "in-progress"] },
       { key: "vendor", label: "Vendor", type: "text" },
       { key: "lastCost", label: "Last Cost", type: "number" },
+      { key: "lastDone", label: "Last Done ISO", type: "text" },
       { key: "nextDue", label: "Next Due ISO", type: "text" },
       { key: "notes", label: "Notes", type: "textarea" },
     ],
     toDbPatch(payload) {
-      const patch = pickAllowed(payload, ["item", "system", "frequency", "status", "vendor", "lastCost", "nextDue", "notes"]);
+      const patch = pickAllowed(payload, ["item", "system", "frequency", "status", "vendor", "lastCost", "lastDone", "nextDue", "notes"]);
       return {
         ...(patch.item !== undefined ? { item: toNullableString(patch.item) } : {}),
         ...(patch.system !== undefined ? { system: patch.system } : {}),
@@ -256,11 +257,13 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
         ...(patch.status !== undefined ? { status: patch.status } : {}),
         ...(patch.vendor !== undefined ? { vendor: toNullableString(patch.vendor) } : {}),
         ...(patch.lastCost !== undefined ? { last_cost: toNumberOrNull(patch.lastCost) } : {}),
+        ...(patch.lastDone !== undefined ? { last_done: toNullableString(patch.lastDone) ?? new Date().toISOString() } : {}),
         ...(patch.nextDue !== undefined ? { next_due: toNullableString(patch.nextDue) } : {}),
         ...(patch.notes !== undefined ? { notes: toNullableString(patch.notes) } : {}),
       };
     },
     toDbInsert(payload, id) {
+      const now = new Date().toISOString();
       return {
         id,
         item: toNullableString(payload.item) ?? "",
@@ -269,8 +272,8 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
         status: payload.status ?? "ok",
         vendor: toNullableString(payload.vendor) ?? null,
         last_cost: toNumberOrNull(payload.lastCost) ?? null,
-        last_done: null,
-        next_due: toNullableString(payload.nextDue) ?? null,
+        last_done: toNullableString(payload.lastDone) ?? now,
+        next_due: toNullableString(payload.nextDue) ?? now,
         notes: toNullableString(payload.notes) ?? null,
       };
     },
@@ -309,7 +312,7 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
         amount: toNumberOrNull(payload.amount) ?? 0,
         due_date: toNullableString(payload.dueDate) ?? null,
         frequency: payload.frequency ?? "monthly",
-        category: toNullableString(payload.category) ?? null,
+        category: toNullableString(payload.category) ?? "General",
         status: payload.status ?? "due",
         autopay: Boolean(payload.autopay ?? false),
         last_paid: toNullableString(payload.lastPaid) ?? null,
@@ -381,7 +384,7 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
         id,
         name: toNullableString(payload.name) ?? "",
         role: payload.role ?? "guest",
-        avatar_color: toNullableString(payload.avatarColor) ?? null,
+        avatar_color: toNullableString(payload.avatarColor) ?? "blue",
         notes: toNullableString(payload.notes) ?? null,
       };
     },
@@ -415,7 +418,7 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
         category: payload.category ?? "general",
         priority: payload.priority ?? "prefer",
         active: Boolean(payload.active ?? true),
-        description: toNullableString(payload.description) ?? null,
+        description: toNullableString(payload.description) ?? "",
       };
     },
   },
@@ -444,7 +447,7 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
     toDbInsert(payload, id) {
       return {
         date: id,
-        label: toNullableString(payload.label) ?? null,
+        label: toNullableString(payload.label) ?? id,
         theme: toNullableString(payload.theme) ?? null,
         breakfast: parseJsonField(payload.breakfast as string) ?? null,
         lunch: parseJsonField(payload.lunch as string) ?? null,
@@ -731,12 +734,14 @@ export async function updateAdminResource(resource: AdminResource, id: string, p
   const supabase = getSupabaseAdmin();
   if (!supabase) throw new Error("Supabase is not configured.");
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from(config.table)
     .update(config.toDbPatch(payload))
-    .eq(config.idKey, id);
+    .eq(config.idKey, id)
+    .select(config.idKey);
 
   if (error) throw new Error(error.message);
+  if (!data || data.length === 0) throw new Error("No matching record was updated.");
 
   revalidateAdminPaths();
 }
@@ -748,12 +753,14 @@ export async function deleteAdminResource(resource: AdminResource, id: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) throw new Error("Supabase is not configured.");
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from(config.table)
     .delete()
-    .eq(config.idKey, id);
+    .eq(config.idKey, id)
+    .select(config.idKey);
 
   if (error) throw new Error(error.message);
+  if (!data || data.length === 0) throw new Error("No matching record was deleted.");
 
   revalidateAdminPaths();
 }

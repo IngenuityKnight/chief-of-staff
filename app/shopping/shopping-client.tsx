@@ -138,13 +138,22 @@ export function ShoppingListClient({ initialItems }: { initialItems: ShoppingLis
     .reduce((sum, i) => sum + (i.estCost ?? 0), 0);
 
   async function handleStatusChange(id: string, status: ShoppingListItem["status"]) {
+    const previousItems = items;
     setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status } : i)));
+    setMessage(null);
     startTransition(async () => {
-      await fetch(`/api/admin/shopping`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, values: { status } }),
-      });
+      try {
+        const response = await fetch(`/api/admin/shopping`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, values: { status } }),
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error ?? "Failed to update shopping item.");
+      } catch (error) {
+        setItems(previousItems);
+        setMessage(error instanceof Error ? error.message : "Failed to update shopping item.");
+      }
     });
   }
 

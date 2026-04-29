@@ -57,7 +57,7 @@ async function selectRows<T>(
     return fallback;
   }
 
-  if (!data || data.length === 0) return fallback;
+  if (!data) return [];
   return (data as Array<Record<string, unknown>>).map(mapRow);
 }
 
@@ -249,7 +249,7 @@ function buildCrossAgentInsights(tasks: Task[], bills: BillItem[], maintenance: 
     });
   }
 
-  return insights.length > 0 ? insights : mockBriefing.crossAgentInsights;
+  return insights;
 }
 
 export async function getInboxItems() {
@@ -457,7 +457,7 @@ export async function getBriefingSummary(): Promise<BriefingSummary> {
     maintenanceDueSoon: maintenance.filter((item) => item.status === "due-soon" || item.status === "overdue").length,
     lowStockItems,
     savingsRatePercent,
-    priorities: priorities.length > 0 ? priorities : mockBriefing.priorities,
+    priorities,
     crossAgentInsights: buildCrossAgentInsights(tasks, bills, maintenance),
   };
 }
