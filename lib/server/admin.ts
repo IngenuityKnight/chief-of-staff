@@ -764,3 +764,26 @@ export async function deleteAdminResource(resource: AdminResource, id: string) {
 
   revalidateAdminPaths();
 }
+
+async function deleteAllRows(table: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) throw new Error("Supabase is not configured.");
+
+  const { data, error } = await supabase
+    .from(table)
+    .delete()
+    .neq("id", "")
+    .select("id");
+
+  if (error) throw new Error(error.message);
+  return data?.length ?? 0;
+}
+
+export async function resetInboxAndTasks() {
+  const tasksDeleted = await deleteAllRows("tasks");
+  const inboxDeleted = await deleteAllRows("inbox_items");
+
+  revalidateAdminPaths();
+
+  return { tasksDeleted, inboxDeleted };
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Panel } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import type { AdminField, AdminResource } from "@/lib/server/admin";
@@ -37,11 +38,14 @@ function buildFormState(fields: AdminField[], record: Record<string, unknown>): 
 }
 
 export function DataEditor({ resources }: EditorProps) {
+  const router = useRouter();
   const resourceKeys = Object.keys(resources) as AdminResource[];
   const [activeResource, setActiveResource] = useState<AdminResource>(resourceKeys[0]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [formState, setFormState] = useState<FormState>({});
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [resetConfirm, setResetConfirm] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const resource = resources[activeResource];
@@ -82,6 +86,38 @@ export function DataEditor({ resources }: EditorProps) {
     }
   }
 
+  async function resetInboxAndTasks() {
+    if (!resetConfirm) {
+      setResetConfirm(true);
+      setMessage("Click again to permanently clear inbox and tasks.");
+      return;
+    }
+
+    setResetting(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/admin/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: "inbox-and-tasks" }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error ?? "Failed to clear inbox and tasks.");
+
+      setSelectedId(null);
+      setFormState({});
+      setResetConfirm(false);
+      setMessage(`Cleared ${payload.tasksDeleted} tasks and ${payload.inboxDeleted} inbox items.`);
+      router.refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Failed to clear inbox and tasks.");
+      setResetConfirm(false);
+    } finally {
+      setResetting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Panel eyebrow="Control" title="Data Studio">
@@ -110,6 +146,23 @@ export function DataEditor({ resources }: EditorProps) {
                 {resources[key].label}
               </button>
             ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-3 border-t border-edge pt-4">
+            <button
+              type="button"
+              onClick={resetInboxAndTasks}
+              disabled={resetting}
+              className={cn(
+                "rounded-md border px-3 py-2 text-sm font-semibold transition",
+                resetConfirm
+                  ? "border-signal-red/50 bg-signal-red/15 text-signal-red"
+                  : "border-edge bg-ink-900 text-slate-300 hover:bg-ink-800",
+                resetting && "cursor-not-allowed opacity-50"
+              )}
+            >
+              {resetting ? "Clearing..." : resetConfirm ? "Confirm clear inbox + tasks" : "Clear inbox + tasks"}
+            </button>
+            <span className="text-xs text-slate-500">Deletes task rows and inbox rows only.</span>
           </div>
         </div>
       </Panel>
