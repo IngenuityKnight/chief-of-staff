@@ -251,12 +251,12 @@ export function CommandDock() {
 
   return (
     <>
-      {/* Floating launcher */}
+      {/* Floating launcher — sits above mobile nav (bottom-24) on small screens */}
       {!open && (
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-br from-signal-blue to-signal-purple px-4 py-3 text-sm font-semibold text-ink-950 shadow-2xl shadow-signal-blue/30 transition hover:scale-105 active:scale-95"
+          className="fixed bottom-24 right-5 z-50 flex items-center gap-2 rounded-full bg-gradient-to-br from-signal-blue to-signal-purple px-4 py-3 text-sm font-semibold text-ink-950 shadow-2xl shadow-signal-blue/30 transition hover:scale-105 active:scale-95 sm:bottom-6 sm:right-6"
         >
           <Radio className="h-4 w-4" />
           Capture
@@ -264,120 +264,140 @@ export function CommandDock() {
         </button>
       )}
 
-      {/* Dock panel */}
       {open && (
-        <div className="fixed bottom-6 right-6 z-50 flex h-[600px] w-[440px] flex-col overflow-hidden rounded-2xl border border-edge bg-ink-950 shadow-2xl shadow-black/60 animate-slide-up">
+        <>
+          {/* Backdrop — tappable to close, mobile only */}
+          <div
+            className="fixed inset-0 z-40 bg-black/60 sm:hidden"
+            onClick={() => setOpen(false)}
+            aria-hidden="true"
+          />
 
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-edge px-4 py-3">
-            <div className="flex items-center gap-2.5">
-              <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-signal-blue to-signal-purple shadow shadow-signal-blue/20">
-                <Sparkles className="h-4 w-4 text-ink-950" strokeWidth={2.5} />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-white">Household Capture</div>
-                <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                  <span className="h-1.5 w-1.5 rounded-full bg-signal-green animate-pulse" />
-                  Ready · Saves tasks, decisions, and records
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-1">
-              {messages.length > 0 && (
-                <button
-                  onClick={clearConversation}
-                  className="grid h-7 w-7 place-items-center rounded-lg text-slate-500 transition hover:bg-ink-800 hover:text-slate-300"
-                  title="Clear conversation"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                </button>
-              )}
-              <a
-                href="/inbox"
-                className="grid h-7 w-7 place-items-center rounded-lg text-slate-500 transition hover:bg-ink-800 hover:text-slate-300"
-                title="View inbox"
-              >
-                <Inbox className="h-3.5 w-3.5" />
-              </a>
-              <button
-                onClick={() => setOpen(false)}
-                className="grid h-7 w-7 place-items-center rounded-lg text-slate-500 transition hover:bg-ink-800 hover:text-slate-300"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+          {/* Dock panel
+              Mobile:  full-width bottom sheet, 85svh tall, rounded top corners
+              Desktop: fixed-size popup anchored bottom-right               */}
+          <div className="fixed z-50 flex flex-col overflow-hidden border border-edge bg-ink-950 shadow-2xl shadow-black/60 animate-slide-up
+            inset-x-0 bottom-0 h-[85svh] rounded-t-2xl
+            sm:inset-x-auto sm:bottom-6 sm:right-6 sm:h-[600px] sm:w-[440px] sm:rounded-2xl">
 
-          {/* Message area */}
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
-            {isEmpty ? (
-              // Empty state — show quick prompts
-              <div className="space-y-4">
-                <div className="rounded-xl bg-ink-900/60 px-4 py-4 text-sm text-slate-400 ring-1 ring-inset ring-white/5">
-                  <p className="font-medium text-slate-300">What needs to be handled?</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Capture a task, decision, shopping need, calendar item, or household note.
-                  </p>
+            {/* Drag handle — visible on mobile only */}
+            <div className="flex shrink-0 justify-center pb-1 pt-2.5 sm:hidden">
+              <div className="h-1 w-10 rounded-full bg-white/20" />
+            </div>
+
+            {/* Header */}
+            <div className="flex shrink-0 items-center justify-between border-b border-edge px-4 py-3">
+              <div className="flex items-center gap-2.5">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-signal-blue to-signal-purple shadow shadow-signal-blue/20">
+                  <Sparkles className="h-4 w-4 text-ink-950" strokeWidth={2.5} />
                 </div>
                 <div>
-                  <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Quick starts</div>
-                  <div className="space-y-1.5">
-                    {QUICK_PROMPTS.map((prompt) => (
-                      <button
-                        key={prompt}
-                        onClick={() => handleSubmit(prompt)}
-                        disabled={busy}
-                        className="w-full rounded-lg border border-edge bg-ink-900/40 px-3 py-2.5 text-left text-sm text-slate-400 transition hover:border-signal-blue/30 hover:bg-ink-900 hover:text-slate-200 disabled:opacity-50"
-                      >
-                        {prompt}
-                      </button>
-                    ))}
+                  <div className="text-sm font-semibold text-white">Household Capture</div>
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                    <span className="h-1.5 w-1.5 rounded-full bg-signal-green animate-pulse" />
+                    Ready · Saves tasks, decisions, and records
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-3">
-                {messages.map((m) =>
-                  m.role === "user"
-                    ? <UserBubble key={m.id} msg={m} />
-                    : <ChiefBubble key={m.id} msg={m} />
+              <div className="flex items-center gap-1">
+                {messages.length > 0 && (
+                  <button
+                    onClick={clearConversation}
+                    className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 transition hover:bg-ink-800 hover:text-slate-300 sm:h-7 sm:w-7"
+                    title="Clear conversation"
+                  >
+                    <RotateCcw className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                  </button>
                 )}
-                {busy && <TypingIndicator />}
+                <a
+                  href="/inbox"
+                  className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 transition hover:bg-ink-800 hover:text-slate-300 sm:h-7 sm:w-7"
+                  title="View inbox"
+                >
+                  <Inbox className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                </a>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 transition hover:bg-ink-800 hover:text-slate-300 sm:h-7 sm:w-7"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5 sm:h-4 sm:w-4" />
+                </button>
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Input */}
-          <div className="border-t border-edge p-3">
-            <div className="flex items-end gap-2 rounded-xl border border-edge bg-ink-900 px-3 py-2.5 focus-within:border-signal-blue/40 transition">
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
-                }}
-                placeholder="Anything on your mind…"
-                rows={1}
-                className="flex-1 resize-none bg-transparent text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none max-h-32"
-                style={{ fieldSizing: "content" } as React.CSSProperties}
-              />
-              <button
-                type="button"
-                onClick={() => handleSubmit()}
-                disabled={!input.trim() || busy}
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-signal-blue text-ink-950 transition hover:bg-signal-blue/80 disabled:opacity-30"
-                aria-label="Send"
-              >
-                <Send className="h-3.5 w-3.5" />
-              </button>
+            {/* Message area */}
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
+              {isEmpty ? (
+                <div className="space-y-4">
+                  <div className="rounded-xl bg-ink-900/60 px-4 py-4 text-sm text-slate-400 ring-1 ring-inset ring-white/5">
+                    <p className="font-medium text-slate-300">What needs to be handled?</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Capture a task, decision, shopping need, calendar item, or household note.
+                    </p>
+                  </div>
+                  <div>
+                    <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Quick starts</div>
+                    <div className="space-y-2 sm:space-y-1.5">
+                      {QUICK_PROMPTS.map((prompt) => (
+                        <button
+                          key={prompt}
+                          onClick={() => handleSubmit(prompt)}
+                          disabled={busy}
+                          className="w-full rounded-lg border border-edge bg-ink-900/40 px-3 py-3 text-left text-sm text-slate-400 transition hover:border-signal-blue/30 hover:bg-ink-900 hover:text-slate-200 disabled:opacity-50 active:bg-ink-900 sm:py-2.5"
+                        >
+                          {prompt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {messages.map((m) =>
+                    m.role === "user"
+                      ? <UserBubble key={m.id} msg={m} />
+                      : <ChiefBubble key={m.id} msg={m} />
+                  )}
+                  {busy && <TypingIndicator />}
+                </div>
+              )}
             </div>
-            <div className="mt-1.5 px-1 text-[10px] text-slate-600">
-              Enter to send · Shift+Enter for newline
+
+            {/* Input */}
+            <div
+              className="shrink-0 border-t border-edge p-3"
+              style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+            >
+              <div className="flex items-end gap-2 rounded-xl border border-edge bg-ink-900 px-3 py-2.5 focus-within:border-signal-blue/40 transition">
+                <textarea
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
+                  }}
+                  placeholder="Anything on your mind…"
+                  rows={1}
+                  className="flex-1 resize-none bg-transparent text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none max-h-32"
+                  style={{ fieldSizing: "content" } as React.CSSProperties}
+                />
+                <button
+                  type="button"
+                  onClick={() => handleSubmit()}
+                  disabled={!input.trim() || busy}
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-signal-blue text-ink-950 transition hover:bg-signal-blue/80 disabled:opacity-30 sm:h-7 sm:w-7"
+                  aria-label="Send"
+                >
+                  <Send className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                </button>
+              </div>
+              <div className="mt-1.5 hidden px-1 text-[10px] text-slate-600 sm:block">
+                Enter to send · Shift+Enter for newline
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </>
   );
