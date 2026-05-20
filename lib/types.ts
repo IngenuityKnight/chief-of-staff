@@ -1,10 +1,3 @@
-// ─────────────────────────────────────────────────────────────
-// Chief of Staff — core types
-// These mirror the shape that n8n + Notion will return.
-// Swap `lib/mock-data.ts` for a real Notion fetcher later and
-// the UI doesn't change.
-// ─────────────────────────────────────────────────────────────
-
 export type AgentId = "chief" | "meals" | "home" | "money" | "schedule" | "roster";
 
 export type Category = "Meals" | "Cleaning" | "Household" | "Admin" | "Planning" | "Finance" | "Social";
@@ -60,6 +53,8 @@ export interface Decision {
   sourceInboxItemId?: string;
   createdAt: string;
   resolvedAt?: string;
+  chosenOption?: string;
+  outcomeNotes?: string;
 }
 
 export interface MealPlanDay {
@@ -145,6 +140,8 @@ export interface BriefingSummary {
   maintenanceDueSoon: number;
   lowStockItems: number;
   savingsRatePercent: number | null;
+  itemsCapturedThisWeek: number;
+  tasksCompletedThisWeek: number;
   priorities: Array<{ id: string; title: string; agent: AgentId; why: string }>;
   crossAgentInsights: Array<{ id: string; agents: AgentId[]; insight: string }>;
 }

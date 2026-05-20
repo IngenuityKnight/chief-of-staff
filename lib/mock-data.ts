@@ -292,6 +292,8 @@ export const briefing: BriefingSummary = {
   maintenanceDueSoon: maintenance.filter(m => m.status === "due-soon" || m.status === "overdue").length,
   lowStockItems: 0,
   savingsRatePercent: null,
+  itemsCapturedThisWeek: 0,
+  tasksCompletedThisWeek: 0,
   priorities: [
     { id: "p1", title: "Decide dishwasher path",                               agent: "home",     why: "15 minutes of basic troubleshooting could avoid a $180 service call." },
     { id: "p2", title: "Gas bill overdue — 2 days",                            agent: "money",    why: "Autopay is off. Late fee hits at day 5." },

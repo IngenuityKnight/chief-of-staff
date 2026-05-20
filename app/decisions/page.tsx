@@ -132,7 +132,13 @@ export default async function DecisionsPage() {
                 <li key={decision.id} className="flex items-center justify-between gap-3 py-3">
                   <div>
                     <div className="text-sm font-medium text-slate-200">{decision.title}</div>
-                    {decision.recommendation && <div className="text-xs text-slate-500">{decision.recommendation}</div>}
+                    {decision.chosenOption && (
+                      <div className="mt-0.5 text-xs text-signal-green">
+                        <span className="font-semibold">Chose: </span>{decision.chosenOption}
+                      </div>
+                    )}
+                    {decision.outcomeNotes && <div className="text-xs text-slate-500">{decision.outcomeNotes}</div>}
+                    {!decision.chosenOption && decision.recommendation && <div className="text-xs text-slate-500">{decision.recommendation}</div>}
                   </div>
                   <span className={STATUS_META[decision.status].pillClass}>{STATUS_META[decision.status].label}</span>
                 </li>

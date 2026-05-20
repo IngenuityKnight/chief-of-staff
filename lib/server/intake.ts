@@ -1,6 +1,8 @@
 import type { AgentId, Category, Priority } from "@/lib/types";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { getAnthropicClient } from "@/lib/server/anthropic";
+import { logActivity } from "@/lib/server/activity";
+import { assembleHouseholdContext } from "@/lib/server/context";
 
 export type IntakeAnalysis = {
   id: string;
@@ -272,7 +274,9 @@ async function analyzeWithClaude(text: string): Promise<Omit<IntakeAnalysis, "id
   const anthropic = getAnthropicClient();
   if (!anthropic) return null;
 
-  const prompt = `You are the Chief of Staff routing engine for a frugal household management system. Analyze this household input and return JSON.
+  const householdCtx = await assembleHouseholdContext();
+
+  const prompt = `${householdCtx}You are the Chief of Staff routing engine for a frugal household management system. Analyze this household input and return JSON.
 
 Input: "${text.replace(/"/g, '\\"')}"
 
@@ -330,7 +334,7 @@ Rules:
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function analyzeIntake(text: string, source = "web"): Promise<IntakeAnalysis & { source: string }> {
-  const id = `inb_${Date.now().toString(36)}`;
+  const id = `inb_${crypto.randomUUID()}`;
   const capturedAt = new Date().toISOString();
   const llm = await analyzeWithClaude(text);
 
@@ -376,6 +380,14 @@ export async function persistIntake(analysis: IntakeAnalysis & { source?: string
     console.error("Supabase intake insert failed:", error);
     return { persisted: false as const, error: error.message };
   }
+
+  await logActivity({
+    event_type: "item_captured",
+    domain: "inbox",
+    entity_title: buildTitle(analysis.text),
+    entity_id: analysis.id,
+    metadata: { primary_agent: analysis.routing.primary, urgency: analysis.urgency },
+  });
 
   return { persisted: true as const };
 }

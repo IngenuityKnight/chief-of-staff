@@ -69,6 +69,8 @@ export default async function BriefingPage() {
               <Stat value={briefing.tasksOverdue} label="Overdue" tone="red" />
               <Stat value={briefing.upcomingEvents} label="On Calendar" tone="cyan" />
               <Stat value={briefing.lowStockItems} label="Low Stock" tone={briefing.lowStockItems > 0 ? "amber" : "green"} />
+              <Stat value={briefing.itemsCapturedThisWeek} label="Captured / 7d" tone="cyan" />
+              <Stat value={briefing.tasksCompletedThisWeek} label="Completed / 7d" tone="green" />
               {briefing.savingsRatePercent !== null && (
                 <Stat value={`${briefing.savingsRatePercent}%`} label="Net Equity" tone="purple" />
               )}

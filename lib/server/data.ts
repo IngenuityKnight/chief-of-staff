@@ -29,6 +29,60 @@ import type {
 } from "@/lib/types";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 
+export interface HouseholdContextRow {
+  householdName: string | undefined;
+  timezone: string;
+  frugalMode: boolean;
+  budgetMonthly: number | undefined;
+  membersSum: string | undefined;
+  aiPersona: string | undefined;
+  goals: string | undefined;
+  preferences: Record<string, unknown>;
+}
+
+const DEFAULT_HOUSEHOLD_CONTEXT: HouseholdContextRow = {
+  householdName: undefined,
+  timezone: "America/Chicago",
+  frugalMode: true,
+  budgetMonthly: undefined,
+  membersSum: undefined,
+  aiPersona: undefined,
+  goals: undefined,
+  preferences: {},
+};
+
+export async function getHouseholdContext(): Promise<HouseholdContextRow> {
+  noStore();
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return DEFAULT_HOUSEHOLD_CONTEXT;
+
+  try {
+    const { data, error } = await supabase
+      .from("household_context")
+      .select("*")
+      .eq("id", "default")
+      .single();
+
+    if (error || !data) return DEFAULT_HOUSEHOLD_CONTEXT;
+
+    const row = data as Record<string, unknown>;
+    return {
+      householdName: typeof row.household_name === "string" ? row.household_name : undefined,
+      timezone: typeof row.timezone === "string" ? row.timezone : "America/Chicago",
+      frugalMode: Boolean(row.frugal_mode ?? true),
+      budgetMonthly: typeof row.budget_monthly === "number" ? row.budget_monthly : undefined,
+      membersSum: typeof row.members_summary === "string" ? row.members_summary : undefined,
+      aiPersona: typeof row.ai_persona === "string" ? row.ai_persona : undefined,
+      goals: typeof row.goals === "string" ? row.goals : undefined,
+      preferences: (row.preferences && typeof row.preferences === "object" && !Array.isArray(row.preferences))
+        ? (row.preferences as Record<string, unknown>)
+        : {},
+    };
+  } catch {
+    return DEFAULT_HOUSEHOLD_CONTEXT;
+  }
+}
+
 type Source = InboxItem["source"];
 type MealSlot = MealPlanDay["breakfast"];
 
@@ -134,6 +188,8 @@ function mapDecision(row: Record<string, unknown>): Decision {
     sourceInboxItemId: typeof row.source_inbox_item_id === "string" ? row.source_inbox_item_id : undefined,
     createdAt: String(row.created_at),
     resolvedAt: typeof row.resolved_at === "string" ? row.resolved_at : undefined,
+    chosenOption: typeof row.chosen_option === "string" ? row.chosen_option : undefined,
+    outcomeNotes: typeof row.outcome_notes === "string" ? row.outcome_notes : undefined,
   };
 }
 
@@ -403,6 +459,28 @@ async function getPlaidSavingsRate(): Promise<number | null> {
   }
 }
 
+async function getWeeklyActivityCounts(): Promise<{ itemsCaptured: number; tasksCompleted: number }> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { itemsCaptured: 0, tasksCompleted: 0 };
+
+  const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  try {
+    const { data } = await supabase
+      .from("activity_log")
+      .select("event_type")
+      .gte("occurred_at", weekAgo);
+
+    if (!data) return { itemsCaptured: 0, tasksCompleted: 0 };
+    const rows = data as Array<{ event_type: string }>;
+    return {
+      itemsCaptured: rows.filter((r) => r.event_type === "item_captured").length,
+      tasksCompleted: rows.filter((r) => r.event_type === "task_status_changed" || r.event_type === "task_completed").length,
+    };
+  } catch {
+    return { itemsCaptured: 0, tasksCompleted: 0 };
+  }
+}
+
 export async function getBriefingSummary(): Promise<BriefingSummary> {
   const [tasks, bills, maintenance, calendar, inventory] = await Promise.all([
     getTasks(),
@@ -422,7 +500,10 @@ export async function getBriefingSummary(): Promise<BriefingSummary> {
   }
 
   const lowStockItems = inventory.filter((i) => i.quantity <= i.minQuantity).length;
-  const savingsRatePercent = await getPlaidSavingsRate();
+  const [savingsRatePercent, weeklyCounts] = await Promise.all([
+    getPlaidSavingsRate(),
+    getWeeklyActivityCounts(),
+  ]);
 
   const now = Date.now();
   const threeDays = now + 3 * 86_400_000;
@@ -457,6 +538,8 @@ export async function getBriefingSummary(): Promise<BriefingSummary> {
     maintenanceDueSoon: maintenance.filter((item) => item.status === "due-soon" || item.status === "overdue").length,
     lowStockItems,
     savingsRatePercent,
+    itemsCapturedThisWeek: weeklyCounts.itemsCaptured,
+    tasksCompletedThisWeek: weeklyCounts.tasksCompleted,
     priorities,
     crossAgentInsights: buildCrossAgentInsights(tasks, bills, maintenance),
   };

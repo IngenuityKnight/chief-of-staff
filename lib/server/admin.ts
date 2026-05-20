@@ -197,12 +197,14 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
       { key: "category", label: "Category", type: "select", options: ["Meals", "Cleaning", "Household", "Admin", "Planning", "Finance", "Social"] },
       { key: "recommendation", label: "Recommendation", type: "textarea" },
       { key: "options", label: "Options JSON", type: "json" },
+      { key: "chosenOption", label: "Chosen Option", type: "text" },
+      { key: "outcomeNotes", label: "Outcome Notes", type: "textarea" },
       { key: "costEstimate", label: "Cost Estimate", type: "number" },
       { key: "timeEstimateMinutes", label: "Time Estimate Minutes", type: "number" },
       { key: "dueDate", label: "Due Date ISO", type: "text" },
     ],
     toDbPatch(payload) {
-      const patch = pickAllowed(payload, ["title", "context", "status", "priority", "category", "recommendation", "options", "costEstimate", "timeEstimateMinutes", "dueDate"]);
+      const patch = pickAllowed(payload, ["title", "context", "status", "priority", "category", "recommendation", "options", "chosenOption", "outcomeNotes", "costEstimate", "timeEstimateMinutes", "dueDate"]);
       return {
         ...(patch.title !== undefined ? { title: toNullableString(patch.title) } : {}),
         ...(patch.context !== undefined ? { context: toNullableString(patch.context) } : {}),
@@ -211,6 +213,8 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
         ...(patch.category !== undefined ? { category: patch.category } : {}),
         ...(patch.recommendation !== undefined ? { recommendation: toNullableString(patch.recommendation) } : {}),
         ...(patch.options !== undefined ? { options: parseJsonField(patch.options) ?? [] } : {}),
+        ...(patch.chosenOption !== undefined ? { chosen_option: toNullableString(patch.chosenOption) } : {}),
+        ...(patch.outcomeNotes !== undefined ? { outcome_notes: toNullableString(patch.outcomeNotes) } : {}),
         ...(patch.costEstimate !== undefined ? { cost_estimate: toNumberOrNull(patch.costEstimate) } : {}),
         ...(patch.timeEstimateMinutes !== undefined ? { time_estimate_minutes: toNumberOrNull(patch.timeEstimateMinutes) } : {}),
         ...(patch.dueDate !== undefined ? { due_date: toNullableString(patch.dueDate) } : {}),
@@ -226,6 +230,8 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
         category: payload.category ?? "Admin",
         recommendation: toNullableString(payload.recommendation) ?? null,
         options: parseJsonField(payload.options as string) ?? [],
+        chosen_option: toNullableString(payload.chosenOption) ?? null,
+        outcome_notes: toNullableString(payload.outcomeNotes) ?? null,
         cost_estimate: toNumberOrNull(payload.costEstimate) ?? null,
         time_estimate_minutes: toNumberOrNull(payload.timeEstimateMinutes) ?? null,
         due_date: toNullableString(payload.dueDate) ?? null,
