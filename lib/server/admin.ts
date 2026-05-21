@@ -476,7 +476,7 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
       { key: "unit",             label: "Unit",             type: "select", options: ["count", "rolls", "lbs", "oz", "gallons", "boxes", "bags", "bottles", "cans"] },
       { key: "minQuantity",      label: "Min Quantity",     type: "number" },
       { key: "estWeeklyConsumption", label: "Est. Weekly Use", type: "number" },
-      { key: "location",         label: "Location",         type: "select", options: ["pantry", "bathroom", "kitchen", "garage", "basement", "laundry", "other"] },
+      { key: "location",         label: "Location",         type: "select", options: ["pantry", "kitchen", "master bathroom", "guest bathroom", "downstairs bathroom", "garage", "basement", "laundry", "other"] },
       { key: "pricePerUnit",     label: "Price/Unit ($)",   type: "number" },
       { key: "preferredStore",   label: "Preferred Store",  type: "select", options: ["Trader Joe's", "Wegmans", "Costco"] },
       { key: "notes",            label: "Notes",            type: "textarea" },
