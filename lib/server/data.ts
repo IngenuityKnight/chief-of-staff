@@ -12,6 +12,7 @@ import {
 } from "@/lib/mock-data";
 import { unstable_noStore as noStore } from "next/cache";
 import type {
+  ActivityLog,
   Appliance,
   BillItem,
   BriefingSummary,
@@ -31,6 +32,7 @@ import { getSupabaseAdmin } from "@/lib/server/supabase";
 
 export interface HouseholdContextRow {
   householdName: string | undefined;
+  address: string | undefined;
   timezone: string;
   frugalMode: boolean;
   budgetMonthly: number | undefined;
@@ -42,6 +44,7 @@ export interface HouseholdContextRow {
 
 const DEFAULT_HOUSEHOLD_CONTEXT: HouseholdContextRow = {
   householdName: undefined,
+  address: undefined,
   timezone: "America/Chicago",
   frugalMode: true,
   budgetMonthly: undefined,
@@ -68,6 +71,7 @@ export async function getHouseholdContext(): Promise<HouseholdContextRow> {
     const row = data as Record<string, unknown>;
     return {
       householdName: typeof row.household_name === "string" ? row.household_name : undefined,
+      address: typeof row.address === "string" ? row.address : undefined,
       timezone: typeof row.timezone === "string" ? row.timezone : "America/Chicago",
       frugalMode: Boolean(row.frugal_mode ?? true),
       budgetMonthly: typeof row.budget_monthly === "number" ? row.budget_monthly : undefined,
@@ -543,4 +547,36 @@ export async function getBriefingSummary(): Promise<BriefingSummary> {
     priorities,
     crossAgentInsights: buildCrossAgentInsights(tasks, bills, maintenance),
   };
+}
+
+export async function getRecentActivity(limit = 20): Promise<ActivityLog[]> {
+  noStore();
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from("activity_log")
+      .select("*")
+      .order("occurred_at", { ascending: false })
+      .limit(limit);
+
+    if (error || !data) return [];
+
+    return (data as Array<Record<string, unknown>>).map((row) => ({
+      id: String(row.id),
+      resource: String(row.entity_type ?? ""),
+      resourceId: typeof row.entity_id === "string" ? row.entity_id : undefined,
+      action: (["created", "updated", "deleted"].includes(String(row.event_type?.toString().split("_").pop()))
+        ? String(row.event_type?.toString().split("_").pop())
+        : "updated") as ActivityLog["action"],
+      field: typeof row.field_name === "string" ? row.field_name : undefined,
+      oldValue: typeof row.old_value === "string" ? row.old_value : undefined,
+      newValue: typeof row.new_value === "string" ? row.new_value : undefined,
+      actor: typeof row.actor === "string" ? row.actor : undefined,
+      createdAt: String(row.occurred_at ?? row.created_at ?? ""),
+    }));
+  } catch {
+    return [];
+  }
 }

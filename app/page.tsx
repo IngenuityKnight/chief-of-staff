@@ -55,7 +55,7 @@ export default async function BriefingPage() {
         <div className="relative grid gap-6 px-6 py-6 md:grid-cols-[1.2fr_1fr] md:px-8 md:py-7">
           <div>
             <div className="text-2xs font-semibold uppercase tracking-[0.18em] text-signal-blue">
-              Situation Report · {briefing.date}
+              Daily Briefing · {briefing.date}
             </div>
             <h2 className="mt-2 font-display text-3xl font-semibold leading-tight text-white md:text-4xl">
               {briefing.greeting}.

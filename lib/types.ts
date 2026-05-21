@@ -36,6 +36,11 @@ export interface Task {
   inboxItemId?: string;
   notes?: string;
   createdAt: string;
+  completedAt?: string;
+  recurringRule?: string;
+  templateId?: string;
+  autoCreateTask?: boolean;
+  lastTaskId?: string;
 }
 
 export interface Decision {
@@ -144,6 +149,20 @@ export interface BriefingSummary {
   tasksCompletedThisWeek: number;
   priorities: Array<{ id: string; title: string; agent: AgentId; why: string }>;
   crossAgentInsights: Array<{ id: string; agents: AgentId[]; insight: string }>;
+}
+
+// ─── Activity Log ─────────────────────────────────────────────────────────────
+
+export interface ActivityLog {
+  id: string;
+  resource: string;
+  resourceId?: string;
+  action: "created" | "updated" | "deleted";
+  field?: string;
+  oldValue?: string;
+  newValue?: string;
+  actor?: string;
+  createdAt: string;
 }
 
 // ─── Stores ───────────────────────────────────────────────────────────────────

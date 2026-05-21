@@ -97,10 +97,10 @@ export const TASK_STATUS: Record<TaskStatus, { label: string; pillClass: string 
 };
 
 export const INBOX_STATUS: Record<Status, { label: string; pillClass: string }> = {
-  new:        { label: "New",        pillClass: "pill-blue" },
-  routed:     { label: "Routed",     pillClass: "pill-cyan" },
-  processing: { label: "Processing", pillClass: "pill-amber" },
-  processed:  { label: "Processed",  pillClass: "pill-green" },
-  completed:  { label: "Completed",  pillClass: "pill-green" },
-  blocked:    { label: "Blocked",    pillClass: "pill-red" },
+  new:        { label: "New",         pillClass: "pill-blue" },
+  routed:     { label: "Reviewed",    pillClass: "pill-cyan" },
+  processing: { label: "In Progress", pillClass: "pill-amber" },
+  processed:  { label: "Done",        pillClass: "pill-green" },
+  completed:  { label: "Completed",   pillClass: "pill-green" },
+  blocked:    { label: "Blocked",     pillClass: "pill-red" },
 };

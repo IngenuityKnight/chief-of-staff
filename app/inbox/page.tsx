@@ -30,12 +30,12 @@ export default async function InboxPage() {
         </Panel>
         <Panel className="!px-0 !py-0">
           <div className="px-5 py-4">
-            <Stat value={newCount} label="Awaiting Triage" tone="blue" />
+            <Stat value={newCount} label="Unreviewed" tone="blue" />
           </div>
         </Panel>
         <Panel className="!px-0 !py-0">
           <div className="px-5 py-4">
-            <Stat value={routed} label="In Flight" tone="amber" />
+            <Stat value={routed} label="In Progress" tone="amber" />
           </div>
         </Panel>
         <Panel className="!px-0 !py-0">
@@ -45,7 +45,7 @@ export default async function InboxPage() {
         </Panel>
       </div>
 
-      <Panel eyebrow="Triage Queue" title="Inbox" action={<span className="text-xs text-slate-500">Sorted by recency</span>}>
+      <Panel eyebrow="Captured Items" title="Inbox" action={<span className="text-xs text-slate-500">Sorted by recency</span>}>
         <ul className="space-y-3">
           {inboxItems.map((item) => {
             const SourceIcon = SOURCE_ICONS[item.source];
