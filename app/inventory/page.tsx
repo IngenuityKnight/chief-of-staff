@@ -5,6 +5,7 @@ import { getInventoryItems } from "@/lib/server/data";
 import { getAdminFields } from "@/lib/server/admin";
 import { InlineForm } from "@/components/inline-form";
 import { EditInline } from "@/components/edit-inline";
+import { QuantityStepper } from "@/components/quantity-stepper";
 import type { AdminField } from "@/lib/server/admin";
 import type { InventoryItem, InventoryCategory } from "@/lib/types";
 
@@ -89,6 +90,12 @@ function ItemRow({ item, fields }: { item: InventoryItem; fields: AdminField[] }
             <div className="text-slate-200">{item.preferredStore}</div>
           </div>
         )}
+        <QuantityStepper
+          id={item.id}
+          quantity={item.quantity}
+          minQuantity={item.minQuantity}
+          unit={item.unit}
+        />
         <EditInline
           resource="inventory"
           id={item.id}
