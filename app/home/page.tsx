@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, Wrench, Clock } from "lucide-react";
 import { getMaintenanceItems } from "@/lib/server/data";
 import { getAdminFields } from "@/lib/server/admin";
 import { InlineForm } from "@/components/inline-form";
+import { EditInline } from "@/components/edit-inline";
 
 const STATUS_META = {
   ok:            { pillClass: "pill-green", label: "OK",           icon: CheckCircle2 },
@@ -56,6 +57,17 @@ export default async function HomePage() {
             const d = daysUntil(m.nextDue);
             return (
               <div key={m.id} className="flex flex-wrap items-center gap-4 rounded-lg border border-edge bg-ink-900/30 px-4 py-3 transition hover:bg-ink-900/60">
+                <EditInline
+                  resource="maintenance"
+                  id={m.id}
+                  fields={maintenanceFields}
+                  values={{
+                    item: m.item, system: m.system, frequency: m.frequency,
+                    status: m.status, vendor: m.vendor ?? "", lastCost: m.lastCost ?? "",
+                    lastDone: m.lastDone, nextDue: m.nextDue, notes: m.notes ?? "",
+                  }}
+                  label={`Edit ${m.item}`}
+                />
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-md ${SYSTEM_COLORS[m.system] ?? SYSTEM_COLORS.Other}`}>
                     <Icon className="h-4 w-4" />

@@ -4,6 +4,7 @@ import { Zap, Tv, CreditCard, AlertCircle } from "lucide-react";
 import { getBills } from "@/lib/server/data";
 import { getAdminFields } from "@/lib/server/admin";
 import { InlineForm } from "@/components/inline-form";
+import { EditInline } from "@/components/edit-inline";
 import { getPlaidAccounts, getPlaidConnections } from "@/lib/server/plaid";
 import { PlaidConnect } from "@/components/plaid-connect";
 
@@ -159,6 +160,17 @@ export default async function MoneyPage() {
                       {isOver && d < 0 ? `${-d}d overdue` : `due ${relativeDay(b.dueDate!)}`}
                     </div>
                   </div>
+                  <EditInline
+                    resource="bills"
+                    id={b.id}
+                    fields={billFields}
+                    values={{
+                      name: b.name, amount: b.amount, category: b.category,
+                      status: b.status, autopay: b.autopay,
+                      dueDate: b.dueDate ?? "", lastPaid: b.lastPaid ?? "",
+                    }}
+                    label={`Edit ${b.name}`}
+                  />
                 </li>
               );
             })}

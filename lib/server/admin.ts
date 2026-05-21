@@ -786,15 +786,15 @@ export async function deleteAdminResource(resource: AdminResource, id: string) {
   revalidateAdminPaths();
 }
 
-async function deleteAllRows(table: string) {
+async function deleteAllRows(table: string, idKey = "id") {
   const supabase = getSupabaseAdmin();
   if (!supabase) throw new Error("Supabase is not configured.");
 
   const { data, error } = await supabase
     .from(table)
     .delete()
-    .neq("id", "")
-    .select("id");
+    .not(idKey, "is", null)
+    .select(idKey);
 
   if (error) throw new Error(error.message);
   return data?.length ?? 0;
@@ -821,7 +821,7 @@ export async function resetAdminTarget(target: AdminResetTarget) {
     let deleted = 0;
 
     for (const resource of deleteOrder) {
-      const count = await deleteAllRows(adminConfig[resource].table);
+      const count = await deleteAllRows(adminConfig[resource].table, adminConfig[resource].idKey);
       details[`${resource}Deleted`] = count;
       deleted += count;
     }
@@ -836,8 +836,8 @@ export async function resetAdminTarget(target: AdminResetTarget) {
   }
 
   if (target === "inbox-and-tasks") {
-    const tasksDeleted = await deleteAllRows("tasks");
-    const inboxDeleted = await deleteAllRows("inbox_items");
+    const tasksDeleted = await deleteAllRows("tasks", "id");
+    const inboxDeleted = await deleteAllRows("inbox_items", "id");
 
     revalidateAdminPaths();
 
@@ -851,7 +851,7 @@ export async function resetAdminTarget(target: AdminResetTarget) {
   const config = adminConfig[target];
   if (!config) throw new Error("Unknown reset target.");
 
-  const deleted = await deleteAllRows(config.table);
+  const deleted = await deleteAllRows(config.table, config.idKey);
 
   revalidateAdminPaths();
 

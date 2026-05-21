@@ -4,6 +4,8 @@ import { formatMoney } from "@/lib/utils";
 import { getAppliances } from "@/lib/server/data";
 import { getAdminFields } from "@/lib/server/admin";
 import { InlineForm } from "@/components/inline-form";
+import { EditInline } from "@/components/edit-inline";
+import type { AdminField } from "@/lib/server/admin";
 import type { Appliance } from "@/lib/types";
 
 function daysUntil(dateStr: string | undefined): number | null {
@@ -91,7 +93,7 @@ function RepairReplaceAdvisor({ appliance }: { appliance: Appliance }) {
   );
 }
 
-function ApplianceCard({ appliance }: { appliance: Appliance }) {
+function ApplianceCard({ appliance, fields }: { appliance: Appliance; fields: AdminField[] }) {
   const status = getApplianceStatus(appliance);
   const meta = STATUS_META[status];
   const warrantyDays = daysUntil(appliance.warrantyExpires);
@@ -124,6 +126,21 @@ function ApplianceCard({ appliance }: { appliance: Appliance }) {
             <h3 className="font-display text-lg font-semibold text-white">{appliance.name}</h3>
             <span className={meta.pillClass}>{meta.label}</span>
             {appliance.location && <span className="pill-ghost">{appliance.location}</span>}
+            <div className="ml-auto">
+              <EditInline
+                resource="appliances"
+                id={appliance.id}
+                fields={fields}
+                values={{
+                  name: appliance.name, brand: appliance.brand ?? "",
+                  modelNumber: appliance.modelNumber ?? "", location: appliance.location ?? "",
+                  purchaseDate: appliance.purchaseDate ?? "", purchasePrice: appliance.purchasePrice ?? "",
+                  warrantyExpires: appliance.warrantyExpires ?? "", lastServiced: appliance.lastServiced ?? "",
+                  estLifespanYears: appliance.estLifespanYears ?? "", notes: appliance.notes ?? "",
+                }}
+                label={`Edit ${appliance.name}`}
+              />
+            </div>
           </div>
           <div className="mt-1 flex flex-wrap gap-3 text-[11px] text-slate-500">
             {appliance.brand && <span>{appliance.brand}</span>}
@@ -233,7 +250,7 @@ export default async function AppliancesPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {sorted.map((a) => <ApplianceCard key={a.id} appliance={a} />)}
+            {sorted.map((a) => <ApplianceCard key={a.id} appliance={a} fields={fields} />)}
           </div>
         )}
         <InlineForm

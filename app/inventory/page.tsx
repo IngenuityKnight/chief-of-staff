@@ -4,6 +4,8 @@ import { formatMoney } from "@/lib/utils";
 import { getInventoryItems } from "@/lib/server/data";
 import { getAdminFields } from "@/lib/server/admin";
 import { InlineForm } from "@/components/inline-form";
+import { EditInline } from "@/components/edit-inline";
+import type { AdminField } from "@/lib/server/admin";
 import type { InventoryItem, InventoryCategory } from "@/lib/types";
 
 const CATEGORY_META: Record<InventoryCategory, { label: string; color: string }> = {
@@ -38,7 +40,7 @@ function StockBar({ item }: { item: InventoryItem }) {
   );
 }
 
-function ItemRow({ item }: { item: InventoryItem }) {
+function ItemRow({ item, fields }: { item: InventoryItem; fields: AdminField[] }) {
   const isLow = item.quantity <= item.minQuantity;
   const isEmpty = item.quantity === 0;
   const meta = CATEGORY_META[item.category];
@@ -87,6 +89,19 @@ function ItemRow({ item }: { item: InventoryItem }) {
             <div className="text-slate-200">{item.preferredStore}</div>
           </div>
         )}
+        <EditInline
+          resource="inventory"
+          id={item.id}
+          fields={fields}
+          values={{
+            name: item.name, category: item.category, quantity: item.quantity,
+            unit: item.unit, minQuantity: item.minQuantity,
+            estWeeklyConsumption: item.estWeeklyConsumption ?? "",
+            location: item.location ?? "", pricePerUnit: item.pricePerUnit ?? "",
+            preferredStore: item.preferredStore ?? "", notes: item.notes ?? "",
+          }}
+          label={`Edit ${item.name}`}
+        />
       </div>
     </div>
   );
@@ -218,7 +233,7 @@ export default async function InventoryPage({
           </div>
         ) : (
           <div className="space-y-2">
-            {sorted.map((item) => <ItemRow key={item.id} item={item} />)}
+            {sorted.map((item) => <ItemRow key={item.id} item={item} fields={fields} />)}
           </div>
         )}
 

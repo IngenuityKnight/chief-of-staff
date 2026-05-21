@@ -4,6 +4,8 @@ import { formatMoney } from "@/lib/utils";
 import { getVehicles } from "@/lib/server/data";
 import { getAdminFields } from "@/lib/server/admin";
 import { InlineForm } from "@/components/inline-form";
+import { EditInline } from "@/components/edit-inline";
+import type { AdminField } from "@/lib/server/admin";
 import type { Vehicle } from "@/lib/types";
 
 function daysUntil(dateStr: string | undefined): number | null {
@@ -70,7 +72,7 @@ function ExpiryBadge({ label, dateStr }: { label: string; dateStr?: string }) {
   );
 }
 
-function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
+function VehicleCard({ vehicle, fields }: { vehicle: Vehicle; fields: AdminField[] }) {
   const insuranceDays = daysUntil(vehicle.insuranceExpires);
   const registrationDays = daysUntil(vehicle.registrationExpires);
   const hasAlert =
@@ -87,6 +89,7 @@ function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
           <Car className="h-6 w-6 text-signal-blue" />
         </div>
         <div className="flex-1">
+
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-display text-lg font-semibold text-white">
               {vehicle.year} {vehicle.make} {vehicle.model}
@@ -123,6 +126,22 @@ function VehicleCard({ vehicle }: { vehicle: Vehicle }) {
             )}
           </div>
         </div>
+        <EditInline
+          resource="vehicles"
+          id={vehicle.id}
+          fields={fields}
+          values={{
+            make: vehicle.make, model: vehicle.model, year: vehicle.year,
+            color: vehicle.color ?? "", licensePlate: vehicle.licensePlate ?? "",
+            mileage: vehicle.mileage ?? "", lastOilChangeMiles: vehicle.lastOilChangeMiles ?? "",
+            oilChangeIntervalMiles: vehicle.oilChangeIntervalMiles,
+            nextServiceType: vehicle.nextServiceType ?? "", nextServiceMiles: vehicle.nextServiceMiles ?? "",
+            insuranceExpires: vehicle.insuranceExpires ?? "", registrationExpires: vehicle.registrationExpires ?? "",
+            avgMpg: vehicle.avgMpg ?? "", monthlyFuelCost: vehicle.monthlyFuelCost ?? "",
+            notes: vehicle.notes ?? "",
+          }}
+          label={`Edit ${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+        />
       </div>
 
       {/* Oil change progress */}
@@ -212,7 +231,7 @@ export default async function VehiclesPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {vehicles.map((v) => <VehicleCard key={v.id} vehicle={v} />)}
+            {vehicles.map((v) => <VehicleCard key={v.id} vehicle={v} fields={fields} />)}
           </div>
         )}
         <InlineForm
