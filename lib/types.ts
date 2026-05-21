@@ -146,6 +146,11 @@ export interface BriefingSummary {
   crossAgentInsights: Array<{ id: string; agents: AgentId[]; insight: string }>;
 }
 
+// ─── Stores ───────────────────────────────────────────────────────────────────
+
+export const STORES = ["Trader Joe's", "Wegmans", "Costco"] as const;
+export type StorePreference = typeof STORES[number];
+
 // ─── Inventory ────────────────────────────────────────────────────────────────
 
 export type InventoryCategory = "food" | "hygiene" | "cleaning" | "paper" | "garage" | "laundry" | "other";

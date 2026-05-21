@@ -478,7 +478,7 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
       { key: "estWeeklyConsumption", label: "Est. Weekly Use", type: "number" },
       { key: "location",         label: "Location",         type: "select", options: ["pantry", "bathroom", "kitchen", "garage", "basement", "laundry", "other"] },
       { key: "pricePerUnit",     label: "Price/Unit ($)",   type: "number" },
-      { key: "preferredStore",   label: "Preferred Store",  type: "text" },
+      { key: "preferredStore",   label: "Preferred Store",  type: "select", options: ["Trader Joe's", "Wegmans", "Costco"] },
       { key: "notes",            label: "Notes",            type: "textarea" },
     ],
     toDbPatch(payload) {
@@ -640,7 +640,7 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
       { key: "quantity",        label: "Quantity",          type: "number" },
       { key: "unit",            label: "Unit",              type: "select", options: ["count", "rolls", "lbs", "oz", "gallons", "boxes", "bags", "bottles", "cans"] },
       { key: "estCost",         label: "Est. Cost ($)",     type: "number" },
-      { key: "storePreference", label: "Store",             type: "text" },
+      { key: "storePreference", label: "Store",             type: "select", options: ["Trader Joe's", "Wegmans", "Costco"] },
       { key: "category",        label: "Category",          type: "select", options: ["food", "hygiene", "cleaning", "paper", "garage", "laundry", "other"] },
       { key: "priority",        label: "Priority",          type: "select", options: ["low", "medium", "high", "critical"] },
       { key: "status",          label: "Status",            type: "select", options: ["needed", "in-cart", "purchased", "skipped"] },

@@ -69,7 +69,7 @@ Generate a prioritized shopping list. Rules:
 1. Always include low-stock items. Set priority based on urgency: quantity=0 → critical, <=50% of min → high, <=min → medium.
 2. Look for items approaching min_quantity (qty < 2x min) — add them as low priority to avoid a second trip.
 3. Suggest buying quantities that minimize restocking frequency (e.g. buy 2-3x the minimum if it's a stable consumable).
-4. Group by store when possible to suggest trip efficiency.
+4. Group by store when possible to suggest trip efficiency. Only use "Trader Joe's", "Wegmans", or "Costco" as storePreference — inherit from the inventory store field when available.
 5. If pricePerUnit is known, estimate total cost.
 
 Respond with ONLY a JSON array of shopping items (no markdown, no explanation):
@@ -134,8 +134,8 @@ export async function POST(req: NextRequest) {
         for (const item of items) {
           const match = priceMap[item.name.toLowerCase()];
           if (match?.found && match.bestPrice) {
-            item.estCost       = parseFloat((match.bestPrice * item.quantity).toFixed(2));
-            item.storePreference = item.storePreference ?? "Kroger";
+            item.estCost = parseFloat((match.bestPrice * item.quantity).toFixed(2));
+            // Kroger is pricing-only — don't overwrite store preference
             krogerPriced++;
           }
         }

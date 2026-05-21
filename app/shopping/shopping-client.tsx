@@ -3,10 +3,7 @@
 import { useState, useTransition } from "react";
 import { ShoppingCart, Sparkles, Check, Package, RefreshCw, DollarSign } from "lucide-react";
 import { Panel } from "@/components/ui";
-
-// This page is a client component so status toggles work without a full reload.
-// Data is fetched via a server action pattern — the initial props are passed from
-// a thin server wrapper below. The shopping list is the one truly interactive page.
+import { STORES } from "@/lib/types";
 
 import type { ShoppingListItem } from "@/lib/types";
 
@@ -32,6 +29,26 @@ const SOURCE_LABELS: Record<ShoppingListItem["source"], string> = {
 
 const CATEGORY_ORDER = ["food", "hygiene", "paper", "cleaning", "laundry", "garage", "other"];
 
+const STORE_TABS = [
+  { key: "all",         label: "All" },
+  { key: "trader-joes", label: "Trader Joe's", store: "Trader Joe's" },
+  { key: "wegmans",     label: "Wegmans",       store: "Wegmans" },
+  { key: "costco",      label: "Costco",         store: "Costco" },
+  { key: "other",       label: "Other" },
+] as const;
+
+type StoreTab = typeof STORE_TABS[number]["key"];
+
+function filterByStore(items: ShoppingListItem[], tab: StoreTab): ShoppingListItem[] {
+  if (tab === "all") return items;
+  if (tab === "other") {
+    return items.filter((i) => !i.storePreference || !STORES.includes(i.storePreference as typeof STORES[number]));
+  }
+  const t = STORE_TABS.find((s) => s.key === tab);
+  const store = "store" in t! ? t!.store : undefined;
+  return items.filter((i) => i.storePreference === store);
+}
+
 function groupByCategory(items: ShoppingListItem[]) {
   const groups: Record<string, ShoppingListItem[]> = {};
   for (const item of items) {
@@ -39,12 +56,10 @@ function groupByCategory(items: ShoppingListItem[]) {
     if (!groups[cat]) groups[cat] = [];
     groups[cat].push(item);
   }
-  // Sort within each group: critical → high → medium → low
   const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
   for (const cat of Object.keys(groups)) {
     groups[cat].sort((a, b) => priorityOrder[a.priority] - priorityOrder[b.priority]);
   }
-  // Return sorted by CATEGORY_ORDER, unknown cats at end alpha
   return Object.entries(groups).sort(([a], [b]) => {
     const ai = CATEGORY_ORDER.indexOf(a);
     const bi = CATEGORY_ORDER.indexOf(b);
@@ -124,16 +139,23 @@ function ShoppingItemRow({
   );
 }
 
-export function ShoppingListClient({ initialItems }: { initialItems: ShoppingListItem[] }) {
+export function ShoppingListClient({
+  initialItems,
+  activeStore = "all",
+}: {
+  initialItems: ShoppingListItem[];
+  activeStore?: string;
+}) {
   const [items, setItems] = useState<ShoppingListItem[]>(initialItems);
   const [isPending, startTransition] = useTransition();
   const [generating, setGenerating] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const needed  = items.filter((i) => i.status === "needed");
-  const inCart  = items.filter((i) => i.status === "in-cart");
-  const done    = items.filter((i) => i.status === "purchased");
-  const estTotal = items
+  const storeFiltered = filterByStore(items, activeStore as StoreTab);
+  const needed  = storeFiltered.filter((i) => i.status === "needed");
+  const inCart  = storeFiltered.filter((i) => i.status === "in-cart");
+  const done    = storeFiltered.filter((i) => i.status === "purchased");
+  const estTotal = storeFiltered
     .filter((i) => i.status !== "purchased" && i.status !== "skipped" && i.estCost !== undefined)
     .reduce((sum, i) => sum + (i.estCost ?? 0), 0);
 
@@ -169,7 +191,6 @@ export function ShoppingListClient({ initialItems }: { initialItems: ShoppingLis
       const data = await res.json();
       if (data.ok) {
         setMessage(`Generated ${data.generated} item${data.generated !== 1 ? "s" : ""}`);
-        // Reload items
         const listRes = await fetch("/api/shopping/list");
         if (listRes.ok) {
           const listData = await listRes.json();
@@ -190,10 +211,10 @@ export function ShoppingListClient({ initialItems }: { initialItems: ShoppingLis
       {/* Stats bar */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
-          { label: "Needed",      value: needed.length,  color: "text-slate-200" },
-          { label: "In Cart",     value: inCart.length,  color: "text-signal-blue" },
-          { label: "Purchased",   value: done.length,    color: "text-signal-green" },
-          { label: "Est. Total",  value: estTotal > 0 ? `$${estTotal.toFixed(2)}` : "—", color: "text-signal-purple" },
+          { label: "Needed",     value: needed.length,  color: "text-slate-200" },
+          { label: "In Cart",    value: inCart.length,  color: "text-signal-blue" },
+          { label: "Purchased",  value: done.length,    color: "text-signal-green" },
+          { label: "Est. Total", value: estTotal > 0 ? `$${estTotal.toFixed(2)}` : "—", color: "text-signal-purple" },
         ].map((s) => (
           <div key={s.label} className="rounded-xl border border-edge bg-ink-900/40 px-4 py-3">
             <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{s.label}</div>
@@ -204,6 +225,30 @@ export function ShoppingListClient({ initialItems }: { initialItems: ShoppingLis
 
       {/* AI Generate */}
       <Panel eyebrow="AI Chief of Staff" title="Shopping List">
+        {/* Store tabs */}
+        <div className="mb-4 flex flex-wrap gap-1 border-b border-edge pb-3">
+          {STORE_TABS.map((tab) => {
+            const count = filterByStore(items, tab.key).filter((i) => i.status !== "skipped").length;
+            return (
+              <a
+                key={tab.key}
+                href={`/shopping?store=${tab.key}`}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                  activeStore === tab.key
+                    ? "bg-signal-blue/20 text-signal-blue"
+                    : "text-slate-400 hover:bg-ink-800 hover:text-slate-200"
+                }`}
+              >
+                {tab.label}
+                {count > 0 && (
+                  <span className="ml-1.5 tabular-nums text-[10px] opacity-60">{count}</span>
+                )}
+              </a>
+            );
+          })}
+        </div>
+
+        {/* Generate controls */}
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <button
             onClick={handleGenerate}
@@ -235,10 +280,14 @@ export function ShoppingListClient({ initialItems }: { initialItems: ShoppingLis
         {groups.length === 0 && done.length === 0 ? (
           <div className="py-12 text-center space-y-2">
             <ShoppingCart className="mx-auto h-8 w-8 text-slate-600" />
-            <p className="text-sm text-slate-500">Your shopping list is empty.</p>
-            <p className="text-xs text-slate-600">
-              Click "Generate from inventory" to auto-populate based on low-stock items.
+            <p className="text-sm text-slate-500">
+              {activeStore === "all" ? "Your shopping list is empty." : `No items for this store.`}
             </p>
+            {activeStore === "all" && (
+              <p className="text-xs text-slate-600">
+                Click "Generate from inventory" to auto-populate based on low-stock items.
+              </p>
+            )}
           </div>
         ) : (
           <div className="space-y-5">
@@ -263,7 +312,6 @@ export function ShoppingListClient({ initialItems }: { initialItems: ShoppingLis
               </div>
             ))}
 
-            {/* Purchased */}
             {done.length > 0 && (
               <div>
                 <div className="mb-2 flex items-center gap-2">
