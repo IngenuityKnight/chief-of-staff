@@ -5,6 +5,7 @@ import { getVehicles } from "@/lib/server/data";
 import { getAdminFields } from "@/lib/server/admin";
 import { InlineForm } from "@/components/inline-form";
 import { EditInline } from "@/components/edit-inline";
+import { VehicleMaintenanceLookup } from "@/components/vehicle-maintenance-lookup";
 import type { AdminField } from "@/lib/server/admin";
 import type { Vehicle } from "@/lib/types";
 
@@ -176,6 +177,13 @@ function VehicleCard({ vehicle, fields }: { vehicle: Vehicle; fields: AdminField
       {vehicle.notes && (
         <p className="text-xs text-slate-500">{vehicle.notes}</p>
       )}
+
+      <VehicleMaintenanceLookup
+        make={vehicle.make}
+        model={vehicle.model}
+        year={vehicle.year}
+        mileage={vehicle.mileage}
+      />
     </div>
   );
 }
