@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Sidebar } from "@/components/sidebar";
 import { Topbar } from "@/components/topbar";
 import { CommandDock } from "@/components/command-dock";
+import { BottomNav } from "@/components/bottom-nav";
 
 export const metadata: Metadata = {
   title: "Burden House — Household OS",
@@ -26,11 +27,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <Sidebar />
           <div className="flex flex-1 flex-col">
             <Topbar />
-            <main className="flex-1 px-6 py-6 md:px-10 md:py-8">
+            <main className="flex-1 px-6 py-6 pb-24 md:px-10 md:py-8 md:pb-8">
               {children}
             </main>
           </div>
         </div>
+        <BottomNav />
         <CommandDock />
       </body>
     </html>
