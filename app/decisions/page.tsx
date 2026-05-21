@@ -1,6 +1,7 @@
 import { ArrowRight, Clock, DollarSign, HelpCircle } from "lucide-react";
 import { EditInline } from "@/components/edit-inline";
 import { InlineForm } from "@/components/inline-form";
+import { ResolveDecision } from "@/components/resolve-decision";
 import { Panel, Stat } from "@/components/ui";
 import { PRIORITY } from "@/lib/agents";
 import { getAdminFields } from "@/lib/server/admin";
@@ -40,7 +41,7 @@ export default async function DecisionsPage() {
       <Panel
         eyebrow="Decision Queue"
         title="Choices Waiting On You"
-        action={<span className="text-xs text-slate-500">Approve, defer, or dismiss from the edit control</span>}
+        action={<span className="text-xs text-slate-500">{open.length} waiting</span>}
       >
         <div className="space-y-3">
           {open.map((decision) => (
@@ -91,6 +92,8 @@ export default async function DecisionsPage() {
                   ))}
                 </div>
               )}
+
+              <ResolveDecision id={decision.id} options={decision.options} />
 
               <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-slate-500">
                 <span>{decision.category}</span>
