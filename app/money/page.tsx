@@ -1,19 +1,20 @@
 import { Panel, Stat, AgentBadge } from "@/components/ui";
 import { formatMoney, relativeDay, daysUntil } from "@/lib/utils";
-import { Zap, Tv, CreditCard, AlertCircle } from "lucide-react";
+import { Zap, Tv, CreditCard, AlertCircle, TrendingDown } from "lucide-react";
 import { getBills } from "@/lib/server/data";
 import { getAdminFields } from "@/lib/server/admin";
 import { InlineForm } from "@/components/inline-form";
 import { EditInline } from "@/components/edit-inline";
-import { getPlaidAccounts, getPlaidConnections } from "@/lib/server/plaid";
+import { getPlaidAccounts, getPlaidConnections, getSpendSummary } from "@/lib/server/plaid";
 import { PlaidConnect } from "@/components/plaid-connect";
 
 export default async function MoneyPage() {
-  const [bills, billFields, plaidAccounts, plaidConnections] = await Promise.all([
+  const [bills, billFields, plaidAccounts, plaidConnections, spend] = await Promise.all([
     getBills(),
     Promise.resolve(getAdminFields("bills")),
     getPlaidAccounts(),
     getPlaidConnections(),
+    getSpendSummary(30),
   ]);
   const due = bills.filter((b) => b.status === "due");
   const overdue = bills.filter((b) => b.status === "overdue");
@@ -22,8 +23,6 @@ export default async function MoneyPage() {
     .filter((b) => b.frequency === "monthly")
     .reduce((s, b) => s + b.amount, 0);
   const subsTotal = subs.reduce((s, b) => s + b.amount, 0);
-  const utilityTotal = bills.filter((b) => b.category === "Utilities").reduce((s, b) => s + b.amount, 0);
-
   const sortedBills = [...bills]
     .filter((b) => b.dueDate)
     .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
@@ -54,7 +53,7 @@ export default async function MoneyPage() {
         <Panel className="!px-0 !py-0"><div className="px-5 py-4"><Stat value={formatMoney(monthlyTotal)} label="Monthly Baseline" /></div></Panel>
         <Panel className="!px-0 !py-0"><div className="px-5 py-4"><Stat value={due.length} label="Due This Month" tone="amber" /></div></Panel>
         <Panel className="!px-0 !py-0"><div className="px-5 py-4"><Stat value={overdue.length} label="Overdue" tone="red" /></div></Panel>
-        <Panel className="!px-0 !py-0"><div className="px-5 py-4"><Stat value={formatMoney(subsTotal)} label="Subs /mo" tone="purple" /></div></Panel>
+        <Panel className="!px-0 !py-0"><div className="px-5 py-4"><Stat value={spend.total > 0 ? formatMoney(spend.total) : "—"} label="Spent / 30d" tone="purple" /></div></Panel>
       </div>
 
       <Panel eyebrow="Budget Allocation" title="Monthly flow" action={<AgentBadge agent="money" size="md" />}>
@@ -199,18 +198,37 @@ export default async function MoneyPage() {
             </ul>
           </Panel>
 
-          <Panel eyebrow="Money Agent" title="Flagged">
-            <div className="space-y-3 text-sm">
-              <div className="rounded-md border border-signal-purple/20 bg-signal-purple/5 p-3">
-                <div className="font-medium text-slate-100">Spotify Family — 2 dormant seats</div>
-                <div className="mt-1 text-xs text-slate-400">Potential save: $84/yr. Pending household review.</div>
+          {spend.total > 0 ? (
+            <Panel eyebrow="Last 30 Days" title="Spend by category">
+              <ul className="space-y-2">
+                {spend.byCategory.slice(0, 8).map(({ category, amount }) => {
+                  const pct = Math.round((amount / spend.total) * 100);
+                  return (
+                    <li key={category}>
+                      <div className="mb-1 flex items-center justify-between text-xs">
+                        <span className="capitalize text-slate-300">{category.replace(/_/g, " ").toLowerCase()}</span>
+                        <span className="font-mono tabular-nums text-slate-400">{formatMoney(amount)}</span>
+                      </div>
+                      <div className="h-1 w-full overflow-hidden rounded-full bg-ink-800">
+                        <div className="h-full rounded-full bg-signal-purple/70" style={{ width: `${pct}%` }} />
+                      </div>
+                    </li>
+                  );
+                })}
+                <li className="mt-1 flex items-center justify-between border-t border-edge pt-2 text-xs font-semibold">
+                  <span className="text-slate-300">Total spend</span>
+                  <span className="font-mono tabular-nums text-white">{formatMoney(spend.total)}</span>
+                </li>
+              </ul>
+            </Panel>
+          ) : (
+            <Panel eyebrow="Spend Insights" title="No data yet">
+              <div className="flex items-start gap-3 py-2 text-sm text-slate-500">
+                <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-slate-600" />
+                <span>Connect a bank account to see your real spending by category over the last 30 days.</span>
               </div>
-              <div className="rounded-md border border-signal-amber/20 bg-signal-amber/5 p-3">
-                <div className="font-medium text-slate-100">Gas bill — autopay off</div>
-                <div className="mt-1 text-xs text-slate-400">Last 3 bills paid manually. Enable autopay to avoid recurring lateness.</div>
-              </div>
-            </div>
-          </Panel>
+            </Panel>
+          )}
         </div>
       </div>
     </div>

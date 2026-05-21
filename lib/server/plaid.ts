@@ -248,6 +248,115 @@ export async function getPlaidAccounts() {
   return data ?? [];
 }
 
+// ─── Sync transactions ────────────────────────────────────────────────────────
+// Fetches the last 30 days of transactions and upserts into the transactions table.
+
+export async function syncTransactions(connectionId: string): Promise<{ synced: number }> {
+  const client = getPlaidClient();
+  const supabase = getSupabaseAdmin();
+  if (!client || !supabase) return { synced: 0 };
+
+  const { data: conn } = await supabase
+    .from("plaid_connections")
+    .select("access_token")
+    .eq("id", connectionId)
+    .single();
+
+  if (!conn) return { synced: 0 };
+
+  const endDate = new Date().toISOString().split("T")[0];
+  const startDate = new Date(Date.now() - 30 * 86_400_000).toISOString().split("T")[0];
+
+  try {
+    const { data } = await client.transactionsGet({
+      access_token: conn.access_token,
+      start_date: startDate,
+      end_date: endDate,
+      options: { count: 250, offset: 0 },
+    });
+
+    const rows = (data.transactions ?? []).map((tx) => {
+      const txAny = tx as unknown as Record<string, unknown>;
+      const pfc = txAny.personal_finance_category as Record<string, unknown> | undefined;
+      return {
+        id: tx.transaction_id,
+        account_id: tx.account_id,
+        connection_id: connectionId,
+        name: tx.name,
+        merchant_name: tx.merchant_name ?? null,
+        amount: tx.amount,
+        category: pfc ? String(pfc.primary ?? "") : (Array.isArray(tx.category) ? tx.category[0] ?? null : null),
+        subcategory: pfc ? String(pfc.detailed ?? "") : (Array.isArray(tx.category) ? tx.category[1] ?? null : null),
+        date: tx.date,
+        pending: tx.pending,
+        logo_url: (txAny.logo_url as string | undefined) ?? null,
+        updated_at: new Date().toISOString(),
+      };
+    });
+
+    if (rows.length > 0) {
+      await supabase.from("transactions").upsert(rows, { onConflict: "id" });
+    }
+    return { synced: rows.length };
+  } catch {
+    return { synced: 0 };
+  }
+}
+
+// ─── Read transactions ────────────────────────────────────────────────────────
+
+export async function getSpendSummary(days = 30): Promise<{
+  total: number;
+  byCategory: Array<{ category: string; amount: number }>;
+  recent: Array<{ id: string; name: string; amount: number; category: string; date: string; pending: boolean }>;
+}> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { total: 0, byCategory: [], recent: [] };
+
+  const since = new Date(Date.now() - days * 86_400_000).toISOString().split("T")[0];
+
+  try {
+    const { data } = await supabase
+      .from("transactions")
+      .select("id, name, merchant_name, amount, category, date, pending")
+      .gte("date", since)
+      .gt("amount", 0)
+      .order("date", { ascending: false })
+      .limit(150);
+
+    if (!data || data.length === 0) return { total: 0, byCategory: [], recent: [] };
+
+    type TxRow = { id: string; name: string; merchant_name?: string | null; amount: number; category?: string | null; date: string; pending: boolean };
+    const rows = data as TxRow[];
+    const settled = rows.filter((r) => !r.pending);
+
+    const catMap: Record<string, number> = {};
+    let total = 0;
+    for (const tx of settled) {
+      const cat = tx.category ?? "Other";
+      catMap[cat] = (catMap[cat] ?? 0) + Number(tx.amount);
+      total += Number(tx.amount);
+    }
+
+    return {
+      total,
+      byCategory: Object.entries(catMap)
+        .map(([category, amount]) => ({ category, amount }))
+        .sort((a, b) => b.amount - a.amount),
+      recent: rows.slice(0, 20).map((tx) => ({
+        id: tx.id,
+        name: tx.merchant_name || tx.name,
+        amount: Number(tx.amount),
+        category: tx.category ?? "Other",
+        date: tx.date,
+        pending: tx.pending,
+      })),
+    };
+  } catch {
+    return { total: 0, byCategory: [], recent: [] };
+  }
+}
+
 export async function getPlaidConnections() {
   const supabase = getSupabaseAdmin();
   if (!supabase) return [];
