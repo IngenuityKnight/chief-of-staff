@@ -52,6 +52,59 @@ async function handleSideEffects(
     });
   }
 
+  if (resource === "maintenance" && (values.status === "overdue" || values.status === "due-soon")) {
+    const supabase = getSupabaseAdmin();
+    if (supabase) {
+      try {
+        const { data: maint } = await supabase
+          .from("maintenance_items")
+          .select("item, system, last_task_id")
+          .eq("id", id)
+          .single();
+
+        if (maint) {
+          const itemTitle = typeof values.item === "string" ? values.item : (maint.item as string);
+          let hasOpenTask = false;
+          if (maint.last_task_id) {
+            const { data: existingTask } = await supabase
+              .from("tasks")
+              .select("status")
+              .eq("id", maint.last_task_id)
+              .single();
+            hasOpenTask = existingTask?.status !== "done";
+          }
+
+          if (!hasOpenTask) {
+            const newTaskId = crypto.randomUUID();
+            await supabase.from("tasks").insert({
+              id: newTaskId,
+              created_at: new Date().toISOString(),
+              title: `${itemTitle} — maintenance ${values.status === "overdue" ? "overdue" : "due soon"}`,
+              agent: "home",
+              category: "Household",
+              status: "todo",
+              priority: values.status === "overdue" ? "high" : "medium",
+              notes: `Auto-created from maintenance tracker (system: ${maint.system as string})`,
+            });
+            await supabase
+              .from("maintenance_items")
+              .update({ last_task_id: newTaskId })
+              .eq("id", id);
+            await logActivity({
+              event_type: "maintenance_task_created",
+              domain: "maintenance",
+              entity_title: itemTitle,
+              entity_id: id,
+              metadata: { task_id: newTaskId, status: values.status },
+            });
+          }
+        }
+      } catch {
+        // non-critical
+      }
+    }
+  }
+
   if (resource === "shopping" && values.status === "purchased") {
     const supabase = getSupabaseAdmin();
     if (supabase) {

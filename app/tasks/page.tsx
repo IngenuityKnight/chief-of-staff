@@ -1,4 +1,4 @@
-import { AGENTS } from "@/lib/agents";
+import { AGENTS, PRIORITY, TASK_STATUS } from "@/lib/agents";
 import { Panel, Stat, AgentBadge } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import type { AgentId } from "@/lib/types";
@@ -6,6 +6,7 @@ import { getTasks } from "@/lib/server/data";
 import { getAdminFields } from "@/lib/server/admin";
 import { InlineForm } from "@/components/inline-form";
 import { TaskRow } from "./task-row";
+import { Clock, Flag } from "lucide-react";
 
 export default async function TasksPage() {
   const [tasks, taskFields] = await Promise.all([getTasks(), Promise.resolve(getAdminFields("tasks"))]);
@@ -14,7 +15,7 @@ export default async function TasksPage() {
   const overdue = tasks.filter((t) => t.dueDate && new Date(t.dueDate).getTime() < Date.now() && t.status !== "done").length;
   const blocked = tasks.filter((t) => t.status === "blocked").length;
 
-  // Group open tasks by agent
+  // Group open tasks by agent (desktop kanban)
   const byAgent: Record<string, typeof tasks> = {};
   open.forEach((t) => {
     byAgent[t.agent] ??= [];
@@ -22,6 +23,17 @@ export default async function TasksPage() {
   });
 
   const agentOrder: AgentId[] = ["meals", "home", "money", "schedule", "roster", "chief"];
+
+  // Mobile: flat list sorted by overdue → priority → title
+  const PRIORITY_RANK: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+  const mobileSorted = [...open].sort((a, b) => {
+    const aOverdue = a.dueDate && new Date(a.dueDate).getTime() < Date.now() ? 0 : 1;
+    const bOverdue = b.dueDate && new Date(b.dueDate).getTime() < Date.now() ? 0 : 1;
+    if (aOverdue !== bOverdue) return aOverdue - bOverdue;
+    const pr = (PRIORITY_RANK[a.priority] ?? 3) - (PRIORITY_RANK[b.priority] ?? 3);
+    if (pr !== 0) return pr;
+    return a.title.localeCompare(b.title);
+  });
 
   return (
     <div className="space-y-6">
@@ -32,8 +44,53 @@ export default async function TasksPage() {
         <Panel className="!px-0 !py-0"><div className="px-5 py-4"><Stat value={done} label="Done" tone="green" /></div></Panel>
       </div>
 
-      {/* Kanban-by-agent */}
-      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+      {/* Mobile: flat priority list */}
+      <div className="block lg:hidden">
+        <Panel eyebrow="Open Tasks" title={`${open.length} remaining`}>
+          {mobileSorted.length === 0 ? (
+            <div className="py-8 text-center text-sm text-slate-500">All caught up.</div>
+          ) : (
+            <ul className="divide-y divide-edge/60">
+              {mobileSorted.map((task) => {
+                const isOverdue = Boolean(task.dueDate && new Date(task.dueDate).getTime() < Date.now());
+                return (
+                  <li key={task.id} className="flex items-start gap-3 px-1 py-3">
+                    <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full" style={{ background: AGENTS[task.agent].accent }} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm text-slate-100">{task.title}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span className={TASK_STATUS[task.status].pillClass}>{TASK_STATUS[task.status].label}</span>
+                        {task.priority !== "low" && (
+                          <span className={PRIORITY[task.priority].pillClass}>
+                            <Flag className="h-2.5 w-2.5" />
+                            {PRIORITY[task.priority].label}
+                          </span>
+                        )}
+                        {task.dueDate && (
+                          <span className={isOverdue ? "pill-red" : "pill-ghost"}>
+                            <Clock className="h-2.5 w-2.5" />
+                            {new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          </span>
+                        )}
+                        <AgentBadge agent={task.agent} />
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <InlineForm
+            resource="tasks"
+            fields={taskFields}
+            defaults={{ agent: "chief", status: "todo", priority: "medium" }}
+            label="Add task"
+          />
+        </Panel>
+      </div>
+
+      {/* Desktop: kanban-by-agent */}
+      <div className="hidden lg:grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         {agentOrder.map((agentId) => {
           const list = byAgent[agentId] ?? [];
           const a = AGENTS[agentId];

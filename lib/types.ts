@@ -155,8 +155,10 @@ export interface BriefingSummary {
 
 export interface ActivityLog {
   id: string;
+  eventType: string;
   resource: string;
   resourceId?: string;
+  entityTitle: string;
   action: "created" | "updated" | "deleted";
   field?: string;
   oldValue?: string;

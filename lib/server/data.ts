@@ -563,19 +563,26 @@ export async function getRecentActivity(limit = 20): Promise<ActivityLog[]> {
 
     if (error || !data) return [];
 
-    return (data as Array<Record<string, unknown>>).map((row) => ({
-      id: String(row.id),
-      resource: String(row.entity_type ?? ""),
-      resourceId: typeof row.entity_id === "string" ? row.entity_id : undefined,
-      action: (["created", "updated", "deleted"].includes(String(row.event_type?.toString().split("_").pop()))
-        ? String(row.event_type?.toString().split("_").pop())
-        : "updated") as ActivityLog["action"],
-      field: typeof row.field_name === "string" ? row.field_name : undefined,
-      oldValue: typeof row.old_value === "string" ? row.old_value : undefined,
-      newValue: typeof row.new_value === "string" ? row.new_value : undefined,
-      actor: typeof row.actor === "string" ? row.actor : undefined,
-      createdAt: String(row.occurred_at ?? row.created_at ?? ""),
-    }));
+    return (data as Array<Record<string, unknown>>).map((row) => {
+      const eventType = String(row.event_type ?? "");
+      const action: ActivityLog["action"] =
+        eventType.includes("creat") || eventType.includes("captur") ? "created"
+        : eventType.includes("delet") ? "deleted"
+        : "updated";
+      return {
+        id: String(row.id),
+        eventType,
+        resource: String(row.domain ?? row.entity_type ?? ""),
+        resourceId: typeof row.entity_id === "string" ? row.entity_id : undefined,
+        entityTitle: String(row.entity_title ?? ""),
+        action,
+        field: typeof row.field_name === "string" ? row.field_name : undefined,
+        oldValue: typeof row.old_value === "string" ? row.old_value : undefined,
+        newValue: typeof row.new_value === "string" ? row.new_value : undefined,
+        actor: typeof row.actor === "string" ? row.actor : undefined,
+        createdAt: String(row.occurred_at ?? row.created_at ?? ""),
+      };
+    });
   } catch {
     return [];
   }

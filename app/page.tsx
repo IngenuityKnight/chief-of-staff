@@ -3,10 +3,11 @@ import { ArrowRight, AlertTriangle, Clock, DollarSign, Wrench, CalendarDays, Pac
 import { AGENTS, TASK_STATUS } from "@/lib/agents";
 import { Panel, Stat, AgentBadge, SectionHeading } from "@/components/ui";
 import { formatMoney, formatTime, relativeDay, daysUntil } from "@/lib/utils";
-import { getBills, getBriefingSummary, getCalendarEvents, getDecisions, getInventoryItems, getMaintenanceItems, getTasks } from "@/lib/server/data";
+import { getBills, getBriefingSummary, getCalendarEvents, getDecisions, getInventoryItems, getMaintenanceItems, getRecentActivity, getTasks } from "@/lib/server/data";
+import { ActivityFeed } from "@/components/activity-feed";
 
 export default async function BriefingPage() {
-  const [briefing, tasks, bills, maintenance, calendar, inventory, decisions] = await Promise.all([
+  const [briefing, tasks, bills, maintenance, calendar, inventory, decisions, recentActivity] = await Promise.all([
     getBriefingSummary(),
     getTasks(),
     getBills(),
@@ -14,6 +15,7 @@ export default async function BriefingPage() {
     getCalendarEvents(),
     getInventoryItems(),
     getDecisions(),
+    getRecentActivity(30),
   ]);
 
   const lowStockItems = inventory.filter((i) => i.quantity <= i.minQuantity);
@@ -320,6 +322,10 @@ export default async function BriefingPage() {
           )}
         </Panel>
       </div>
+
+      <Panel eyebrow="History" title="Recent Activity">
+        <ActivityFeed items={recentActivity} />
+      </Panel>
     </div>
   );
 }
