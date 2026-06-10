@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { logActivity } from "@/lib/server/activity";
+import { getVehicles } from "@/lib/server/data";
 
 function json(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(body, { status });
@@ -76,6 +77,79 @@ export async function GET(req: NextRequest) {
       });
 
       created++;
+    }
+
+    // Auto-create maintenance items from vehicle state
+    const vehicles = await getVehicles();
+    for (const vehicle of vehicles) {
+      const label = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
+      const checks: { title: string; condition: boolean; priority: "high" | "medium" }[] = [];
+
+      // Oil change
+      if (vehicle.mileage && vehicle.lastOilChangeMiles) {
+        const milesSince = vehicle.mileage - vehicle.lastOilChangeMiles;
+        if (milesSince >= vehicle.oilChangeIntervalMiles) {
+          checks.push({ title: `Oil change — ${label}`, condition: true, priority: "high" });
+        }
+      }
+
+      // Next scheduled service
+      if (vehicle.nextServiceType && vehicle.nextServiceMiles && vehicle.mileage &&
+          vehicle.mileage >= vehicle.nextServiceMiles) {
+        checks.push({ title: `${vehicle.nextServiceType} — ${label}`, condition: true, priority: "medium" });
+      }
+
+      // Insurance expiry
+      if (vehicle.insuranceExpires) {
+        const daysLeft = Math.floor((new Date(vehicle.insuranceExpires).getTime() - Date.now()) / 86_400_000);
+        if (daysLeft <= 30) {
+          checks.push({ title: `Insurance renewal — ${label}`, condition: true, priority: daysLeft <= 7 ? "high" : "medium" });
+        }
+      }
+
+      // Registration expiry
+      if (vehicle.registrationExpires) {
+        const daysLeft = Math.floor((new Date(vehicle.registrationExpires).getTime() - Date.now()) / 86_400_000);
+        if (daysLeft <= 30) {
+          checks.push({ title: `Registration renewal — ${label}`, condition: true, priority: daysLeft <= 7 ? "high" : "medium" });
+        }
+      }
+
+      for (const check of checks) {
+        // Skip if an open maintenance item with this title already exists
+        const { data: existing } = await supabase
+          .from("maintenance_items")
+          .select("id, status")
+          .ilike("item", check.title)
+          .in("status", ["due-soon", "overdue", "in-progress"])
+          .maybeSingle();
+
+        if (existing) continue;
+
+        const nextDue = new Date().toISOString();
+        const { error: maintError } = await supabase.from("maintenance_items").insert({
+          id: crypto.randomUUID(),
+          item: check.title,
+          system: "Vehicle",
+          frequency: "annual",
+          last_done: new Date(Date.now() - 365 * 86_400_000).toISOString().slice(0, 10),
+          next_due: nextDue,
+          status: "overdue",
+          auto_create_task: true,
+          created_at: new Date().toISOString(),
+        });
+
+        if (!maintError) {
+          created++;
+          await logActivity({
+            event_type: "maintenance_task_created",
+            domain: "maintenance",
+            entity_title: check.title,
+            entity_id: vehicle.id,
+            metadata: { source: "vehicle_check" },
+          });
+        }
+      }
     }
 
     return json({ ok: true, cron: "maintenance", created });

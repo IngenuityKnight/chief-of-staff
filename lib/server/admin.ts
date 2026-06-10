@@ -156,10 +156,11 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
       { key: "status", label: "Status", type: "select", options: ["todo", "in_progress", "blocked", "done"] },
       { key: "priority", label: "Priority", type: "select", options: ["low", "medium", "high", "critical"] },
       { key: "dueDate", label: "Due Date ISO", type: "text" },
+      { key: "recurringRule", label: "Recurring Rule", type: "select", options: ["", "daily", "weekly", "every-2-weeks", "monthly", "quarterly"] },
       { key: "notes", label: "Notes", type: "textarea" },
     ],
     toDbPatch(payload) {
-      const patch = pickAllowed(payload, ["title", "agent", "category", "status", "priority", "dueDate", "notes"]);
+      const patch = pickAllowed(payload, ["title", "agent", "category", "status", "priority", "dueDate", "recurringRule", "notes"]);
       return {
         ...(patch.title !== undefined ? { title: toNullableString(patch.title) } : {}),
         ...(patch.agent !== undefined ? { agent: patch.agent } : {}),
@@ -167,6 +168,8 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
         ...(patch.status !== undefined ? { status: patch.status } : {}),
         ...(patch.priority !== undefined ? { priority: patch.priority } : {}),
         ...(patch.dueDate !== undefined ? { due_date: toNullableString(patch.dueDate) } : {}),
+        ...(patch.recurringRule !== undefined ? { recurring_rule: toNullableString(patch.recurringRule) } : {}),
+        ...(patch.status === "done" ? { completed_at: new Date().toISOString() } : {}),
         ...(patch.notes !== undefined ? { notes: toNullableString(patch.notes) } : {}),
       };
     },
@@ -180,6 +183,7 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
         status: payload.status ?? "todo",
         priority: payload.priority ?? "medium",
         due_date: toNullableString(payload.dueDate) ?? null,
+        recurring_rule: toNullableString(payload.recurringRule) ?? null,
         notes: toNullableString(payload.notes) ?? null,
       };
     },

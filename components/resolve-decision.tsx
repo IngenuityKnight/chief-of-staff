@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2, X } from "lucide-react";
+import { CheckCircle2, Loader2, Sparkles, X } from "lucide-react";
 
 type ResolutionStatus = "approved" | "deferred" | "dismissed";
 
@@ -26,6 +26,8 @@ export function ResolveDecision({
   const [outcomeNotes, setOutcomeNotes] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiRec, setAiRec] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   function reset() {
     setOpen(false);
@@ -33,6 +35,21 @@ export function ResolveDecision({
     setChosenOption(null);
     setOutcomeNotes("");
     setError(null);
+    setAiRec(null);
+  }
+
+  async function fetchAiRecommendation() {
+    setAiLoading(true);
+    setAiRec(null);
+    try {
+      const res = await fetch(`/api/decisions/${id}/recommend`, { method: "POST" });
+      const data = await res.json();
+      setAiRec(data.recommendation ?? "No recommendation available.");
+    } catch {
+      setAiRec("Failed to get AI recommendation.");
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   async function handleSubmit() {
@@ -76,6 +93,23 @@ export function ResolveDecision({
 
   return (
     <div className="mt-3 rounded-xl border border-signal-green/20 bg-signal-green/5 p-4 space-y-4">
+      {/* AI recommendation */}
+      {aiRec ? (
+        <div className="rounded-md border border-signal-blue/20 bg-signal-blue/5 px-3 py-2 text-sm text-slate-200">
+          <span className="font-semibold text-signal-blue">AI: </span>{aiRec}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={fetchAiRecommendation}
+          disabled={aiLoading}
+          className="flex items-center gap-1.5 rounded-md bg-signal-blue/10 px-3 py-1.5 text-xs font-semibold text-signal-blue transition hover:bg-signal-blue/20 disabled:opacity-50"
+        >
+          {aiLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+          {aiLoading ? "Thinking…" : "Ask AI for a recommendation"}
+        </button>
+      )}
+
       {/* Option picker */}
       {options.length > 0 && (
         <div>

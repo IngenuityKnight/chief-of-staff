@@ -27,6 +27,43 @@ async function handleSideEffects(
       entity_id: id,
       metadata: { status: values.status },
     });
+
+    // Spawn next instance for recurring tasks when marked done
+    if (values.status === "done") {
+      const supabase = getSupabaseAdmin();
+      if (supabase) {
+        try {
+          const { data: task } = await supabase
+            .from("tasks")
+            .select("title, agent, category, priority, recurring_rule, due_date")
+            .eq("id", id)
+            .single();
+
+          if (task?.recurring_rule) {
+            const intervalDays: Record<string, number> = {
+              daily: 1, weekly: 7, "every-2-weeks": 14, monthly: 30, quarterly: 91,
+            };
+            const days = intervalDays[task.recurring_rule as string] ?? 7;
+            const nextDue = new Date(Date.now() + days * 86_400_000).toISOString();
+
+            await supabase.from("tasks").insert({
+              id: crypto.randomUUID(),
+              created_at: new Date().toISOString(),
+              title: task.title,
+              agent: task.agent,
+              category: task.category,
+              status: "todo",
+              priority: task.priority,
+              recurring_rule: task.recurring_rule,
+              due_date: nextDue,
+              notes: `Auto-created from recurring rule: ${task.recurring_rule as string}`,
+            });
+          }
+        } catch {
+          // non-critical
+        }
+      }
+    }
   }
 
   if (resource === "decisions" && values.status !== undefined && values.status !== "open") {

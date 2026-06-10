@@ -1,12 +1,13 @@
 import { Package, AlertTriangle, CheckCircle2, ShoppingCart, TrendingDown } from "lucide-react";
 import { Panel, Stat } from "@/components/ui";
 import { formatMoney, relativeDay } from "@/lib/utils";
-import { getInventoryItems } from "@/lib/server/data";
+import { getInventoryItems, getPurchasePriceHistory } from "@/lib/server/data";
 import { getAdminFields } from "@/lib/server/admin";
 import { InlineForm } from "@/components/inline-form";
 import { EditInline } from "@/components/edit-inline";
 import { QuantityStepper } from "@/components/quantity-stepper";
 import { LogPurchase } from "@/components/log-purchase";
+import { PriceSparkline } from "@/components/price-sparkline";
 import type { AdminField } from "@/lib/server/admin";
 import type { InventoryItem, InventoryCategory } from "@/lib/types";
 
@@ -42,7 +43,7 @@ function StockBar({ item }: { item: InventoryItem }) {
   );
 }
 
-function ItemRow({ item, fields }: { item: InventoryItem; fields: AdminField[] }) {
+function ItemRow({ item, fields, priceHistory }: { item: InventoryItem; fields: AdminField[]; priceHistory: number[] }) {
   const isLow = item.quantity <= item.minQuantity;
   const isEmpty = item.quantity === 0;
   const meta = CATEGORY_META[item.category];
@@ -84,6 +85,7 @@ function ItemRow({ item, fields }: { item: InventoryItem; fields: AdminField[] }
           <div>
             <div className="text-slate-500">Per unit</div>
             <div className="font-mono text-slate-200">{formatMoney(item.pricePerUnit)}</div>
+            <PriceSparkline prices={priceHistory} />
           </div>
         )}
         {item.estWeeklyConsumption !== undefined && (
@@ -145,9 +147,10 @@ export default async function InventoryPage({
 }) {
   const params = await searchParams;
   const activeTab = (params.tab ?? "all") as InventoryCategory | "all";
-  const [items, fields] = await Promise.all([
+  const [items, fields, priceHistory] = await Promise.all([
     getInventoryItems(),
     Promise.resolve(getAdminFields("inventory")),
+    getPurchasePriceHistory(),
   ]);
 
   const lowStock   = items.filter((i) => i.quantity <= i.minQuantity);
@@ -253,7 +256,7 @@ export default async function InventoryPage({
           </div>
         ) : (
           <div className="space-y-2">
-            {sorted.map((item) => <ItemRow key={item.id} item={item} fields={fields} />)}
+            {sorted.map((item) => <ItemRow key={item.id} item={item} fields={fields} priceHistory={priceHistory.get(item.id) ?? []} />)}
           </div>
         )}
 

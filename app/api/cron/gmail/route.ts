@@ -53,16 +53,32 @@ export async function GET(req: NextRequest) {
       const { data: fullMsg } = await gmail.users.messages.get({
         userId: "me",
         id: msg.id,
-        format: "metadata",
-        metadataHeaders: ["Subject", "From"],
+        format: "full",
       });
 
       const headers = fullMsg.payload?.headers ?? [];
       const subject = headers.find((h) => h.name === "Subject")?.value ?? "(no subject)";
-      const snippet = fullMsg.snippet ?? "";
+      const from = headers.find((h) => h.name === "From")?.value ?? "";
 
-      // Build text for intake: "Subject: snippet..."
-      const text = `${subject}: ${snippet.slice(0, 500)}`.trim();
+      // Recursively extract plain-text body from MIME parts
+      function extractBody(part: typeof fullMsg.payload): string {
+        if (!part) return "";
+        if (part.mimeType === "text/plain" && part.body?.data) {
+          return Buffer.from(part.body.data, "base64url").toString("utf-8");
+        }
+        for (const child of part.parts ?? []) {
+          const result = extractBody(child);
+          if (result) return result;
+        }
+        return "";
+      }
+
+      const body = extractBody(fullMsg.payload).slice(0, 1500).trim();
+      const text = [
+        `From: ${from}`,
+        `Subject: ${subject}`,
+        body || (fullMsg.snippet ?? "").slice(0, 500),
+      ].filter(Boolean).join("\n").trim();
 
       const intake = await analyzeIntake(text, "email");
       await persistIntake(intake);

@@ -168,6 +168,8 @@ function mapTask(row: Record<string, unknown>): Task {
     inboxItemId: typeof row.inbox_item_id === "string" ? row.inbox_item_id : undefined,
     notes: typeof row.notes === "string" ? row.notes : undefined,
     createdAt: String(row.created_at),
+    completedAt: typeof row.completed_at === "string" ? row.completed_at : undefined,
+    recurringRule: typeof row.recurring_rule === "string" ? row.recurring_rule : undefined,
   };
 }
 
@@ -279,33 +281,113 @@ function summarizeWhy(task: Task) {
   return "Open task in the active queue.";
 }
 
-function buildCrossAgentInsights(tasks: Task[], bills: BillItem[], maintenance: MaintenanceItem[]) {
+function buildCrossAgentInsights(
+  tasks: Task[],
+  bills: BillItem[],
+  maintenance: MaintenanceItem[],
+  calendar: CalendarEvent[],
+  inventory: InventoryItem[],
+) {
   const insights: BriefingSummary["crossAgentInsights"] = [];
-  const overdueBills = bills.filter((bill) => bill.status === "overdue");
-  const repairTasks = tasks.filter((task) => task.agent === "home" && task.priority !== "low");
-  const dueSoonMaintenance = maintenance.filter((item) => item.status === "due-soon" || item.status === "overdue");
+  const now = Date.now();
+  const sevenDays = now + 7 * 86_400_000;
+  const thirtyDays = now + 30 * 86_400_000;
 
+  const overdueBills = bills.filter((b) => b.status === "overdue");
+  const repairTasks = tasks.filter((t) => t.agent === "home" && t.priority !== "low" && t.status !== "done");
+  const dueSoonMaint = maintenance.filter((m) => m.status === "due-soon" || m.status === "overdue");
+  const upcomingEvents = calendar.filter((e) => new Date(e.start).getTime() > now && new Date(e.start).getTime() <= sevenDays);
+  const outOfStock = inventory.filter((i) => i.quantity === 0);
+  const lowFood = inventory.filter((i) => i.category === "food" && i.quantity <= i.minQuantity);
+  const openTasks = tasks.filter((t) => t.status !== "done");
+
+  // 1. Home repair tasks → budget
   if (repairTasks.length > 0) {
     insights.push({
       id: "x_home_money",
       agents: ["home", "money"],
-      insight: `${repairTasks.length} home tasks are active; review budget approval before authorizing vendor work.`,
+      insight: `${repairTasks.length} active home task${repairTasks.length > 1 ? "s" : ""} may require vendor spend — review budget before authorizing work.`,
     });
   }
 
+  // 2. Overdue bills → schedule time to pay
   if (overdueBills.length > 0) {
     insights.push({
       id: "x_money_schedule",
       agents: ["money", "schedule"],
-      insight: `${overdueBills.length} bills are overdue. Block a payment window to clear them before new due dates stack up.`,
+      insight: `${overdueBills.length} bill${overdueBills.length > 1 ? "s are" : " is"} overdue. Block 30 min this week to clear them before late fees stack.`,
     });
   }
 
-  if (dueSoonMaintenance.length > 0) {
+  // 3. Bundle maintenance service visits
+  if (dueSoonMaint.length >= 2) {
     insights.push({
       id: "x_home_schedule",
       agents: ["home", "schedule"],
-      insight: `${dueSoonMaintenance.length} maintenance items need attention soon. Bundling service visits could reduce cost and calendar overhead.`,
+      insight: `${dueSoonMaint.length} maintenance items need attention soon — bundling them into one service visit could save $50–$150.`,
+    });
+  }
+
+  // 4. Upcoming event + food low stock
+  if (upcomingEvents.length > 0 && lowFood.length >= 3) {
+    const nextEvent = upcomingEvents[0];
+    insights.push({
+      id: "x_meals_schedule",
+      agents: ["meals", "schedule"],
+      insight: `You have ${upcomingEvents.length} event${upcomingEvents.length > 1 ? "s" : ""} this week (next: ${nextEvent.title}) and ${lowFood.length} food items are low — run a shopping trip before then.`,
+    });
+  }
+
+  // 5. Out-of-stock essentials
+  if (outOfStock.length > 0) {
+    insights.push({
+      id: "x_meals_money",
+      agents: ["meals", "money"],
+      insight: `${outOfStock.length} item${outOfStock.length > 1 ? "s are" : " is"} completely out of stock (${outOfStock.slice(0, 3).map((i) => i.name).join(", ")}${outOfStock.length > 3 ? "…" : ""}). Add to shopping list before the next trip.`,
+    });
+  }
+
+  // 6. Heavy task load + open decisions
+  const openDecisionCount = 0; // decisions not fetched here — checked via task count proxy
+  if (openTasks.length >= 8) {
+    insights.push({
+      id: "x_chief_schedule",
+      agents: ["chief", "schedule"],
+      insight: `${openTasks.length} open tasks — consider a weekly review to reprioritize and defer low-value items before the queue grows further.`,
+    });
+  }
+
+  // 7. Bills due this week + events scheduled
+  const billsDueThisWeek = bills.filter((b) => b.dueDate && b.status !== "paid" && new Date(b.dueDate).getTime() <= sevenDays);
+  if (billsDueThisWeek.length > 0 && upcomingEvents.length >= 2) {
+    insights.push({
+      id: "x_money_schedule_2",
+      agents: ["money", "schedule"],
+      insight: `${billsDueThisWeek.length} bill${billsDueThisWeek.length > 1 ? "s" : ""} due this week alongside ${upcomingEvents.length} calendar events — make sure cash flow is clear.`,
+    });
+  }
+
+  // 8. Vehicle-tagged maintenance + upcoming travel
+  const vehicleMaint = maintenance.filter((m) => m.system === "Vehicle" && (m.status === "due-soon" || m.status === "overdue"));
+  const travelEvents = upcomingEvents.filter((e) => /trip|travel|flight|road/i.test(e.title));
+  if (vehicleMaint.length > 0 && travelEvents.length > 0) {
+    insights.push({
+      id: "x_home_schedule_vehicle",
+      agents: ["home", "schedule"],
+      insight: `Vehicle maintenance is due and you have ${travelEvents.length} upcoming travel event${travelEvents.length > 1 ? "s" : ""} — service the car before you leave.`,
+    });
+  }
+
+  // 9. Expiring insurance/registration via maintenance items
+  const expiring = maintenance.filter((m) =>
+    /insurance|registration/i.test(m.item) &&
+    new Date(m.nextDue).getTime() <= thirtyDays
+  );
+  if (expiring.length > 0) {
+    insights.push({
+      id: "x_home_money_expiry",
+      agents: ["home", "money"],
+      insight: `${expiring.map((m) => m.item).join(", ")} expire${expiring.length === 1 ? "s" : ""} within 30 days — renew to avoid lapses or fines.`,
     });
   }
 
@@ -371,6 +453,27 @@ function mapInventoryItem(row: Record<string, unknown>): InventoryItem {
     notes: typeof row.notes === "string" ? row.notes : undefined,
     createdAt: String(row.created_at),
   };
+}
+
+export async function getPurchasePriceHistory(): Promise<Map<string, number[]>> {
+  noStore();
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return new Map();
+
+  const { data } = await supabase
+    .from("inventory_purchases")
+    .select("inventory_item_id, price, recorded_at")
+    .not("price", "is", null)
+    .order("recorded_at", { ascending: true });
+
+  const map = new Map<string, number[]>();
+  for (const row of data ?? []) {
+    const key = String(row.inventory_item_id);
+    const prices = map.get(key) ?? [];
+    prices.push(Number(row.price));
+    map.set(key, prices);
+  }
+  return map;
 }
 
 function mapVehicle(row: Record<string, unknown>): Vehicle {
@@ -585,7 +688,7 @@ export async function getBriefingSummary(): Promise<BriefingSummary> {
     itemsCapturedThisWeek: weeklyCounts.itemsCaptured,
     tasksCompletedThisWeek: weeklyCounts.tasksCompleted,
     priorities,
-    crossAgentInsights: buildCrossAgentInsights(tasks, bills, maintenance),
+    crossAgentInsights: buildCrossAgentInsights(tasks, bills, maintenance, calendar, inventory),
   };
 }
 

@@ -42,8 +42,8 @@ export async function GET(req: NextRequest) {
   const calendarId = process.env.GOOGLE_CALENDAR_ID ?? "primary";
   const calendar = google.calendar({ version: "v3", auth });
 
-  // 15-minute window — wider than cron interval to avoid gaps on missed runs
-  const updatedMin = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+  // 25-hour window so the daily 7am cron always catches yesterday's changes
+  const updatedMin = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
 
   const { data } = await calendar.events.list({
     calendarId,
