@@ -480,11 +480,10 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
       { key: "pricePerUnit",     label: "Price/Unit ($)",   type: "number" },
       { key: "unitsPerPackage",  label: "Units/Package",    type: "number" },
       { key: "packagePrice",     label: "Package Price ($)", type: "number" },
-      { key: "preferredStore",   label: "Preferred Store",  type: "select", options: ["Trader Joe's", "Wegmans", "Costco"] },
       { key: "notes",            label: "Notes",            type: "textarea" },
     ],
     toDbPatch(payload) {
-      const patch = pickAllowed(payload, ["name", "category", "quantity", "unit", "minQuantity", "estWeeklyConsumption", "location", "pricePerUnit", "unitsPerPackage", "packagePrice", "preferredStore", "notes"]);
+      const patch = pickAllowed(payload, ["name", "category", "quantity", "unit", "minQuantity", "estWeeklyConsumption", "location", "pricePerUnit", "unitsPerPackage", "packagePrice", "notes"]);
       return {
         ...(patch.name !== undefined ? { name: toNullableString(patch.name) } : {}),
         ...(patch.category !== undefined ? { category: patch.category } : {}),
@@ -496,7 +495,6 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
         ...(patch.pricePerUnit !== undefined ? { price_per_unit: toNumberOrNull(patch.pricePerUnit) } : {}),
         ...(patch.unitsPerPackage !== undefined ? { units_per_package: toNumberOrNull(patch.unitsPerPackage) } : {}),
         ...(patch.packagePrice !== undefined ? { package_price: toNumberOrNull(patch.packagePrice) } : {}),
-        ...(patch.preferredStore !== undefined ? { preferred_store: toNullableString(patch.preferredStore) } : {}),
         ...(patch.notes !== undefined ? { notes: toNullableString(patch.notes) } : {}),
       };
     },
@@ -513,7 +511,6 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
         price_per_unit: toNumberOrNull(payload.pricePerUnit) ?? null,
         units_per_package: toNumberOrNull(payload.unitsPerPackage) ?? null,
         package_price: toNumberOrNull(payload.packagePrice) ?? null,
-        preferred_store: toNullableString(payload.preferredStore) ?? null,
         last_restocked_at: null,
         notes: toNullableString(payload.notes) ?? null,
         created_at: new Date().toISOString(),

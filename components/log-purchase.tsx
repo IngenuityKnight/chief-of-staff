@@ -6,23 +6,17 @@ import { ShoppingBag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { STORES } from "@/lib/types";
 
-export function LogPurchase({
-  id,
-  preferredStore,
-}: {
-  id: string;
-  preferredStore?: string;
-}) {
+export function LogPurchase({ id }: { id: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [store, setStore] = useState(preferredStore ?? "");
+  const [store, setStore] = useState("");
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
   function reset() {
-    setStore(preferredStore ?? "");
+    setStore("");
     setQuantity("");
     setPrice("");
     setMessage(null);

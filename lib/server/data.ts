@@ -365,7 +365,6 @@ function mapInventoryItem(row: Record<string, unknown>): InventoryItem {
       : (typeof row.package_price === "number" && typeof row.units_per_package === "number" && row.units_per_package > 0)
         ? row.package_price / row.units_per_package
         : undefined,
-    preferredStore: typeof row.preferred_store === "string" ? row.preferred_store : undefined,
     lastPurchasedStore: typeof row.last_purchased_store === "string" ? row.last_purchased_store : undefined,
     lastPurchasedAt: typeof row.last_purchased_at === "string" ? row.last_purchased_at : undefined,
     lastRestockedAt: typeof row.last_restocked_at === "string" ? row.last_restocked_at : undefined,

@@ -92,12 +92,6 @@ function ItemRow({ item, fields }: { item: InventoryItem; fields: AdminField[] }
             <div className="font-mono text-slate-200">{item.estWeeklyConsumption} {item.unit}</div>
           </div>
         )}
-        {item.preferredStore && (
-          <div>
-            <div className="text-slate-500">Preferred store</div>
-            <div className="text-slate-200">{item.preferredStore}</div>
-          </div>
-        )}
         {item.lastPurchasedStore && (
           <div>
             <div className="text-slate-500">Last bought at</div>
@@ -113,7 +107,7 @@ function ItemRow({ item, fields }: { item: InventoryItem; fields: AdminField[] }
           minQuantity={item.minQuantity}
           unit={item.unit}
         />
-        <LogPurchase id={item.id} preferredStore={item.preferredStore} />
+        <LogPurchase id={item.id} />
         <EditInline
           resource="inventory"
           id={item.id}
@@ -124,7 +118,7 @@ function ItemRow({ item, fields }: { item: InventoryItem; fields: AdminField[] }
             estWeeklyConsumption: item.estWeeklyConsumption ?? "",
             location: item.location ?? "", pricePerUnit: item.pricePerUnit ?? "",
             unitsPerPackage: item.unitsPerPackage ?? "", packagePrice: item.packagePrice ?? "",
-            preferredStore: item.preferredStore ?? "", notes: item.notes ?? "",
+            notes: item.notes ?? "",
           }}
           label={`Edit ${item.name}`}
         />
