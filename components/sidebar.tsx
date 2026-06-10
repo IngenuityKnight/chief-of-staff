@@ -25,6 +25,8 @@ const NAV = [
   { href: "/money",      label: "Money",      icon: Wallet,          hint: "Bills + budget" },
   { href: "/schedule",   label: "Schedule",   icon: CalendarDays,    hint: "Calendar + time" },
   { href: "/roster",     label: "Roster",     icon: Users,           hint: "Household + rules" },
+  { type: "divider", label: "System" } as const,
+  { href: "/settings",   label: "Settings",   icon: Settings,        hint: "Household context + AI config" },
 ];
 
 export function Sidebar() {
