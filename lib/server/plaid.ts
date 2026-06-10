@@ -361,10 +361,179 @@ export async function getPlaidConnections() {
   const supabase = getSupabaseAdmin();
   if (!supabase) return [];
 
-  // Select only non-sensitive fields
   const { data } = await supabase
     .from("plaid_connections")
     .select("id, institution_name, institution_id, accounts, last_synced_at, created_at");
 
   return data ?? [];
+}
+
+// ─── Net worth ────────────────────────────────────────────────────────────────
+
+export async function getNetWorth() {
+  const accounts = await getPlaidAccounts();
+  if (!accounts.length) return null;
+
+  const assets = accounts
+    .filter((a) => ["depository", "investment"].includes(String(a.type)))
+    .reduce((sum, a) => sum + Number(a.balance_current ?? 0), 0);
+
+  const liabilities = accounts
+    .filter((a) => ["credit", "loan"].includes(String(a.type)))
+    .reduce((sum, a) => sum + Number(a.balance_current ?? 0), 0);
+
+  return { assets, liabilities, net: assets - liabilities };
+}
+
+// ─── Cash flow forecast ───────────────────────────────────────────────────────
+
+export async function getCashFlowForecast(days = 7) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return null;
+
+  const cutoff = new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+
+  const [accounts, { data: dueBills }] = await Promise.all([
+    getPlaidAccounts(),
+    supabase
+      .from("bills")
+      .select("name, amount, due_date, autopay, status")
+      .neq("status", "paid")
+      .lte("due_date", cutoff)
+      .order("due_date"),
+  ]);
+
+  const checking = accounts
+    .filter((a) => String(a.type) === "depository")
+    .reduce((sum, a) => sum + Number(a.balance_available ?? a.balance_current ?? 0), 0);
+
+  const billsTotal = (dueBills ?? []).reduce((sum, b) => sum + Number(b.amount), 0);
+
+  return {
+    checking,
+    bills: (dueBills ?? []) as Array<{ name: string; amount: number; due_date: string; autopay: boolean; status: string }>,
+    billsTotal,
+    buffer: checking - billsTotal,
+    daysWindow: days,
+  };
+}
+
+// ─── Credit utilization ───────────────────────────────────────────────────────
+
+export async function getCreditUtilization() {
+  const accounts = await getPlaidAccounts();
+  const creditAccounts = accounts.filter((a) => String(a.type) === "credit");
+  if (!creditAccounts.length) return null;
+
+  const cards = creditAccounts.map((acct) => {
+    const used = Number(acct.balance_current ?? 0);
+    const limit = Number(acct.balance_limit ?? 0);
+    const pct = limit > 0 ? Math.round((used / limit) * 100) : null;
+    return {
+      id: String(acct.id),
+      name: String(acct.name),
+      mask: acct.mask ? String(acct.mask) : null,
+      used, limit, pct,
+      status: pct === null ? "unknown" : pct >= 90 ? "critical" : pct >= 70 ? "high" : pct >= 30 ? "medium" : "good",
+    };
+  });
+
+  const totalUsed = cards.reduce((s, c) => s + c.used, 0);
+  const totalLimit = cards.reduce((s, c) => s + c.limit, 0);
+  const totalPct = totalLimit > 0 ? Math.round((totalUsed / totalLimit) * 100) : null;
+
+  return { cards, totalUsed, totalLimit, totalPct };
+}
+
+// ─── Budget vs actual ─────────────────────────────────────────────────────────
+
+export async function getBudgetVsActual(monthlyBudget: number | null) {
+  if (!monthlyBudget) return null;
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return null;
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+
+  const { data } = await supabase
+    .from("transactions")
+    .select("amount")
+    .gte("date", monthStart)
+    .gt("amount", 0)
+    .eq("pending", false);
+
+  const spent = (data ?? []).reduce((sum, tx) => sum + Number(tx.amount), 0);
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const dayOfMonth = now.getDate();
+  const dailyBurn = dayOfMonth > 0 ? spent / dayOfMonth : 0;
+
+  return {
+    spent,
+    budget: monthlyBudget,
+    remaining: monthlyBudget - spent,
+    pct: Math.round((spent / monthlyBudget) * 100),
+    daysLeft: daysInMonth - dayOfMonth,
+    projectedMonth: Math.round(dailyBurn * daysInMonth),
+    onTrack: dailyBurn * daysInMonth <= monthlyBudget,
+    hasData: (data?.length ?? 0) > 0,
+  };
+}
+
+// ─── Subscription audit ───────────────────────────────────────────────────────
+// Finds Plaid-detected recurring charges that aren't already in the bills list.
+
+export async function getSubscriptionAudit() {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { unmatched: [] as Array<{ id: string; name: string; amount: number }>, hasData: false };
+
+  const [{ data: plaidBills }, { data: allBills }] = await Promise.all([
+    supabase.from("bills").select("id, name, amount").like("id", "plaid_%"),
+    supabase.from("bills").select("id, name, amount").not("id", "like", "plaid_%"),
+  ]);
+
+  if (!plaidBills?.length) return { unmatched: [], hasData: false };
+
+  const manualNames = (allBills ?? []).map((b) => String(b.name).toLowerCase());
+  const unmatched = plaidBills.filter((pb) => {
+    const n = String(pb.name).toLowerCase();
+    return !manualNames.some((mn) => mn.includes(n.slice(0, 7)) || n.includes(mn.slice(0, 7)));
+  });
+
+  return {
+    unmatched: unmatched.map((b) => ({ id: String(b.id), name: String(b.name), amount: Number(b.amount) })),
+    hasData: true,
+  };
+}
+
+// ─── Auto-match bill payments ─────────────────────────────────────────────────
+// Called after transaction sync — marks bills paid when a matching charge appears.
+
+export async function autoMatchBillPayments() {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { matched: 0 };
+
+  const since = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+
+  const [{ data: txns }, { data: unpaidBills }] = await Promise.all([
+    supabase.from("transactions").select("name, merchant_name, amount, date").gte("date", since).eq("pending", false).gt("amount", 0),
+    supabase.from("bills").select("id, name, amount").neq("status", "paid"),
+  ]);
+
+  if (!txns?.length || !unpaidBills?.length) return { matched: 0 };
+
+  let matched = 0;
+  for (const bill of unpaidBills) {
+    const bName = String(bill.name).toLowerCase();
+    const bAmt = Number(bill.amount);
+    const hit = txns.find((tx) => {
+      const tName = (tx.merchant_name || tx.name || "").toLowerCase();
+      const tAmt = Math.abs(Number(tx.amount));
+      return (tName.includes(bName.slice(0, 7)) || bName.includes(tName.slice(0, 7))) && Math.abs(tAmt - bAmt) < 10;
+    });
+    if (hit) {
+      await supabase.from("bills").update({ status: "paid", last_paid: hit.date }).eq("id", bill.id);
+      matched++;
+    }
+  }
+  return { matched };
 }

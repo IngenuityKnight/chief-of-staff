@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getPlaidConnections, syncAccounts, syncRecurringToBills } from "@/lib/server/plaid";
+import { getPlaidConnections, syncAccounts, syncRecurringToBills, syncTransactions, autoMatchBillPayments } from "@/lib/server/plaid";
 
 // POST /api/plaid/sync
 //
@@ -36,8 +36,11 @@ export async function POST(req: NextRequest) {
     const results = await Promise.allSettled(
       connections.map(async (conn) => {
         await syncAccounts(conn.id);
-        const { synced } = await syncRecurringToBills(conn.id);
-        return { institution: conn.institution_name, billsSynced: synced };
+        const [{ synced: billsSynced }, { synced: txSynced }] = await Promise.all([
+          syncRecurringToBills(conn.id),
+          syncTransactions(conn.id),
+        ]);
+        return { institution: conn.institution_name, billsSynced, txSynced };
       })
     );
 
@@ -45,6 +48,7 @@ export async function POST(req: NextRequest) {
       r.status === "fulfilled" ? r.value : { error: String(r.reason) }
     );
 
+    await autoMatchBillPayments();
     revalidatePath("/money");
     revalidatePath("/");
 

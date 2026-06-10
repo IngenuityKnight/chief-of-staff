@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getPlaidConnections, syncAccounts, syncRecurringToBills, syncTransactions } from "@/lib/server/plaid";
+import { getPlaidConnections, syncAccounts, syncRecurringToBills, syncTransactions, autoMatchBillPayments } from "@/lib/server/plaid";
 
 // GET /api/cron/plaid
 //
@@ -43,6 +43,7 @@ async function runSync() {
     r.status === "fulfilled" ? r.value : { error: String(r.reason) }
   );
 
+  await autoMatchBillPayments();
   revalidatePath("/money");
   revalidatePath("/");
 
