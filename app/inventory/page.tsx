@@ -44,87 +44,44 @@ function StockBar({ item }: { item: InventoryItem }) {
 }
 
 function ItemRow({ item, fields, priceHistory }: { item: InventoryItem; fields: AdminField[]; priceHistory: number[] }) {
-  const isLow = item.quantity <= item.minQuantity;
+  const isLow   = item.quantity <= item.minQuantity;
   const isEmpty = item.quantity === 0;
-  const meta = CATEGORY_META[item.category];
+  const borderClass = isEmpty ? "border-l-signal-red" : isLow ? "border-l-signal-amber" : "border-l-edge";
 
   return (
-    <div className={`flex flex-wrap items-center gap-4 rounded-lg border px-4 py-3 transition hover:bg-ink-900/60 ${
-      isEmpty ? "border-signal-red/30 bg-signal-red/5" :
-      isLow ? "border-signal-amber/20 bg-signal-amber/5" :
-      "border-edge bg-ink-900/20"
-    }`}>
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <div className={`grid h-8 w-8 shrink-0 place-items-center rounded-md text-xs font-bold ${meta.color}`}>
-          <Package className="h-3.5 w-3.5" />
+    <div className={`flex items-center gap-3 rounded-xl border border-edge border-l-[3px] bg-ink-900/20 px-4 py-3 transition hover:bg-ink-900/50 ${borderClass}`}>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-sm font-medium text-slate-100">{item.name}</span>
+          {isEmpty && <span className="pill-red text-[10px]">OUT</span>}
+          {!isEmpty && isLow && <span className="pill-amber text-[10px]">Low</span>}
+          {item.lastPurchasedStore && (
+            <span className="text-[11px] text-slate-600">@ {item.lastPurchasedStore}</span>
+          )}
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-slate-100">{item.name}</span>
-            <span className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold ${meta.color}`}>
-              {meta.label}
-            </span>
-            {isEmpty && <span className="pill-red">OUT</span>}
-            {!isEmpty && isLow && <span className="pill-amber">Low Stock</span>}
-            {item.location && <span className="text-[11px] text-slate-600">{item.location}</span>}
-          </div>
-          <div className="mt-1">
-            <StockBar item={item} />
-          </div>
+        <div className="mt-1.5">
+          <StockBar item={item} />
         </div>
-      </div>
-      <div className="flex items-center gap-5 text-right text-[11px]">
-        {item.unitsPerPackage !== undefined && item.packagePrice !== undefined && (
-          <div>
-            <div className="text-slate-500">Per pack</div>
-            <div className="font-mono text-slate-200">{formatMoney(item.packagePrice)}</div>
-            <div className="text-[10px] text-slate-600">{item.unitsPerPackage} {item.unit}/pack</div>
-          </div>
-        )}
         {item.pricePerUnit !== undefined && (
-          <div>
-            <div className="text-slate-500">Per unit</div>
-            <div className="font-mono text-slate-200">{formatMoney(item.pricePerUnit)}</div>
+          <div className="mt-1">
             <PriceSparkline prices={priceHistory} />
           </div>
         )}
-        {item.estWeeklyConsumption !== undefined && (
-          <div>
-            <div className="text-slate-500">Weekly use</div>
-            <div className="font-mono text-slate-200">{item.estWeeklyConsumption} {item.unit}</div>
-          </div>
-        )}
-        {item.lastPurchasedStore && (
-          <div>
-            <div className="text-slate-500">Last bought at</div>
-            <div className="text-slate-200">{item.lastPurchasedStore}</div>
-            {item.lastPurchasedAt && (
-              <div className="text-[10px] text-slate-600">{relativeDay(item.lastPurchasedAt)}</div>
-            )}
-          </div>
-        )}
-        <QuantityStepper
-          id={item.id}
-          quantity={item.quantity}
-          minQuantity={item.minQuantity}
-          unit={item.unit}
-        />
-        <LogPurchase id={item.id} />
-        <EditInline
-          resource="inventory"
-          id={item.id}
-          fields={fields}
-          values={{
-            name: item.name, category: item.category, quantity: item.quantity,
-            unit: item.unit, minQuantity: item.minQuantity,
-            estWeeklyConsumption: item.estWeeklyConsumption ?? "",
-            location: item.location ?? "", pricePerUnit: item.pricePerUnit ?? "",
-            unitsPerPackage: item.unitsPerPackage ?? "", packagePrice: item.packagePrice ?? "",
-            notes: item.notes ?? "",
-          }}
-          label={`Edit ${item.name}`}
-        />
       </div>
+      <QuantityStepper id={item.id} quantity={item.quantity} minQuantity={item.minQuantity} unit={item.unit} />
+      <LogPurchase id={item.id} />
+      <EditInline
+        resource="inventory" id={item.id} fields={fields}
+        values={{
+          name: item.name, category: item.category, quantity: item.quantity,
+          unit: item.unit, minQuantity: item.minQuantity,
+          estWeeklyConsumption: item.estWeeklyConsumption ?? "",
+          location: item.location ?? "", pricePerUnit: item.pricePerUnit ?? "",
+          unitsPerPackage: item.unitsPerPackage ?? "", packagePrice: item.packagePrice ?? "",
+          notes: item.notes ?? "",
+        }}
+        label={`Edit ${item.name}`}
+      />
     </div>
   );
 }
@@ -169,61 +126,23 @@ export default async function InventoryPage({
   });
 
   return (
-    <div className="space-y-6">
-      {/* Stats */}
-      <div className="grid gap-3 md:grid-cols-4">
-        <Panel className="!px-0 !py-0"><div className="px-5 py-4"><Stat value={items.length} label="Tracked Items" /></div></Panel>
-        <Panel className="!px-0 !py-0"><div className="px-5 py-4"><Stat value={outOfStock.length} label="Out of Stock" tone="red" /></div></Panel>
-        <Panel className="!px-0 !py-0"><div className="px-5 py-4"><Stat value={lowStock.length} label="Low Stock" tone="amber" /></div></Panel>
-        <Panel className="!px-0 !py-0"><div className="px-5 py-4"><Stat value={formatMoney(totalValue)} label="Est. Inventory Value" tone="purple" /></div></Panel>
+    <div className="space-y-4">
+      <div className="flex items-start justify-between px-1">
+        <div>
+          <h1 className="font-display text-2xl font-semibold text-white">Inventory</h1>
+          <p className="mt-0.5 text-sm text-slate-500">
+            {items.length} tracked · {formatMoney(totalValue)} value
+            {outOfStock.length > 0 && <span className="ml-2 font-semibold text-signal-red">{outOfStock.length} out of stock</span>}
+            {outOfStock.length === 0 && lowStock.length > 0 && <span className="ml-2 font-semibold text-signal-amber">{lowStock.length} low</span>}
+          </p>
+        </div>
+        <a href="/shopping" className="flex items-center gap-1.5 rounded-lg bg-signal-amber/10 px-3 py-1.5 text-xs font-semibold text-signal-amber hover:bg-signal-amber/20 transition">
+          <ShoppingCart className="h-3.5 w-3.5" />
+          Shopping list
+        </a>
       </div>
 
-      {/* Low stock alert */}
-      {lowStock.length > 0 && (
-        <div className="rounded-xl border border-signal-amber/20 bg-signal-amber/5 px-5 py-4">
-          <div className="mb-3 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-signal-amber" />
-            <span className="text-sm font-semibold text-signal-amber">
-              {lowStock.length} item{lowStock.length > 1 ? "s" : ""} need restocking
-            </span>
-            <a
-              href="/shopping"
-              className="ml-auto flex items-center gap-1 rounded-lg bg-signal-amber/20 px-3 py-1 text-xs font-semibold text-signal-amber hover:bg-signal-amber/30 transition"
-            >
-              <ShoppingCart className="h-3 w-3" />
-              View Shopping List
-            </a>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {lowStock.slice(0, 10).map((item) => (
-              <span key={item.id} className={`rounded-md px-2.5 py-1 text-xs font-medium ${
-                item.quantity === 0 ? "bg-signal-red/20 text-signal-red" : "bg-signal-amber/20 text-signal-amber"
-              }`}>
-                {item.name} — {item.quantity} {item.unit}
-              </span>
-            ))}
-            {lowStock.length > 10 && (
-              <span className="rounded-md bg-slate-800 px-2.5 py-1 text-xs text-slate-400">
-                +{lowStock.length - 10} more
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Main panel */}
-      <Panel
-        eyebrow="Household Inventory"
-        title="All Items"
-        action={
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <CheckCircle2 className="h-3.5 w-3.5 text-signal-green" />
-            {items.length - lowStock.length} stocked
-            <TrendingDown className="ml-2 h-3.5 w-3.5 text-signal-amber" />
-            {lowStock.length} low
-          </div>
-        }
-      >
+      <div>
         {/* Tabs */}
         <div className="mb-4 flex flex-wrap gap-1 border-b border-edge pb-3">
           {TABS.map((tab) => {
@@ -266,7 +185,7 @@ export default async function InventoryPage({
           defaults={{ category: activeTab === "all" ? "other" : activeTab, unit: "count", quantity: "0", minQuantity: "1" }}
           label="Add inventory item"
         />
-      </Panel>
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { Panel, Stat, AgentBadge } from "@/components/ui";
+import { AgentBadge } from "@/components/ui";
 import { AGENTS } from "@/lib/agents";
 import { getHouseholdMembers, getRules } from "@/lib/server/data";
 import { InlineForm } from "@/components/inline-form";
@@ -23,81 +23,85 @@ export default async function RosterPage() {
     Promise.resolve(getAdminFields("household")),
     Promise.resolve(getAdminFields("rules")),
   ]);
-  const humans = household.filter((h) => h.role !== "pet").length;
-  const pets = household.filter((h) => h.role === "pet").length;
-  const mustRules = rules.filter((r) => r.priority === "must-follow" && r.active).length;
 
-  // Group rules by agent category
+  const mustRules = rules.filter((r) => r.priority === "must-follow" && r.active);
+
   const rulesByAgent: Record<string, typeof rules> = {};
-  rules.forEach((r) => {
-    rulesByAgent[r.category] ??= [];
-    rulesByAgent[r.category].push(r);
-  });
-  const ruleCategories = ["general", ...Object.keys(AGENTS)];
+  rules.forEach((r) => { rulesByAgent[r.category] ??= []; rulesByAgent[r.category].push(r); });
+  const ruleCategories = ["general", ...Object.keys(AGENTS)].filter(
+    (c) => rulesByAgent[c]?.length || c === "general"
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="grid gap-3 md:grid-cols-4">
-        <Panel className="!px-0 !py-0"><div className="px-5 py-4"><Stat value={household.length} label="Household" /></div></Panel>
-        <Panel className="!px-0 !py-0"><div className="px-5 py-4"><Stat value={humans} label="People" tone="pink" /></div></Panel>
-        <Panel className="!px-0 !py-0"><div className="px-5 py-4"><Stat value={pets} label="Pets" tone="amber" /></div></Panel>
-        <Panel className="!px-0 !py-0"><div className="px-5 py-4"><Stat value={mustRules} label="Binding Rules" tone="red" /></div></Panel>
-      </div>
+    <div className="space-y-8 py-2">
 
-      <Panel eyebrow="The House" title="Roster" action={<AgentBadge agent="roster" size="md" />}>
-        <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
+      {/* Members */}
+      <div className="space-y-4">
+        <div className="flex items-start justify-between px-1">
+          <div>
+            <h1 className="font-display text-2xl font-semibold text-white">Roster</h1>
+            <p className="mt-0.5 text-sm text-slate-500">
+              {household.length} member{household.length !== 1 ? "s" : ""}
+              {mustRules.length > 0 && <span className="ml-2 text-slate-500">· {mustRules.length} binding rules</span>}
+            </p>
+          </div>
+          <AgentBadge agent="roster" size="md" />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {household.map((member) => (
             <MemberCard key={member.id} member={member} fields={householdFields} colorMap={COLOR_MAP} />
           ))}
         </div>
         <InlineForm resource="household" fields={householdFields} />
-      </Panel>
+      </div>
 
       {/* Rules */}
-      <section id="rules" className="space-y-3">
-        <div className="flex items-end justify-between">
-          <div>
-            <div className="text-2xs font-semibold uppercase tracking-[0.18em] text-slate-500">Configuration</div>
-            <h2 className="font-display text-2xl font-semibold text-white">Rules &amp; Preferences</h2>
-            <p className="mt-1 max-w-2xl text-sm text-slate-400">
-              The agents consult these before every proposal. Must-follow rules are enforced — the Chief of Staff won't route past them.
-            </p>
-          </div>
+      <div id="rules" className="space-y-4">
+        <div className="px-1">
+          <h2 className="font-display text-xl font-semibold text-white">Rules & Preferences</h2>
+          <p className="mt-0.5 text-sm text-slate-500">
+            Consulted by the AI before every proposal. Must-follow rules are enforced.
+          </p>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-2">
           {ruleCategories.map((category) => {
-            const list = rulesByAgent[category] ?? [];
+            const list  = rulesByAgent[category] ?? [];
             const agent = category === "general" ? null : AGENTS[category as keyof typeof AGENTS];
+            if (!list.length && category !== "general") return null;
             return (
-              <Panel
-                key={category}
-                eyebrow={agent ? agent.role : "Cross-cutting"}
-                title={agent ? agent.name : "General"}
-                action={agent && <AgentBadge agent={agent.id} />}
-              >
+              <div key={category} className="rounded-xl border border-edge bg-ink-900/20 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-2xs font-semibold uppercase tracking-wider text-slate-500">
+                      {agent ? agent.role : "Cross-cutting"}
+                    </div>
+                    <div className="mt-0.5 font-semibold text-slate-100">
+                      {agent ? agent.name : "General"}
+                    </div>
+                  </div>
+                  {agent && <AgentBadge agent={agent.id} />}
+                </div>
                 {list.length > 0 ? (
-                  <ul className="space-y-2.5">
+                  <ul className="space-y-2">
                     {list.map((rule) => (
                       <RuleItem key={rule.id} rule={rule} fields={ruleFields} />
                     ))}
                   </ul>
                 ) : (
-                  <div className="rounded-md border border-dashed border-edge px-4 py-6 text-sm text-slate-500">
-                    No rules yet for this group.
-                  </div>
+                  <div className="text-sm text-slate-600">No rules yet.</div>
                 )}
                 <InlineForm
-                  resource="rules"
-                  fields={ruleFields}
+                  resource="rules" fields={ruleFields}
                   defaults={{ category, priority: "prefer", active: true }}
                   label={`Add ${agent ? agent.shortName : "general"} rule`}
                 />
-              </Panel>
+              </div>
             );
           })}
         </div>
-      </section>
+      </div>
     </div>
   );
 }
