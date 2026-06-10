@@ -472,7 +472,7 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
     fields: [
       { key: "name",             label: "Name",             type: "text" },
       { key: "category",         label: "Category",         type: "select", options: ["food", "hygiene", "cleaning", "paper", "garage", "laundry", "other"] },
-      { key: "quantity",         label: "Quantity",         type: "number" },
+      { key: "quantity",         label: "Individual Units", type: "number" },
       { key: "unit",             label: "Unit",             type: "select", options: ["count", "rolls", "lbs", "oz", "gallons", "boxes", "bags", "bottles", "cans"] },
       { key: "minQuantity",      label: "Min Quantity",     type: "number" },
       { key: "estWeeklyConsumption", label: "Est. Weekly Use", type: "number" },

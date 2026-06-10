@@ -358,9 +358,13 @@ function mapInventoryItem(row: Record<string, unknown>): InventoryItem {
     minQuantity: Number(row.min_quantity ?? 1),
     estWeeklyConsumption: typeof row.est_weekly_consumption === "number" ? row.est_weekly_consumption : undefined,
     location: typeof row.location === "string" ? row.location : undefined,
-    pricePerUnit: typeof row.price_per_unit === "number" ? row.price_per_unit : undefined,
     unitsPerPackage: typeof row.units_per_package === "number" ? row.units_per_package : undefined,
     packagePrice: typeof row.package_price === "number" ? row.package_price : undefined,
+    pricePerUnit: typeof row.price_per_unit === "number"
+      ? row.price_per_unit
+      : (typeof row.package_price === "number" && typeof row.units_per_package === "number" && row.units_per_package > 0)
+        ? row.package_price / row.units_per_package
+        : undefined,
     preferredStore: typeof row.preferred_store === "string" ? row.preferred_store : undefined,
     lastRestockedAt: typeof row.last_restocked_at === "string" ? row.last_restocked_at : undefined,
     notes: typeof row.notes === "string" ? row.notes : undefined,
