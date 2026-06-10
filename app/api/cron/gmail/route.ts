@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 
   const { data: listData } = await gmail.users.messages.list({
     userId: "me",
-    q: "is:unread label:inbox",
+    q: "is:unread label:inbox (category:primary OR category:updates)",
     maxResults: 20,
   });
 
