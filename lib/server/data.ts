@@ -366,6 +366,8 @@ function mapInventoryItem(row: Record<string, unknown>): InventoryItem {
         ? row.package_price / row.units_per_package
         : undefined,
     preferredStore: typeof row.preferred_store === "string" ? row.preferred_store : undefined,
+    lastPurchasedStore: typeof row.last_purchased_store === "string" ? row.last_purchased_store : undefined,
+    lastPurchasedAt: typeof row.last_purchased_at === "string" ? row.last_purchased_at : undefined,
     lastRestockedAt: typeof row.last_restocked_at === "string" ? row.last_restocked_at : undefined,
     notes: typeof row.notes === "string" ? row.notes : undefined,
     createdAt: String(row.created_at),
@@ -430,8 +432,41 @@ function mapShoppingListItem(row: Record<string, unknown>): ShoppingListItem {
   };
 }
 
-export async function getInventoryItems() {
-  return selectRows<InventoryItem>("inventory_items", [], mapInventoryItem, { column: "name" });
+export async function getInventoryItems(): Promise<InventoryItem[]> {
+  noStore();
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return [];
+
+  const [itemsRes, purchasesRes] = await Promise.all([
+    supabase.from("inventory_items").select("*").order("name"),
+    supabase
+      .from("inventory_purchases")
+      .select("inventory_item_id, store, recorded_at")
+      .order("recorded_at", { ascending: false }),
+  ]);
+
+  if (itemsRes.error) {
+    logTableError("inventory_items", itemsRes.error);
+    return [];
+  }
+
+  // First occurrence per item is the most recent (ordered desc above)
+  const lastByItem = new Map<string, { store: string | null; at: string }>();
+  for (const p of (purchasesRes.data ?? [])) {
+    const key = String(p.inventory_item_id);
+    if (!lastByItem.has(key)) {
+      lastByItem.set(key, { store: p.store as string | null, at: p.recorded_at as string });
+    }
+  }
+
+  return (itemsRes.data ?? []).map((row) => {
+    const lp = lastByItem.get(String(row.id));
+    return mapInventoryItem({
+      ...row,
+      last_purchased_store: lp?.store ?? null,
+      last_purchased_at: lp?.at ?? null,
+    });
+  });
 }
 
 export async function getVehicles() {

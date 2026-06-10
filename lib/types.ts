@@ -190,6 +190,8 @@ export interface InventoryItem {
   unitsPerPackage?: number;
   packagePrice?: number;
   preferredStore?: string;
+  lastPurchasedStore?: string;
+  lastPurchasedAt?: string;
   lastRestockedAt?: string;
   notes?: string;
   createdAt: string;

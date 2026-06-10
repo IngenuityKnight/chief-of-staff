@@ -1,11 +1,12 @@
 import { Package, AlertTriangle, CheckCircle2, ShoppingCart, TrendingDown } from "lucide-react";
 import { Panel, Stat } from "@/components/ui";
-import { formatMoney } from "@/lib/utils";
+import { formatMoney, relativeDay } from "@/lib/utils";
 import { getInventoryItems } from "@/lib/server/data";
 import { getAdminFields } from "@/lib/server/admin";
 import { InlineForm } from "@/components/inline-form";
 import { EditInline } from "@/components/edit-inline";
 import { QuantityStepper } from "@/components/quantity-stepper";
+import { LogPurchase } from "@/components/log-purchase";
 import type { AdminField } from "@/lib/server/admin";
 import type { InventoryItem, InventoryCategory } from "@/lib/types";
 
@@ -93,8 +94,17 @@ function ItemRow({ item, fields }: { item: InventoryItem; fields: AdminField[] }
         )}
         {item.preferredStore && (
           <div>
-            <div className="text-slate-500">Store</div>
+            <div className="text-slate-500">Preferred store</div>
             <div className="text-slate-200">{item.preferredStore}</div>
+          </div>
+        )}
+        {item.lastPurchasedStore && (
+          <div>
+            <div className="text-slate-500">Last bought at</div>
+            <div className="text-slate-200">{item.lastPurchasedStore}</div>
+            {item.lastPurchasedAt && (
+              <div className="text-[10px] text-slate-600">{relativeDay(item.lastPurchasedAt)}</div>
+            )}
           </div>
         )}
         <QuantityStepper
@@ -103,6 +113,7 @@ function ItemRow({ item, fields }: { item: InventoryItem; fields: AdminField[] }
           minQuantity={item.minQuantity}
           unit={item.unit}
         />
+        <LogPurchase id={item.id} preferredStore={item.preferredStore} />
         <EditInline
           resource="inventory"
           id={item.id}
