@@ -33,16 +33,33 @@ async function generateWithAI(lowStock: Awaited<ReturnType<typeof getInventoryIt
   const client = getAnthropicClient();
   if (!client) {
     // Fallback: just convert low-stock items directly without AI
-    return lowStock.map((item) => ({
-      name: item.name,
-      quantity: Math.max(item.minQuantity - item.quantity, item.minQuantity),
-      unit: item.unit,
-      category: item.category,
-      priority: item.quantity === 0 ? "critical" : item.quantity <= item.minQuantity / 2 ? "high" : "medium",
-      estCost: item.pricePerUnit ? item.pricePerUnit * Math.max(item.minQuantity - item.quantity, 1) : undefined,
-      storePreference: item.preferredStore ?? undefined,
-      inventoryItemId: item.id,
-    }));
+    return lowStock.map((item) => {
+      const unitsNeeded = Math.max(item.minQuantity - item.quantity, item.minQuantity);
+      if (item.unitsPerPackage && item.packagePrice) {
+        const packsNeeded = Math.max(1, Math.ceil(unitsNeeded / item.unitsPerPackage));
+        return {
+          name: item.name,
+          quantity: packsNeeded,
+          unit: "packs",
+          category: item.category,
+          priority: item.quantity === 0 ? "critical" : item.quantity <= item.minQuantity / 2 ? "high" : "medium",
+          estCost: packsNeeded * item.packagePrice,
+          storePreference: item.preferredStore ?? undefined,
+          notes: `${item.unitsPerPackage} ${item.unit} per pack`,
+          inventoryItemId: item.id,
+        };
+      }
+      return {
+        name: item.name,
+        quantity: unitsNeeded,
+        unit: item.unit,
+        category: item.category,
+        priority: item.quantity === 0 ? "critical" : item.quantity <= item.minQuantity / 2 ? "high" : "medium",
+        estCost: item.pricePerUnit ? item.pricePerUnit * Math.max(item.minQuantity - item.quantity, 1) : undefined,
+        storePreference: item.preferredStore ?? undefined,
+        inventoryItemId: item.id,
+      };
+    });
   }
 
   const inventorySummary = all.map((i) => ({
@@ -53,6 +70,8 @@ async function generateWithAI(lowStock: Awaited<ReturnType<typeof getInventoryIt
     min: i.minQuantity,
     weeklyUse: i.estWeeklyConsumption,
     pricePerUnit: i.pricePerUnit,
+    unitsPerPackage: i.unitsPerPackage,
+    packagePrice: i.packagePrice,
     store: i.preferredStore,
     id: i.id,
   }));
@@ -70,7 +89,8 @@ Generate a prioritized shopping list. Rules:
 2. Look for items approaching min_quantity (qty < 2x min) — add them as low priority to avoid a second trip.
 3. Suggest buying quantities that minimize restocking frequency (e.g. buy 2-3x the minimum if it's a stable consumable).
 4. Group by store when possible to suggest trip efficiency. Only use "Trader Joe's", "Wegmans", or "Costco" as storePreference — inherit from the inventory store field when available.
-5. If pricePerUnit is known, estimate total cost.
+5. If an item has unitsPerPackage and packagePrice, express quantity in PACKS (not individual units), set unit="packs", estCost=packs*packagePrice, and add a note like "6 yogurts per pack". If only pricePerUnit is known, use that for cost.
+6. If pricePerUnit is known (and no package pricing), estimate total cost as pricePerUnit * quantity.
 
 Respond with ONLY a JSON array of shopping items (no markdown, no explanation):
 [

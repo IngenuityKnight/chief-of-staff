@@ -478,11 +478,13 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
       { key: "estWeeklyConsumption", label: "Est. Weekly Use", type: "number" },
       { key: "location",         label: "Location",         type: "select", options: ["pantry", "kitchen", "master bathroom", "guest bathroom", "downstairs bathroom", "garage", "basement", "laundry", "other"] },
       { key: "pricePerUnit",     label: "Price/Unit ($)",   type: "number" },
+      { key: "unitsPerPackage",  label: "Units/Package",    type: "number" },
+      { key: "packagePrice",     label: "Package Price ($)", type: "number" },
       { key: "preferredStore",   label: "Preferred Store",  type: "select", options: ["Trader Joe's", "Wegmans", "Costco"] },
       { key: "notes",            label: "Notes",            type: "textarea" },
     ],
     toDbPatch(payload) {
-      const patch = pickAllowed(payload, ["name", "category", "quantity", "unit", "minQuantity", "estWeeklyConsumption", "location", "pricePerUnit", "preferredStore", "notes"]);
+      const patch = pickAllowed(payload, ["name", "category", "quantity", "unit", "minQuantity", "estWeeklyConsumption", "location", "pricePerUnit", "unitsPerPackage", "packagePrice", "preferredStore", "notes"]);
       return {
         ...(patch.name !== undefined ? { name: toNullableString(patch.name) } : {}),
         ...(patch.category !== undefined ? { category: patch.category } : {}),
@@ -492,6 +494,8 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
         ...(patch.estWeeklyConsumption !== undefined ? { est_weekly_consumption: toNumberOrNull(patch.estWeeklyConsumption) } : {}),
         ...(patch.location !== undefined ? { location: toNullableString(patch.location) } : {}),
         ...(patch.pricePerUnit !== undefined ? { price_per_unit: toNumberOrNull(patch.pricePerUnit) } : {}),
+        ...(patch.unitsPerPackage !== undefined ? { units_per_package: toNumberOrNull(patch.unitsPerPackage) } : {}),
+        ...(patch.packagePrice !== undefined ? { package_price: toNumberOrNull(patch.packagePrice) } : {}),
         ...(patch.preferredStore !== undefined ? { preferred_store: toNullableString(patch.preferredStore) } : {}),
         ...(patch.notes !== undefined ? { notes: toNullableString(patch.notes) } : {}),
       };
@@ -507,6 +511,8 @@ const adminConfig: Record<AdminResource, AdminConfig<any>> = {
         est_weekly_consumption: toNumberOrNull(payload.estWeeklyConsumption) ?? null,
         location: toNullableString(payload.location) ?? null,
         price_per_unit: toNumberOrNull(payload.pricePerUnit) ?? null,
+        units_per_package: toNumberOrNull(payload.unitsPerPackage) ?? null,
+        package_price: toNumberOrNull(payload.packagePrice) ?? null,
         preferred_store: toNullableString(payload.preferredStore) ?? null,
         last_restocked_at: null,
         notes: toNullableString(payload.notes) ?? null,

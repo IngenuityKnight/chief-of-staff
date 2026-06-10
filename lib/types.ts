@@ -187,6 +187,8 @@ export interface InventoryItem {
   estWeeklyConsumption?: number;
   location?: string;
   pricePerUnit?: number;
+  unitsPerPackage?: number;
+  packagePrice?: number;
   preferredStore?: string;
   lastRestockedAt?: string;
   notes?: string;

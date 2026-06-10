@@ -72,6 +72,13 @@ function ItemRow({ item, fields }: { item: InventoryItem; fields: AdminField[] }
         </div>
       </div>
       <div className="flex items-center gap-5 text-right text-[11px]">
+        {item.unitsPerPackage !== undefined && item.packagePrice !== undefined && (
+          <div>
+            <div className="text-slate-500">Per pack</div>
+            <div className="font-mono text-slate-200">{formatMoney(item.packagePrice)}</div>
+            <div className="text-[10px] text-slate-600">{item.unitsPerPackage} {item.unit}/pack</div>
+          </div>
+        )}
         {item.pricePerUnit !== undefined && (
           <div>
             <div className="text-slate-500">Per unit</div>
@@ -105,6 +112,7 @@ function ItemRow({ item, fields }: { item: InventoryItem; fields: AdminField[] }
             unit: item.unit, minQuantity: item.minQuantity,
             estWeeklyConsumption: item.estWeeklyConsumption ?? "",
             location: item.location ?? "", pricePerUnit: item.pricePerUnit ?? "",
+            unitsPerPackage: item.unitsPerPackage ?? "", packagePrice: item.packagePrice ?? "",
             preferredStore: item.preferredStore ?? "", notes: item.notes ?? "",
           }}
           label={`Edit ${item.name}`}
