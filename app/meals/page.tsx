@@ -7,6 +7,7 @@ import { getAdminFields } from "@/lib/server/admin";
 import { InlineForm } from "@/components/inline-form";
 import { MealSlotEditor } from "@/components/meal-slot-editor";
 import { GenerateMealPlanButton } from "@/components/generate-meal-plan-button";
+import { AddMealIngredientsButton } from "@/components/add-meal-ingredients-button";
 
 const KIND_META = {
   cook:       { label: "Cook",       pillClass: "pill-amber", icon: ChefHat },
@@ -78,6 +79,7 @@ export default async function MealsPage() {
         action={
           <div className="flex items-center gap-3">
             <AgentBadge agent="meals" size="md" />
+            <AddMealIngredientsButton />
             <GenerateMealPlanButton />
           </div>
         }

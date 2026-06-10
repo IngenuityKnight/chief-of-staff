@@ -6,6 +6,7 @@ import { getTasks } from "@/lib/server/data";
 import { getAdminFields } from "@/lib/server/admin";
 import { InlineForm } from "@/components/inline-form";
 import { TaskRow } from "./task-row";
+import { TaskTemplates } from "@/components/task-templates";
 import { Clock, Flag } from "lucide-react";
 
 export default async function TasksPage() {
@@ -37,6 +38,8 @@ export default async function TasksPage() {
 
   return (
     <div className="space-y-6">
+      <TaskTemplates />
+
       <div className="grid gap-3 md:grid-cols-4">
         <Panel className="!px-0 !py-0"><div className="px-5 py-4"><Stat value={open.length} label="Open" /></div></Panel>
         <Panel className="!px-0 !py-0"><div className="px-5 py-4"><Stat value={overdue} label="Overdue" tone="red" /></div></Panel>
