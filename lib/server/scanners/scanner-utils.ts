@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AgentId, Priority } from "@/lib/types";
 import { CATEGORY_MAP } from "@/lib/server/intake";
 import type { IntakeAnalysis } from "@/lib/server/intake";
+import { getHouseholdForJob } from "@/lib/server/household";
 
 // Returns true if a scanner inbox item with this key already exists within
 // the dedup window, preventing duplicate alerts for the same entity.
@@ -31,12 +32,14 @@ export function buildScannerAnalysis(opts: {
   urgency: Priority;
   analysis: string;
   proposedTasks?: string[];
+  householdId?: string;
 }): IntakeAnalysis & { source: string } {
   return {
     id: `inb_${crypto.randomUUID()}`,
     capturedAt: new Date().toISOString(),
     text: opts.text,
     source: "system",
+    householdId: opts.householdId ?? getHouseholdForJob(),
     analysis: opts.analysis,
     routing: {
       primary: opts.primary,

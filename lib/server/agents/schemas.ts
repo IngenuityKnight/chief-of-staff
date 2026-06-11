@@ -47,6 +47,45 @@ export interface BlockTimePayload {
   notes?: string;
 }
 
+export interface UpsertAppliancePayload {
+  name: string;
+  brand?: string;
+  modelNumber?: string;
+  location?: string;
+  purchaseDate?: string;
+  purchasePrice?: number;
+  warrantyExpires?: string;
+  lastServiced?: string;
+  notes?: string;
+}
+
+export interface UpsertVehiclePayload {
+  make: string;
+  model: string;
+  year: number;
+  mileage?: number;
+  insuranceExpires?: string;
+  registrationExpires?: string;
+  notes?: string;
+}
+
+export interface RecordServicePayload {
+  item: string;          // "HVAC filter", "oil change"
+  system: string;        // "HVAC", "Vehicle"
+  doneDate: string;
+  vendor?: string;
+  cost?: number;
+  nextDueDate?: string;
+  notes?: string;
+}
+
+export interface AddRulePayload {
+  category: string;           // agent id or "general"
+  title: string;
+  description: string;
+  priority: "must-follow" | "prefer" | "consider";
+}
+
 // A proposal before it is written to the DB — no id, no timestamps, no status.
 export interface ProposalDraft {
   inboxItemId: string;

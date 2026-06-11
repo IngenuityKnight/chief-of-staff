@@ -19,12 +19,14 @@ import { formatMoney, relativeDay, daysUntil } from "@/lib/utils";
 import { HouseholdPulse, type PulseNode } from "@/components/household-pulse";
 import { HouseholdCallCard, type HouseholdCall } from "@/components/household-call-card";
 import { AgentActivityFeed, type ActivityEntry } from "@/components/agent-activity-feed";
+import { PlayCard } from "@/components/play-card";
 import { houseStatePhrase, type HouseState } from "@/components/hearth-line";
 import type { AgentId } from "@/lib/types";
 import {
   getBills, getCalendarEvents, getDecisions, getInboxItems,
   getMaintenanceItems, getTasks, getBriefingSummary,
 } from "@/lib/server/data";
+import { getPendingPlays } from "@/lib/server/plays";
 
 function SectionRule({ label }: { label: string }) {
   return (
@@ -38,10 +40,10 @@ function SectionRule({ label }: { label: string }) {
 }
 
 export default async function PulsePage() {
-  const [bills, calendar, decisions, inboxItems, maintenance, tasks, briefing] =
+  const [bills, calendar, decisions, inboxItems, maintenance, tasks, briefing, plays] =
     await Promise.all([
       getBills(), getCalendarEvents(), getDecisions(), getInboxItems(),
-      getMaintenanceItems(), getTasks(), getBriefingSummary(),
+      getMaintenanceItems(), getTasks(), getBriefingSummary(), getPendingPlays(),
     ]);
 
   const now = Date.now();
@@ -189,11 +191,14 @@ export default async function PulsePage() {
         nodes={nodes}
       />
 
-      {/* Waiting on you */}
-      {calls.length > 0 && (
+      {/* Waiting on you — Plays render above single proposals */}
+      {(plays.length > 0 || calls.length > 0) && (
         <>
           <SectionRule label="Waiting on you" />
-          <div className="space-y-2">
+          <div className="space-y-3">
+            {plays.map((play) => (
+              <PlayCard key={play.id} play={play} />
+            ))}
             {calls.slice(0, 6).map((call) => (
               <HouseholdCallCard key={call.id} call={call} />
             ))}

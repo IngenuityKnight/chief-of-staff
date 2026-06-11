@@ -6,13 +6,15 @@
 import { getAnthropicClient } from "@/lib/server/anthropic";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { logAgentRun } from "@/lib/server/agents/agent-runs";
+import { getHouseholdForJob } from "@/lib/server/household";
 import type { BriefingSummary, AgentId } from "@/lib/types";
 
 const MODEL = "claude-haiku-4-5-20251001";
 
-export async function generateDailyBriefing(): Promise<BriefingSummary | null> {
+export async function generateDailyBriefing(householdId?: string): Promise<BriefingSummary | null> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return null;
+  const tenantId = householdId ?? getHouseholdForJob();
 
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
@@ -30,13 +32,13 @@ export async function generateDailyBriefing(): Promise<BriefingSummary | null> {
     lowStockResult,
     weekActivityResult,
   ] = await Promise.allSettled([
-    supabase.from("proposals").select("id, title, agent, kind, status").eq("status", "awaiting_approval").limit(10),
-    supabase.from("calendar_events").select("title, start_at").gte("start_at", now.toISOString()).lte("start_at", todayEnd),
-    supabase.from("tasks").select("id, title, agent, status, due_date").neq("status", "done").limit(20),
-    supabase.from("bills").select("name, amount, due_date").neq("status", "paid").lte("due_date", in3Days).gte("due_date", today),
-    supabase.from("maintenance_items").select("item, next_due").lte("next_due", in14Days).not("status", "eq", "in-progress"),
-    supabase.from("inventory_items").select("name").not("min_quantity", "is", null).filter("quantity", "lte", "min_quantity"),
-    supabase.from("activity_log").select("event_type").gte("occurred_at", weekAgo),
+    supabase.from("proposals").select("id, title, agent, kind, status").eq("household_id", tenantId).eq("status", "awaiting_approval").limit(10),
+    supabase.from("calendar_events").select("title, start_at").eq("household_id", tenantId).gte("start_at", now.toISOString()).lte("start_at", todayEnd),
+    supabase.from("tasks").select("id, title, agent, status, due_date").eq("household_id", tenantId).neq("status", "done").limit(20),
+    supabase.from("bills").select("name, amount, due_date").eq("household_id", tenantId).neq("status", "paid").lte("due_date", in3Days).gte("due_date", today),
+    supabase.from("maintenance_items").select("item, next_due").eq("household_id", tenantId).lte("next_due", in14Days).not("status", "eq", "in-progress"),
+    supabase.from("inventory_items").select("name").eq("household_id", tenantId).not("min_quantity", "is", null).filter("quantity", "lte", "min_quantity"),
+    supabase.from("activity_log").select("event_type").eq("household_id", tenantId).gte("occurred_at", weekAgo),
   ]);
 
   const proposals = (proposalsResult.status === "fulfilled" ? proposalsResult.value.data ?? [] : []) as Array<{ id: string; title: string; agent: string; kind: string }>;
@@ -163,19 +165,24 @@ Rules:
   // Persist to daily_briefings
   await supabase
     .from("daily_briefings")
-    .upsert({ date: today, content: summary as unknown as Record<string, unknown> }, { onConflict: "date" });
+    .upsert(
+      { date: today, household_id: tenantId, content: summary as unknown as Record<string, unknown> },
+      { onConflict: "date,household_id" },
+    );
 
   return summary;
 }
 
-export async function getTodaysBriefing(): Promise<BriefingSummary | null> {
+export async function getTodaysBriefing(householdId?: string): Promise<BriefingSummary | null> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return null;
+  const tenantId = householdId ?? getHouseholdForJob();
   const today = new Date().toISOString().slice(0, 10);
   const { data } = await supabase
     .from("daily_briefings")
     .select("content")
     .eq("date", today)
+    .eq("household_id", tenantId)
     .maybeSingle();
   return data ? (data as { content: BriefingSummary }).content : null;
 }

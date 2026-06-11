@@ -25,7 +25,10 @@ export type ProposalKind =
   | "order_item"
   | "contact_vendor"
   | "cancel_subscription"
-  | "add_rule";
+  | "add_rule"
+  | "upsert_appliance"
+  | "upsert_vehicle"
+  | "record_service";
 
 export interface Proposal {
   id: string;

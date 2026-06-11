@@ -47,6 +47,10 @@
     {
       "path": "/api/jobs/scan/budget_drift",
       "schedule": "30 6 * * 1"
+    },
+    {
+      "path": "/api/jobs/report",
+      "schedule": "0 18 * * 0"
     }
   ]
 }

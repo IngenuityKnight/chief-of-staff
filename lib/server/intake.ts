@@ -24,6 +24,7 @@ export type IntakeAnalysis = {
   rulesConsulted: string[];   // rule IDs the chief cited as relevant
   rulesConflicts: string[];   // must-follow rule IDs the chief flagged as potentially violated
   householdId: string;        // tenant scope for every downstream insert
+  invocations?: Array<{ agent: AgentId; focus: string }>;
 };
 
 export type CreatedTask = {
@@ -282,7 +283,7 @@ const MODEL = "claude-haiku-4-5-20251001";
 async function analyzeWithClaude(
   text: string,
   inboxItemId: string,
-): Promise<Omit<IntakeAnalysis, "id" | "capturedAt" | "text"> | null> {
+): Promise<Omit<IntakeAnalysis, "id" | "capturedAt" | "text" | "householdId"> | null> {
   const anthropic = getAnthropicClient();
   if (!anthropic) return null;
 
@@ -380,7 +381,7 @@ Instructions:
     ? (parsed.rules_conflicts as unknown[]).filter((id): id is string => typeof id === "string" && mustFollowIds.has(id))
     : [];
 
-  const result: Omit<IntakeAnalysis, "id" | "capturedAt" | "text"> = {
+  const result: Omit<IntakeAnalysis, "id" | "capturedAt" | "text" | "householdId"> = {
     analysis:       typeof parsed.analysis === "string" ? parsed.analysis : synthesizeAnalysis(primary, secondary),
     routing:        { primary, secondary, category: CATEGORIES_LIST.includes(parsed.category as string) ? parsed.category as Category : CATEGORY_MAP[primary] },
     urgency:        PRIORITIES_LIST.includes(parsed.urgency as string) ? parsed.urgency as Priority : "medium",
@@ -413,8 +414,26 @@ export async function analyzeIntake(text: string, source = "web", householdIdOve
   const id = `inb_${crypto.randomUUID()}`;
   const capturedAt = new Date().toISOString();
   const householdId = householdIdOverride ?? (await getCurrentHousehold());
-  const llm = await analyzeWithClaude(text, id);
 
+  // Prefer the new chief.run module (chief.ts). Fall back to the legacy
+  // analyzeWithClaude (which still runs but is being retired) if that fails.
+  const { run: runChief } = await import("@/lib/server/agents/chief");
+  const chiefDecision = await runChief({ text, inboxItemId: id, householdId });
+
+  if (chiefDecision) {
+    return {
+      id, capturedAt, text, source, householdId,
+      analysis: chiefDecision.analysis,
+      routing: { primary: chiefDecision.primary, secondary: chiefDecision.secondary, category: chiefDecision.category },
+      urgency: chiefDecision.urgency,
+      proposedTasks: chiefDecision.proposedTasks,
+      rulesConsulted: chiefDecision.rulesConsulted,
+      rulesConflicts: chiefDecision.rulesConflicts,
+      invocations: chiefDecision.invocations,
+    };
+  }
+
+  const llm = await analyzeWithClaude(text, id);
   if (llm) {
     return { id, capturedAt, text, source, householdId, ...llm };
   }
@@ -579,60 +598,32 @@ export async function persistAndGateProposals(
 }
 
 // Entry point: builds proposals from an intake analysis.
-// When meals is primary, delegates to the Meals specialist for richer proposals.
-// All other agents use the generic create_task fallback.
+// Delegates to the orchestrator which runs the chief → specialists fan-out
+// → Play synthesis → policy gate.
 export async function createProposalsFromIntake(analysis: IntakeAnalysis): Promise<ProposalResult[]> {
-  if (analysis.routing.primary === "meals") {
-    const [{ run: runMeals }, { buildMealsDomainState }, { getRules }] = await Promise.all([
-      import("@/lib/server/agents/meals"),
-      import("@/lib/server/agents/agent-context"),
-      import("@/lib/server/data"),
-    ]);
+  const { orchestrate } = await import("@/lib/server/agents/orchestrator");
 
-    const [domainState, allRules] = await Promise.all([
-      buildMealsDomainState(),
-      getRules(),
-    ]);
+  // Re-derive a ChiefDecision shape from the analysis. The chief already ran
+  // during analyzeIntake() — its routing + invocations are stored on the
+  // analysis object. We reconstruct a minimal ChiefDecision so the orchestrator
+  // can fan out without re-calling Claude.
+  const chiefDecision = {
+    analysis: analysis.analysis,
+    primary: analysis.routing.primary,
+    secondary: analysis.routing.secondary,
+    category: analysis.routing.category,
+    urgency: analysis.urgency,
+    proposedTasks: analysis.proposedTasks,
+    rulesConsulted: analysis.rulesConsulted,
+    rulesConflicts: analysis.rulesConflicts,
+    invocations: analysis.invocations ?? [
+      ...(analysis.routing.primary !== "chief" ? [{ agent: analysis.routing.primary, focus: analysis.analysis }] : []),
+      ...analysis.routing.secondary.filter((a) => a !== "chief").map((agent) => ({ agent, focus: "" })),
+    ],
+  };
 
-    const domainRules = allRules.filter((r) => r.category === "meals" || r.category === "general");
-
-    const drafts = await runMeals({
-      inboxItemId: analysis.id,
-      capture: analysis.text,
-      chiefAnalysis: analysis.analysis,
-      rulesConsulted: analysis.rulesConsulted,
-      rulesConflicts: analysis.rulesConflicts,
-      domainState,
-      domainRules,
-    });
-
-    // Fallback to generic tasks if the specialist produced nothing
-    if (drafts.length > 0) {
-      return persistAndGateProposals(drafts, analysis);
-    }
-  }
-
-  // Generic create_task fallback for all other agents (and meals fallback)
-  if (analysis.proposedTasks.length === 0) return [];
-
-  const drafts: ProposalDraft[] = analysis.proposedTasks.map((title) => ({
-    inboxItemId: analysis.id,
-    agent: analysis.routing.primary,
-    kind: "create_task",
-    title,
-    rationale: analysis.analysis,
-    payload: {
-      title,
-      agent: analysis.routing.primary,
-      category: analysis.routing.category,
-      priority: analysis.urgency,
-    },
-    estimatedCostCents: 0,
-    rulesConsulted: analysis.rulesConsulted ?? [],
-    rulesConflicts: analysis.rulesConflicts ?? [],
-  }));
-
-  return persistAndGateProposals(drafts, analysis);
+  const result = await orchestrate(analysis, chiefDecision);
+  return result.proposals;
 }
 
 export async function applyIntakeChanges(analysis: IntakeAnalysis): Promise<AppliedChange[]> {

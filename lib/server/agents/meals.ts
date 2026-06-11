@@ -128,6 +128,7 @@ Rules:
       output: null,
       ok: false,
       error: err instanceof Error ? err.message : String(err),
+      householdId: ctx.householdId,
     });
     return [];
   }
