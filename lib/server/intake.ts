@@ -1,8 +1,13 @@
 import type { AgentId, Category, Priority } from "@/lib/types";
+import { gate } from "@/lib/server/agents/policy";
+import { executeProposal } from "@/lib/server/agents/executors";
+import { logAgentRun } from "@/lib/server/agents/agent-runs";
+import type { ProposalDraft } from "@/lib/server/agents/schemas";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { getAnthropicClient } from "@/lib/server/anthropic";
 import { logActivity } from "@/lib/server/activity";
-import { assembleHouseholdContext } from "@/lib/server/context";
+import { assembleContextForIntake } from "@/lib/server/context";
+import { getCurrentHousehold } from "@/lib/server/household";
 
 export type IntakeAnalysis = {
   id: string;
@@ -16,6 +21,10 @@ export type IntakeAnalysis = {
   };
   urgency: Priority;
   proposedTasks: string[];
+  rulesConsulted: string[];   // rule IDs the chief cited as relevant
+  rulesConflicts: string[];   // must-follow rule IDs the chief flagged as potentially violated
+  householdId: string;        // tenant scope for every downstream insert
+  invocations?: Array<{ agent: AgentId; focus: string }>;
 };
 
 export type CreatedTask = {
@@ -41,7 +50,7 @@ const KEYWORDS: Record<AgentId, string[]> = {
   chief:    [],
 };
 
-const CATEGORY_MAP: Record<AgentId, Category> = {
+export const CATEGORY_MAP: Record<AgentId, Category> = {
   meals:    "Meals",
   home:     "Household",
   money:    "Finance",
@@ -269,12 +278,16 @@ function decisionOptionsFor(text: string) {
 const AGENT_IDS: AgentId[] = ["meals", "home", "money", "schedule", "roster", "chief"];
 const CATEGORIES_LIST = ["Meals", "Cleaning", "Household", "Admin", "Planning", "Finance", "Social"];
 const PRIORITIES_LIST = ["low", "medium", "high", "critical"];
+const MODEL = "claude-haiku-4-5-20251001";
 
-async function analyzeWithClaude(text: string): Promise<Omit<IntakeAnalysis, "id" | "capturedAt" | "text"> | null> {
+async function analyzeWithClaude(
+  text: string,
+  inboxItemId: string,
+): Promise<Omit<IntakeAnalysis, "id" | "capturedAt" | "text" | "householdId"> | null> {
   const anthropic = getAnthropicClient();
   if (!anthropic) return null;
 
-  const householdCtx = await assembleHouseholdContext();
+  const { text: householdCtx, activeRules } = await assembleContextForIntake();
 
   const prompt = `${householdCtx}You are the Chief of Staff routing engine for a frugal household management system. Analyze this household input and return JSON.
 
@@ -290,58 +303,142 @@ Return ONLY valid JSON — no markdown, no explanation:
   "secondary": ["<agent>"],
   "category": "<category>",
   "urgency": "<urgency>",
-  "analysis": "<1-2 sentence summary — what was captured, why routed this way, any frugal angle>",
-  "proposedTasks": ["<concrete actionable task 1>", "<task 2>", "<task 3>"]
+  "analysis": "<1-2 sentence summary — what was captured, why routed this way, any frugal or rule angle>",
+  "proposedTasks": ["<concrete actionable task 1>", "<task 2>", "<task 3>"],
+  "rules_consulted": ["<rule-id from ACTIVE RULES section that informed this analysis>"],
+  "rules_conflicts": ["<id of a [MUST] rule that this action would directly violate>"]
 }
 
-Rules:
+Instructions:
 - proposedTasks: 2-3 specific, actionable tasks — not generic placeholders
+- If any ACTIVE RULES apply to this input, note them in analysis and list their IDs in rules_consulted
+- rules_conflicts: only include IDs of [MUST] rules whose stated constraint this action would break — leave empty if none
 - If the input mentions money or costs, note the frugal angle in analysis
 - urgency=critical only for genuine emergencies`;
 
+  const t0 = Date.now();
+  let message: Awaited<ReturnType<typeof anthropic.messages.create>> | null = null;
+  let parseError: string | undefined;
+
   try {
-    const message = await anthropic.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 512,
+    message = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 600,
       messages: [{ role: "user", content: prompt }],
     });
-
-    const content = message.content[0];
-    if (content.type !== "text") return null;
-
-    const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-
-    const parsed = JSON.parse(jsonMatch[0]);
-    const primary: AgentId = AGENT_IDS.includes(parsed.primary) ? parsed.primary : "chief";
-    const secondary: AgentId[] = Array.isArray(parsed.secondary)
-      ? parsed.secondary.filter((a: string) => AGENT_IDS.includes(a as AgentId) && a !== primary).slice(0, 2) as AgentId[]
-      : [];
-
-    return {
-      analysis:      typeof parsed.analysis === "string" ? parsed.analysis : synthesizeAnalysis(primary, secondary),
-      routing:       { primary, secondary, category: CATEGORIES_LIST.includes(parsed.category) ? parsed.category : CATEGORY_MAP[primary] },
-      urgency:       PRIORITIES_LIST.includes(parsed.urgency) ? parsed.urgency as Priority : "medium",
-      proposedTasks: Array.isArray(parsed.proposedTasks)
-        ? parsed.proposedTasks.filter((t: unknown) => typeof t === "string").slice(0, 3) as string[]
-        : proposeTasks(primary, text),
-    };
-  } catch {
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    void logAgentRun({
+      agent: "chief",
+      trigger: "capture",
+      inboxItemId,
+      model: MODEL,
+      promptTokens: 0,
+      completionTokens: 0,
+      latencyMs: Date.now() - t0,
+      inputSummary: text.slice(0, 200),
+      output: null,
+      ok: false,
+      error: errMsg,
+    });
     return null;
   }
+
+  const latencyMs = Date.now() - t0;
+  const content = message.content[0];
+
+  if (content.type !== "text") {
+    void logAgentRun({ agent: "chief", trigger: "capture", inboxItemId, model: MODEL, promptTokens: message.usage.input_tokens, completionTokens: message.usage.output_tokens, latencyMs, inputSummary: text.slice(0, 200), output: null, ok: false, error: "non-text response" });
+    return null;
+  }
+
+  let parsed: Record<string, unknown>;
+  try {
+    const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("no JSON in response");
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch (err) {
+    parseError = err instanceof Error ? err.message : "parse failed";
+    void logAgentRun({ agent: "chief", trigger: "capture", inboxItemId, model: MODEL, promptTokens: message.usage.input_tokens, completionTokens: message.usage.output_tokens, latencyMs, inputSummary: text.slice(0, 200), output: { raw: content.text }, ok: false, error: parseError });
+    return null;
+  }
+
+  const primary: AgentId = AGENT_IDS.includes(parsed.primary as AgentId) ? (parsed.primary as AgentId) : "chief";
+  const secondary: AgentId[] = Array.isArray(parsed.secondary)
+    ? (parsed.secondary as unknown[]).filter((a): a is AgentId => typeof a === "string" && AGENT_IDS.includes(a as AgentId) && a !== primary).slice(0, 2)
+    : [];
+
+  // Validate rule IDs — only keep IDs that actually exist in the active rules list
+  const validRuleIds = new Set(activeRules.map((r) => r.id));
+  const mustFollowIds = new Set(activeRules.filter((r) => r.priority === "must-follow").map((r) => r.id));
+
+  const rulesConsulted: string[] = Array.isArray(parsed.rules_consulted)
+    ? (parsed.rules_consulted as unknown[]).filter((id): id is string => typeof id === "string" && validRuleIds.has(id))
+    : [];
+
+  // Conflicts: LLM-reported, then code-validated — only must-follow rules count as binding conflicts
+  const rulesConflicts: string[] = Array.isArray(parsed.rules_conflicts)
+    ? (parsed.rules_conflicts as unknown[]).filter((id): id is string => typeof id === "string" && mustFollowIds.has(id))
+    : [];
+
+  const result: Omit<IntakeAnalysis, "id" | "capturedAt" | "text" | "householdId"> = {
+    analysis:       typeof parsed.analysis === "string" ? parsed.analysis : synthesizeAnalysis(primary, secondary),
+    routing:        { primary, secondary, category: CATEGORIES_LIST.includes(parsed.category as string) ? parsed.category as Category : CATEGORY_MAP[primary] },
+    urgency:        PRIORITIES_LIST.includes(parsed.urgency as string) ? parsed.urgency as Priority : "medium",
+    proposedTasks:  Array.isArray(parsed.proposedTasks)
+      ? parsed.proposedTasks.filter((t: unknown) => typeof t === "string").slice(0, 3) as string[]
+      : proposeTasks(primary, text),
+    rulesConsulted,
+    rulesConflicts,
+  };
+
+  void logAgentRun({
+    agent: "chief",
+    trigger: "capture",
+    inboxItemId,
+    model: MODEL,
+    promptTokens: message.usage.input_tokens,
+    completionTokens: message.usage.output_tokens,
+    latencyMs,
+    inputSummary: text.slice(0, 200),
+    output: result as unknown as Record<string, unknown>,
+    ok: true,
+  });
+
+  return result;
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
-export async function analyzeIntake(text: string, source = "web"): Promise<IntakeAnalysis & { source: string }> {
+export async function analyzeIntake(text: string, source = "web", householdIdOverride?: string): Promise<IntakeAnalysis & { source: string }> {
   const id = `inb_${crypto.randomUUID()}`;
   const capturedAt = new Date().toISOString();
-  const llm = await analyzeWithClaude(text);
+  const householdId = householdIdOverride ?? (await getCurrentHousehold());
 
-  if (llm) {
-    return { id, capturedAt, text, source, ...llm };
+  // Prefer the new chief.run module (chief.ts). Fall back to the legacy
+  // analyzeWithClaude (which still runs but is being retired) if that fails.
+  const { run: runChief } = await import("@/lib/server/agents/chief");
+  const chiefDecision = await runChief({ text, inboxItemId: id, householdId });
+
+  if (chiefDecision) {
+    return {
+      id, capturedAt, text, source, householdId,
+      analysis: chiefDecision.analysis,
+      routing: { primary: chiefDecision.primary, secondary: chiefDecision.secondary, category: chiefDecision.category },
+      urgency: chiefDecision.urgency,
+      proposedTasks: chiefDecision.proposedTasks,
+      rulesConsulted: chiefDecision.rulesConsulted,
+      rulesConflicts: chiefDecision.rulesConflicts,
+      invocations: chiefDecision.invocations,
+    };
   }
 
+  const llm = await analyzeWithClaude(text, id);
+  if (llm) {
+    return { id, capturedAt, text, source, householdId, ...llm };
+  }
+
+  // Degraded-honesty fallback: keyword routing, no LLM, no rule citation
   const primary = classify(text);
   const secondary = secondaryAgents(text, primary);
   return {
@@ -349,28 +446,36 @@ export async function analyzeIntake(text: string, source = "web"): Promise<Intak
     capturedAt,
     text,
     source,
+    householdId,
     analysis: synthesizeAnalysis(primary, secondary),
     routing: { primary, secondary, category: CATEGORY_MAP[primary] },
     urgency: gaugeUrgency(text),
     proposedTasks: proposeTasks(primary, text),
+    rulesConsulted: [],
+    rulesConflicts: [],
   };
 }
 
-export async function persistIntake(analysis: IntakeAnalysis & { source?: string }) {
+export async function persistIntake(
+  analysis: IntakeAnalysis & { source?: string },
+  options?: { origin?: "capture" | "scanner"; rawInputOverride?: string },
+) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { persisted: false as const };
 
   const { error } = await supabase.from("inbox_items").insert({
     id: analysis.id,
+    household_id: analysis.householdId,
     title: buildTitle(analysis.text),
-    raw_input: analysis.text,
+    raw_input: options?.rawInputOverride ?? analysis.text,
     analysis: analysis.analysis,
     primary_agent: analysis.routing.primary,
     secondary_agents: analysis.routing.secondary,
     category: analysis.routing.category,
     needs_action: analysis.proposedTasks.length > 0,
     proposed_tasks: analysis.proposedTasks,
-    status: "routed",
+    status: "new",
+    origin: options?.origin ?? "capture",
     source: analysis.source ?? "web",
     created_at: analysis.capturedAt,
     urgency: analysis.urgency,
@@ -387,33 +492,138 @@ export async function persistIntake(analysis: IntakeAnalysis & { source?: string
     entity_title: buildTitle(analysis.text),
     entity_id: analysis.id,
     metadata: { primary_agent: analysis.routing.primary, urgency: analysis.urgency },
+    household_id: analysis.householdId,
   });
 
   return { persisted: true as const };
 }
 
-export async function createTasksFromIntake(analysis: IntakeAnalysis): Promise<CreatedTask[]> {
-  const supabase = getSupabaseAdmin();
-  if (!supabase || analysis.proposedTasks.length === 0) return [];
+export type ProposalResult = { id: string; title: string; gateDecision: string; gateReason: string };
 
-  const rows = analysis.proposedTasks.map((title) => ({
+// Shared infrastructure: insert proposal drafts, run the policy gate on each,
+// auto-execute where trust permits. Used by all specialist paths.
+export async function persistAndGateProposals(
+  drafts: ProposalDraft[],
+  analysis: IntakeAnalysis,
+  options?: { playId?: string | null },
+): Promise<ProposalResult[]> {
+  if (drafts.length === 0) return [];
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return [];
+
+  const [rulesResult, trustResult] = await Promise.all([
+    supabase
+      .from("rules")
+      .select("id")
+      .eq("household_id", analysis.householdId)
+      .eq("priority", "must-follow")
+      .eq("active", true),
+    supabase
+      .from("agent_trust")
+      .select("level")
+      .eq("household_id", analysis.householdId)
+      .eq("agent", analysis.routing.primary)
+      .eq("kind", drafts[0].kind)
+      .maybeSingle(),
+  ]);
+
+  const mustFollowRuleIds = new Set(
+    ((rulesResult.data ?? []) as { id: string }[]).map((r) => r.id)
+  );
+  const trustLevel: number = (trustResult.data as { level: number } | null)?.level ?? 0;
+  const now = new Date().toISOString();
+
+  const rows = drafts.map((d) => ({
     id: crypto.randomUUID(),
-    title,
-    agent: analysis.routing.primary,
-    category: analysis.routing.category,
-    status: "todo",
-    priority: analysis.urgency,
-    inbox_item_id: analysis.id,
-    created_at: new Date().toISOString(),
+    household_id: analysis.householdId,
+    play_id: options?.playId ?? null,
+    inbox_item_id: d.inboxItemId,
+    agent: d.agent,
+    kind: d.kind,
+    title: d.title,
+    rationale: d.rationale,
+    payload: d.payload,
+    estimated_cost_cents: d.estimatedCostCents,
+    rules_consulted: d.rulesConsulted,
+    rules_conflicts: d.rulesConflicts,
+    status: "awaiting_approval",
+    created_at: now,
   }));
 
-  const { error } = await supabase.from("tasks").insert(rows);
+  const { error } = await supabase.from("proposals").insert(rows);
   if (error) {
-    console.error("Task creation from intake failed:", error);
+    console.error("Proposal insert failed:", error);
     return [];
   }
 
-  return rows.map((r) => ({ id: r.id, title: r.title, agent: r.agent as AgentId }));
+  const results: ProposalResult[] = [];
+  for (const row of rows) {
+    const verdict = gate(
+      { kind: row.kind, estimatedCostCents: row.estimated_cost_cents, rulesConflicts: row.rules_conflicts },
+      mustFollowRuleIds,
+      trustLevel,
+    );
+
+    if (verdict.decision === "auto") {
+      await executeProposal(
+        { id: row.id, kind: row.kind, payload: row.payload, inbox_item_id: row.inbox_item_id },
+        "policy",
+      );
+    }
+
+    results.push({ id: row.id, title: row.title, gateDecision: verdict.decision, gateReason: verdict.reason });
+  }
+
+  // Bump usage counters for rules the chief cited
+  const allConsulted = [...new Set(drafts.flatMap((d) => d.rulesConsulted))];
+  if (allConsulted.length > 0) {
+    await Promise.all(
+      allConsulted.map((ruleId) =>
+        supabase.rpc("increment_rule_consulted", { rule_id: ruleId, consulted_at: now })
+      )
+    );
+  }
+
+  // Outbox: one event per gate verdict — n8n drains for notifications.
+  await supabase.from("events").insert(
+    rows.map((row) => ({
+      household_id: analysis.householdId,
+      type: row.status === "awaiting_approval" ? "proposal.created" : "proposal.auto_executed",
+      entity_id: row.id,
+      payload: { agent: row.agent, kind: row.kind, title: row.title },
+    }))
+  );
+
+  return results;
+}
+
+// Entry point: builds proposals from an intake analysis.
+// Delegates to the orchestrator which runs the chief → specialists fan-out
+// → Play synthesis → policy gate.
+export async function createProposalsFromIntake(analysis: IntakeAnalysis): Promise<ProposalResult[]> {
+  const { orchestrate } = await import("@/lib/server/agents/orchestrator");
+
+  // Re-derive a ChiefDecision shape from the analysis. The chief already ran
+  // during analyzeIntake() — its routing + invocations are stored on the
+  // analysis object. We reconstruct a minimal ChiefDecision so the orchestrator
+  // can fan out without re-calling Claude.
+  const chiefDecision = {
+    analysis: analysis.analysis,
+    primary: analysis.routing.primary,
+    secondary: analysis.routing.secondary,
+    category: analysis.routing.category,
+    urgency: analysis.urgency,
+    proposedTasks: analysis.proposedTasks,
+    rulesConsulted: analysis.rulesConsulted,
+    rulesConflicts: analysis.rulesConflicts,
+    invocations: analysis.invocations ?? [
+      ...(analysis.routing.primary !== "chief" ? [{ agent: analysis.routing.primary, focus: analysis.analysis }] : []),
+      ...analysis.routing.secondary.filter((a) => a !== "chief").map((agent) => ({ agent, focus: "" })),
+    ],
+  };
+
+  const result = await orchestrate(analysis, chiefDecision);
+  return result.proposals;
 }
 
 export async function applyIntakeChanges(analysis: IntakeAnalysis): Promise<AppliedChange[]> {

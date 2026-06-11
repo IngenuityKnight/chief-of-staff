@@ -8,6 +8,44 @@ export type Status = "new" | "routed" | "processing" | "processed" | "completed"
 
 export type TaskStatus = "todo" | "in_progress" | "blocked" | "done";
 export type DecisionStatus = "open" | "approved" | "deferred" | "dismissed";
+export type ProposalStatus =
+  | "awaiting_approval"
+  | "approved"
+  | "declined"
+  | "auto_executed"
+  | "executed"
+  | "failed"
+  | "expired";
+
+export type ProposalKind =
+  | "create_task"
+  | "block_time"
+  | "meal_plan"
+  | "pay_bill"
+  | "order_item"
+  | "contact_vendor"
+  | "cancel_subscription"
+  | "add_rule"
+  | "upsert_appliance"
+  | "upsert_vehicle"
+  | "record_service";
+
+export interface Proposal {
+  id: string;
+  inboxItemId: string | null;
+  agent: AgentId;
+  kind: ProposalKind;
+  title: string;
+  rationale: string;
+  payload: Record<string, unknown>;
+  estimatedCostCents: number;
+  status: ProposalStatus;
+  decidedBy: "user" | "policy" | null;
+  decidedAt: string | null;
+  executedAt: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+}
 
 export interface InboxItem {
   id: string;

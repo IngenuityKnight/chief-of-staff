@@ -8,7 +8,7 @@ This file is the build spec. It describes what the system is, the data it moves,
 
 ## 1. System in one paragraph
 
-The Chief of Staff is a multi-agent system that captures unstructured household input (a text, a stressed thought, an email forward), runs it through a coordinator LLM that decides which specialist agent should handle it (Meals, Home, Money, Schedule, Roster), and proposes structured tasks the user approves. Approved tasks persist in a shared backend (Notion in the MVP), get executed with human oversight, and the results feed back into briefings and cross-agent insights.
+The Chief of Staff is a multi-agent **proposal economy** that captures unstructured household input (a text, a photographed permission slip, a forwarded email), runs it through a Chief LLM that picks specialists to invoke (Meals, Schedule, Money, Home, Roster), fans those specialists out in parallel with sibling context digests, gathers their structured **proposals**, runs each through a code-level **policy gate** (must-follow rule conflict / spend threshold / per-agent trust level), and either auto-executes or surfaces as "Waiting on you" via a single **Play card** with the Chief's synthesis on top. Agents never write domain tables — typed **executors** are the single write path, which makes the gate unbypassable and the audit trail complete. Proactivity arrives through deterministic **scanners** that emit scanner-origin inbox items into the same pipeline; memory grows through an extraction pass on every capture that proposes durable facts (appliances, vehicles, services, rules) the user approves. Notion has been retired; the system of record is Supabase with RLS via household memberships.
 
 ---
 
@@ -17,24 +17,43 @@ The Chief of Staff is a multi-agent system that captures unstructured household 
 ### High-level flow
 
 ```
-┌─────────────┐   ┌─────────────────────┐   ┌────────────────────┐   ┌──────────┐
-│  CAPTURE    │ → │  CHIEF OF STAFF     │ → │  SPECIALIST AGENTS │ → │  TASKS   │
-│  web / SMS  │   │  LLM (router +      │   │  Meals · Home ·    │   │  (human  │
-│  email/chat │   │  synthesis)         │   │  Money · Schedule  │   │  approves)│
-└─────────────┘   └─────────────────────┘   │  · Roster          │   └──────────┘
-                                            └────────────────────┘
-                         ↑                            ↓
-                         └────── BACKEND (Notion) ────┘
-                                (databases per domain)
+  CAPTURE (web/email/photo/PDF)    SCANNERS (cron: bills_due, maintenance_due,
+        │                          calendar_pressure, budget_drift, briefing)
+        ▼                                      │
+   ┌────────────────────────────────────────── ▼ ─────┐
+   │  CHIEF OF STAFF  (LLM, rules-aware, hh snapshot) │
+   │  → routing + invocations[] + proposed tasks      │
+   └──────────────┬───────────────────────────────────┘
+                  ▼  (Promise.allSettled fan-out)
+   ┌──────────────────────────────────────────────────┐
+   │  SPECIALISTS: meals · schedule · money · …       │
+   │  each: own prompt + domain state + sibling       │
+   │  digests + domain rules → ProposalDraft[]        │
+   │  + MEMORY EXTRACTION pass (durable facts)        │
+   └──────────────┬───────────────────────────────────┘
+                  ▼
+   ┌──────────────────────────────────────────────────┐
+   │  POLICY GATE  (code, unit-tested)                │
+   │  must-follow conflict / cost > $200 / trust < n  │
+   │  → 'ask' or 'auto'                               │
+   └──────┬────────────────────────────┬──────────────┘
+          ▼                            ▼
+   "Waiting on you"            EXECUTORS (typed per kind →
+   Play card + provenance     DB writes; only code path that
+   chips per proposal         writes domain tables)
+          │                            │
+          └────── events outbox ───────┴─── Sunday Chief's Report
+                  (n8n drain → notifications + Resend email)
 ```
 
 ### Stack
 
-- **Front-end:** Next.js 14 (App Router) + TypeScript + Tailwind — this repo
-- **Orchestration:** n8n (self-hosted or cloud) — workflow per agent
-- **Memory:** Notion databases (one per domain) — swappable behind `lib/` adapters
-- **LLM:** OpenAI `gpt-4o` or Anthropic `claude-3.5-sonnet` for routing + agent work
-- **Notifications:** Gmail / SMS (Twilio) for briefs and approvals
+- **Front-end:** Next.js 15 (App Router) + TypeScript + Tailwind — this repo
+- **System of record:** Supabase Postgres with RLS via `household_memberships`. Notion retired.
+- **LLM:** Anthropic `claude-haiku-4-5-20251001` for all calls (routing, specialists, vision, ask, briefing, memory, report). zod-validated structured output.
+- **Cron:** Vercel Cron hits `/api/jobs/*` (scanners + briefing + Sunday report). n8n is no longer required; the seam is clean if reintroduced.
+- **Email:** Resend — inbound via webhook on `/api/intake/email`, outbound for the Sunday Chief's Report.
+- **Auth:** Supabase Auth magic link (`/api/auth/magic-link` → `/api/auth/callback`).
 
 ### Why this stack
 
