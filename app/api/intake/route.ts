@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { analyzeIntake, applyIntakeChanges, createTasksFromIntake, persistIntake } from "@/lib/server/intake";
+import { analyzeIntake, applyIntakeChanges, createProposalsFromIntake, persistIntake } from "@/lib/server/intake";
 import { isSupabaseConfigured } from "@/lib/server/supabase";
 import { isAnthropicConfigured } from "@/lib/server/anthropic";
 
 // POST /api/intake
 //
 // Analyzes freeform household input, routes it to the right agent,
-// persists an inbox item, and immediately creates the proposed tasks.
+// persists an inbox item, and creates proposals awaiting human approval.
+// Tasks are no longer auto-created — see POST /api/proposals/:id/approve.
 //
 // Request:  { "text": "...", "source"?: "web" | "email" | ... }
-// Response: { ok, id, analysis, routing, urgency, proposedTasks, createdTasks }
+// Response: { ok, id, analysis, routing, urgency, proposedTasks, proposals }
 
 const MAX_TEXT_LENGTH = 2_000;
 
@@ -65,10 +66,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const [createdTasks, appliedChanges] = await Promise.all([
-      createTasksFromIntake(intake),
+    const [proposals, appliedChanges] = await Promise.all([
+      createProposalsFromIntake(intake),
       applyIntakeChanges(intake),
     ]);
+
+    const autoExecuted = proposals.filter((p) => p.gateDecision === "auto").length;
+    const waitingOnYou  = proposals.filter((p) => p.gateDecision === "ask").length;
 
     return json({
       ok: true,
@@ -78,13 +82,15 @@ export async function POST(req: NextRequest) {
       routing: intake.routing,
       urgency: intake.urgency,
       proposedTasks: intake.proposedTasks,
-      createdTasks,
+      proposals,
       appliedChanges,
       meta: {
         supabaseConfigured: isSupabaseConfigured(),
         anthropicConfigured: isAnthropicConfigured(),
         persisted: persistence.persisted,
-        tasksCreated: createdTasks.length,
+        proposalsCreated: proposals.length,
+        autoExecuted,
+        waitingOnYou,
       },
     });
   } catch {

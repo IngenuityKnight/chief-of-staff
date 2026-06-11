@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "test": "node --test --experimental-strip-types lib/server/agents/policy.test.ts",
     "seed:supabase": "node --experimental-strip-types scripts/seed-supabase.ts"
   },
   "dependencies": {

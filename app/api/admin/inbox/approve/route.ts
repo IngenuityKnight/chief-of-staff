@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateAdminPaths } from "@/lib/server/admin";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
+import { executeProposal } from "@/lib/server/agents/executors";
 
-function asStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is string => typeof item === "string");
-}
+// Approves all awaiting_approval proposals for an inbox item,
+// executes each through the typed executor, and marks the item processed.
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,46 +23,40 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Supabase is not configured." }, { status: 400 });
     }
 
-    const { data: inboxItem, error: fetchError } = await supabase
-      .from("inbox_items")
-      .select("id, primary_agent, category, urgency, proposed_tasks")
-      .eq("id", inboxItemId)
-      .maybeSingle();
+    const { data: proposals, error: fetchError } = await supabase
+      .from("proposals")
+      .select("id, kind, payload, inbox_item_id, household_id")
+      .eq("inbox_item_id", inboxItemId)
+      .eq("status", "awaiting_approval");
 
     if (fetchError) throw new Error(fetchError.message);
-    if (!inboxItem) {
-      return NextResponse.json({ ok: false, error: "Inbox item not found." }, { status: 404 });
+
+    let executedCount = 0;
+    for (const proposal of proposals ?? []) {
+      const result = await executeProposal(
+        {
+          id: proposal.id,
+          kind: proposal.kind,
+          payload: proposal.payload as Record<string, unknown>,
+          inbox_item_id: proposal.inbox_item_id,
+          household_id: proposal.household_id as string,
+        },
+        "user",
+      );
+      if (result.ok) executedCount++;
     }
 
-    const proposedTasks = asStringArray(inboxItem.proposed_tasks);
-    if (proposedTasks.length > 0) {
-      const now = new Date().toISOString();
-      const inserts = proposedTasks.map((title) => ({
-        id: crypto.randomUUID(),
-        title,
-        agent: inboxItem.primary_agent,
-        category: inboxItem.category,
-        status: "todo",
-        priority: inboxItem.urgency,
-        inbox_item_id: inboxItemId,
-        created_at: now,
-      }));
-
-      const { error: insertError } = await supabase.from("tasks").insert(inserts);
-      if (insertError) throw new Error(insertError.message);
-    }
-
-    const { error: updateError } = await supabase
+    const { error: itemUpdateError } = await supabase
       .from("inbox_items")
       .update({ status: "processed", needs_action: false })
       .eq("id", inboxItemId);
 
-    if (updateError) throw new Error(updateError.message);
+    if (itemUpdateError) throw new Error(itemUpdateError.message);
 
     revalidateAdminPaths();
 
     return NextResponse.json(
-      { ok: true, tasksCreated: proposedTasks.length },
+      { ok: true, executedCount },
       { headers: { "Cache-Control": "no-store, max-age=0" } }
     );
   } catch (err) {

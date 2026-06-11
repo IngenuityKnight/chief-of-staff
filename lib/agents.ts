@@ -1,5 +1,10 @@
 import type { AgentId, Category, Priority, TaskStatus, Status } from "./types";
 
+// NOTE (Hearth redesign): only the `accent` hex values changed in this file.
+// Pill/dot class names are unchanged — they resolve to the new palette via
+// tailwind.config.js. If your local copy has exports below INBOX_STATUS,
+// keep them and apply only the accent changes above.
+
 export const AGENTS: Record<AgentId, {
   id: AgentId;
   name: string;
@@ -18,7 +23,7 @@ export const AGENTS: Record<AgentId, {
     color: "blue",
     pillClass: "pill-blue",
     dotClass: "bg-signal-blue",
-    accent: "#60a5fa",
+    accent: "#7FA5D6",
   },
   meals: {
     id: "meals",
@@ -28,7 +33,7 @@ export const AGENTS: Record<AgentId, {
     color: "amber",
     pillClass: "pill-amber",
     dotClass: "bg-signal-amber",
-    accent: "#fbbf24",
+    accent: "#E8A857",
   },
   home: {
     id: "home",
@@ -38,7 +43,7 @@ export const AGENTS: Record<AgentId, {
     color: "green",
     pillClass: "pill-green",
     dotClass: "bg-signal-green",
-    accent: "#4ade80",
+    accent: "#97B873",
   },
   money: {
     id: "money",
@@ -48,7 +53,7 @@ export const AGENTS: Record<AgentId, {
     color: "purple",
     pillClass: "pill-purple",
     dotClass: "bg-signal-purple",
-    accent: "#a78bfa",
+    accent: "#B59AC6",
   },
   schedule: {
     id: "schedule",
@@ -58,7 +63,7 @@ export const AGENTS: Record<AgentId, {
     color: "cyan",
     pillClass: "pill-cyan",
     dotClass: "bg-signal-cyan",
-    accent: "#22d3ee",
+    accent: "#7FBDB0",
   },
   roster: {
     id: "roster",
@@ -68,7 +73,7 @@ export const AGENTS: Record<AgentId, {
     color: "pink",
     pillClass: "pill-pink",
     dotClass: "bg-signal-pink",
-    accent: "#f472b6",
+    accent: "#D98E9F",
   },
 };
 
