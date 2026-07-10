@@ -114,7 +114,7 @@ export function EditInline({
         type="button"
         aria-label={label ?? `Edit ${resource}`}
         onClick={() => setOpen((prev) => !prev)}
-        className="rounded-md p-1 text-slate-600 transition hover:text-slate-300"
+        className="rounded-md p-1 text-slate-500 transition hover:text-slate-300"
       >
         <Pencil className="h-3 w-3" />
       </button>
@@ -148,7 +148,7 @@ export function EditInline({
                   onChange={(e) => setValue(field.key, e.target.value)}
                   rows={field.type === "json" ? 4 : 2}
                   placeholder={field.type === "json" ? "[]" : ""}
-                  className="w-full rounded-lg border border-edge bg-ink-800 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-signal-blue/50 resize-none"
+                  className="w-full rounded-lg border border-edge bg-ink-800 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-signal-blue/50 resize-none"
                   ref={i === 0 ? (el) => { firstInputRef.current = el; } : undefined}
                 />
               ) : field.type === "select" && field.options ? (
@@ -170,7 +170,7 @@ export function EditInline({
                   type={field.type === "number" ? "number" : "text"}
                   value={String(formState[field.key] ?? "")}
                   onChange={(e) => setValue(field.key, e.target.value)}
-                  className="w-full rounded-lg border border-edge bg-ink-800 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-signal-blue/50"
+                  className="w-full rounded-lg border border-edge bg-ink-800 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-signal-blue/50"
                   ref={i === 0 ? (el) => { firstInputRef.current = el; } : undefined}
                 />
               )}

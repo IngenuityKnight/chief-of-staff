@@ -393,7 +393,7 @@ export default async function MoneyPage() {
           ) : (
             <Panel eyebrow="Spend Insights" title="No data yet">
               <div className="flex items-start gap-3 py-2 text-sm text-slate-500">
-                <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-slate-600" />
+                <TrendingDown className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
                 <span>Connect a bank and sync transactions to see real spending breakdown.</span>
               </div>
             </Panel>
@@ -433,7 +433,7 @@ export default async function MoneyPage() {
             )
           ) : (
             <div className="flex items-start gap-3 py-2 text-sm text-slate-500">
-              <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-slate-600" />
+              <Wallet className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
               <span>Subscription audit will populate after Plaid detects your recurring charges (usually within 1-2 billing cycles).</span>
             </div>
           )}
@@ -460,7 +460,7 @@ export default async function MoneyPage() {
             </ul>
           ) : (
             <div className="flex items-start gap-3 py-2 text-sm text-slate-500">
-              <PlusCircle className="mt-0.5 h-4 w-4 shrink-0 text-slate-600" />
+              <PlusCircle className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
               <span>Transactions will appear here after your first Plaid sync with a real bank account.</span>
             </div>
           )}

@@ -95,7 +95,7 @@ export default async function SchedulePage() {
         </div>
       ) : (
         <div className="rounded-xl border border-edge bg-ink-900/20 px-5 py-12 text-center">
-          <CalendarDays className="mx-auto h-6 w-6 text-slate-600" />
+          <CalendarDays className="mx-auto h-6 w-6 text-slate-500" />
           <div className="mt-2 text-sm text-slate-500">No events yet. Add one below or connect Google Calendar.</div>
         </div>
       )}

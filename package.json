@@ -12,13 +12,13 @@
     "seed:supabase": "node --experimental-strip-types scripts/seed-supabase.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.90.0",
+    "@anthropic-ai/sdk": "^0.110.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.57.4",
     "clsx": "^2.1.1",
     "googleapis": "^171.4.0",
     "lucide-react": "^0.424.0",
-    "next": "15.5.15",
+    "next": "^15.5.20",
     "plaid": "^42.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -29,7 +29,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.40",
+    "postcss": "^8.5.16",
     "tailwindcss": "^3.4.7",
     "typescript": "^5.5.4"
   }

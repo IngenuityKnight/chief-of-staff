@@ -4,7 +4,7 @@ export default function NotFound() {
   return (
     <div className="mx-auto grid max-w-md place-items-center py-24 text-center">
       <div>
-        <div className="font-mono text-5xl font-semibold text-slate-600">404</div>
+        <div className="font-mono text-5xl font-semibold text-slate-500">404</div>
         <h1 className="mt-4 font-display text-xl font-semibold text-white">
           No room by that name
         </h1>

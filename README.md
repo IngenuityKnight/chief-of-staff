@@ -44,11 +44,15 @@ The app now supports a real backend path with `Supabase` for persistence and an 
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...  # required — enables sign-in and the session wall
 SUPABASE_SERVICE_ROLE_KEY=...
+CRON_SECRET=...                # required in production for /api/cron/* and /api/jobs/*
 N8N_INTAKE_WEBHOOK_URL=...     # optional
 N8N_WEBHOOK_SECRET=...         # optional
-APP_EDITOR_PASSWORD=...        # required for in-app editing
 ```
+
+With Supabase configured, every page requires signing in via the magic-link
+flow at `/login`; in-app editing is limited to household owners.
 
 3. Apply the Supabase schema in `supabase/migrations/20260419130000_initial_schema.sql`
 4. Seed the initial mock dataset into Supabase:

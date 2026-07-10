@@ -90,7 +90,7 @@ export default async function MobileHomePage() {
         ))}
       </div>
 
-      <p className="text-center text-xs text-slate-600">
+      <p className="text-center text-xs text-slate-500">
         Tap ⌘ to capture anything — your Chief will route it.
       </p>
     </div>

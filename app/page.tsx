@@ -244,7 +244,7 @@ export default async function PulsePage() {
       <AgentActivityFeed entries={activity} />
 
       {/* Quiet footer nav */}
-      <div className="flex flex-wrap gap-x-5 gap-y-1 px-1 pb-2 pt-8 text-xs text-slate-600">
+      <div className="flex flex-wrap gap-x-5 gap-y-1 px-1 pb-2 pt-8 text-xs text-slate-400">
         {[
           { href: "/inbox", label: unreviewed.length > 0 ? `Inbox (${unreviewed.length})` : "Inbox" },
           { href: "/decisions", label: openDecisions.length > 0 ? `Decisions (${openDecisions.length})` : "Decisions" },
@@ -253,7 +253,7 @@ export default async function PulsePage() {
           { href: "/meals", label: "Meals" },
           { href: "/schedule", label: "Schedule" },
         ].map(({ href, label }) => (
-          <Link key={href} href={href} className="transition hover:text-slate-300">
+          <Link key={href} href={href} className="transition hover:text-slate-200">
             {label}
           </Link>
         ))}

@@ -145,7 +145,7 @@ export default async function VehiclesPage() {
 
       {vehicles.length === 0 ? (
         <div className="rounded-xl border border-edge bg-ink-900/20 px-5 py-12 text-center">
-          <Car className="mx-auto h-6 w-6 text-slate-600" />
+          <Car className="mx-auto h-6 w-6 text-slate-500" />
           <div className="mt-2 text-sm text-slate-500">No vehicles added yet.</div>
         </div>
       ) : (

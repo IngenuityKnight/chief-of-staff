@@ -85,7 +85,7 @@ export default async function HomePage() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-slate-100">{m.item}</span>
-                  <span className="text-[11px] text-slate-600">{m.system}</span>
+                  <span className="text-[11px] text-slate-500">{m.system}</span>
                 </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
                   {m.vendor && <span>{m.vendor}</span>}
@@ -97,7 +97,7 @@ export default async function HomePage() {
                 <div className={`text-sm font-medium ${STATUS_COLOR[m.status]}`}>
                   {d !== null && d < 0 ? `${-d}d overdue` : relativeDay(m.nextDue)}
                 </div>
-                <div className="text-[11px] text-slate-600 capitalize">{m.frequency}</div>
+                <div className="text-[11px] text-slate-500 capitalize">{m.frequency}</div>
               </div>
               <EditInline
                 resource="maintenance" id={m.id} fields={fields}

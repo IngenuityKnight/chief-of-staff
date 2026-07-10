@@ -362,7 +362,7 @@ export function CommandDock() {
                     </p>
                   </div>
                   <div>
-                    <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Quick starts</div>
+                    <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Quick starts</div>
                     <div className="space-y-2 sm:space-y-1.5">
                       {QUICK_PROMPTS.map((prompt) => (
                         <button
@@ -404,7 +404,7 @@ export function CommandDock() {
                   }}
                   placeholder="Anything on your mind…"
                   rows={1}
-                  className="flex-1 resize-none bg-transparent text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none max-h-32"
+                  className="flex-1 resize-none bg-transparent text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none max-h-32"
                   style={{ fieldSizing: "content" } as React.CSSProperties}
                 />
                 <button
@@ -417,7 +417,7 @@ export function CommandDock() {
                   <Send className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                 </button>
               </div>
-              <div className="mt-1.5 hidden px-1 text-[10px] text-slate-600 sm:block">
+              <div className="mt-1.5 hidden px-1 text-[10px] text-slate-400 sm:block">
                 Enter to send · Shift+Enter for newline
               </div>
             </div>

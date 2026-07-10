@@ -226,7 +226,7 @@ export function DataEditor({ resources, resetTargets }: EditorProps) {
                       value={String(formState[field.key] ?? "")}
                       onChange={(event) => setFormState((current) => ({ ...current, [field.key]: event.target.value }))}
                       rows={field.type === "json" ? 6 : 4}
-                      className="w-full rounded-md border border-edge bg-ink-950 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-600 focus:border-signal-blue/40 focus:outline-none"
+                      className="w-full rounded-md border border-edge bg-ink-950 px-3 py-2 font-mono text-sm text-slate-100 placeholder:text-slate-500 focus:border-signal-blue/40 focus:outline-none"
                     />
                   ) : field.type === "boolean" ? (
                     <label className="inline-flex items-center gap-2 rounded-md border border-edge bg-ink-950 px-3 py-2 text-sm text-slate-200">
@@ -254,7 +254,7 @@ export function DataEditor({ resources, resetTargets }: EditorProps) {
                       type={field.type === "number" ? "number" : "text"}
                       value={String(formState[field.key] ?? "")}
                       onChange={(event) => setFormState((current) => ({ ...current, [field.key]: event.target.value }))}
-                      className="w-full rounded-md border border-edge bg-ink-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-signal-blue/40 focus:outline-none"
+                      className="w-full rounded-md border border-edge bg-ink-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-signal-blue/40 focus:outline-none"
                     />
                   )}
                 </label>

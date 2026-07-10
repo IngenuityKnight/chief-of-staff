@@ -54,7 +54,7 @@ export function LogPurchase({ id }: { id: string }) {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="rounded-md p-1 text-slate-600 transition hover:text-signal-green"
+        className="rounded-md p-1 text-slate-500 transition hover:text-signal-green"
         aria-label="Log purchase"
         title="Log purchase"
       >
@@ -95,7 +95,7 @@ export function LogPurchase({ id }: { id: string }) {
                 onChange={(e) => setQuantity(e.target.value)}
                 placeholder="0"
                 min="0"
-                className="w-full rounded-lg border border-edge bg-ink-800 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-signal-blue/50"
+                className="w-full rounded-lg border border-edge bg-ink-800 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-signal-blue/50"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -107,7 +107,7 @@ export function LogPurchase({ id }: { id: string }) {
                 placeholder="0.00"
                 step="0.01"
                 min="0"
-                className="w-full rounded-lg border border-edge bg-ink-800 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-signal-blue/50"
+                className="w-full rounded-lg border border-edge bg-ink-800 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-signal-blue/50"
               />
             </div>
           </div>

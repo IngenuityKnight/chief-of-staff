@@ -43,11 +43,11 @@ export function MobileAgentCard({
         {topItems.length > 0 ? (
           <p className="mt-0.5 truncate text-xs text-slate-500">{topItems[0]}</p>
         ) : (
-          <p className="mt-0.5 text-xs text-slate-600">No urgent items</p>
+          <p className="mt-0.5 text-xs text-slate-500">No urgent items</p>
         )}
       </div>
 
-      <ChevronRight className="h-4 w-4 shrink-0 text-slate-600" />
+      <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" />
     </Link>
   );
 }

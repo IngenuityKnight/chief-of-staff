@@ -53,7 +53,7 @@ export function SettingsForm({ ctx }: { ctx: HouseholdContextRow }) {
     }
   }
 
-  const inputCls = "w-full rounded-lg border border-edge bg-ink-800 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-signal-blue/50";
+  const inputCls = "w-full rounded-lg border border-edge bg-ink-800 px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-signal-blue/50";
   const labelCls = "block text-xs font-semibold text-slate-400 mb-1.5";
 
   return (
@@ -75,7 +75,7 @@ export function SettingsForm({ ctx }: { ctx: HouseholdContextRow }) {
           </div>
         </div>
         <div>
-          <label className={labelCls}>Address <span className="font-normal text-slate-600">(used for local context)</span></label>
+          <label className={labelCls}>Address <span className="font-normal text-slate-500">(used for local context)</span></label>
           <input type="text" value={form.address} onChange={(e) => set("address", e.target.value)}
             placeholder="123 Main St, City, State 12345" className={inputCls} />
         </div>
@@ -118,13 +118,13 @@ export function SettingsForm({ ctx }: { ctx: HouseholdContextRow }) {
       <section className="space-y-4">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">AI Behavior</h2>
         <div>
-          <label className={labelCls}>Goals <span className="font-normal text-slate-600">(prepended to every AI call)</span></label>
+          <label className={labelCls}>Goals <span className="font-normal text-slate-500">(prepended to every AI call)</span></label>
           <textarea value={form.goals} onChange={(e) => set("goals", e.target.value)} rows={3}
             placeholder="Build financial independence. Maintain an organized, low-stress household. Protect time for family."
             className={cn(inputCls, "resize-none")} />
         </div>
         <div>
-          <label className={labelCls}>AI persona <span className="font-normal text-slate-600">(tone + style instructions)</span></label>
+          <label className={labelCls}>AI persona <span className="font-normal text-slate-500">(tone + style instructions)</span></label>
           <textarea value={form.aiPersona} onChange={(e) => set("aiPersona", e.target.value)} rows={3}
             placeholder="Direct and practical. Financially minded. Concise responses. Flag risks early."
             className={cn(inputCls, "resize-none")} />

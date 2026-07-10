@@ -366,8 +366,7 @@ function buildCrossAgentInsights(
     });
   }
 
-  // 6. Heavy task load + open decisions
-  const openDecisionCount = 0; // decisions not fetched here — checked via task count proxy
+  // 6. Heavy task load
   if (openTasks.length >= 8) {
     insights.push({
       id: "x_chief_schedule",
