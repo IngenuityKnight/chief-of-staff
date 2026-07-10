@@ -3,15 +3,14 @@ import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { logActivity } from "@/lib/server/activity";
 import { getVehicles } from "@/lib/server/data";
 import { getHouseholdForJob } from "@/lib/server/household";
+import { isCronAuthorized } from "@/lib/server/cron-auth";
 
 function json(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(body, { status });
 }
 
 function verifyCronSecret(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
-  return req.headers.get("authorization") === `Bearer ${secret}`;
+  return isCronAuthorized(req);
 }
 
 export async function GET(req: NextRequest) {

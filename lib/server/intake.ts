@@ -8,6 +8,7 @@ import { getAnthropicClient } from "@/lib/server/anthropic";
 import { logActivity } from "@/lib/server/activity";
 import { assembleContextForIntake } from "@/lib/server/context";
 import { getCurrentHousehold } from "@/lib/server/household";
+import { addDays, getHouseholdTimezone, todayInTz, zonedTimeToUtc, type DateParts } from "@/lib/server/timezone";
 
 export type IntakeAnalysis = {
   id: string;
@@ -143,28 +144,13 @@ function buildTitle(text: string) {
   return normalized.length <= 72 ? normalized : `${normalized.slice(0, 69).trimEnd()}…`;
 }
 
-function startOfToday() {
-  const date = new Date();
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function nextWeekday(target: number) {
-  const date = startOfToday();
-  const diff = (target - date.getDay() + 7) % 7 || 7;
-  date.setDate(date.getDate() + diff);
-  return date;
-}
-
-function parseRequestedDate(text: string) {
+// Dates are resolved on the household's wall clock (audit B5): "tomorrow"
+// captured at 8pm Chicago is Chicago's tomorrow, not UTC's.
+function parseRequestedDateParts(text: string, timeZone: string): DateParts | null {
   const lower = text.toLowerCase();
-  const today = startOfToday();
+  const today = todayInTz(timeZone);
   if (lower.includes("today")) return today;
-  if (lower.includes("tomorrow")) {
-    const date = startOfToday();
-    date.setDate(date.getDate() + 1);
-    return date;
-  }
+  if (lower.includes("tomorrow")) return addDays(today, 1);
 
   const weekdays: Record<string, number> = {
     sunday: 0,
@@ -176,19 +162,23 @@ function parseRequestedDate(text: string) {
     saturday: 6,
   };
   for (const [day, index] of Object.entries(weekdays)) {
-    if (lower.includes(day)) return nextWeekday(index);
+    if (lower.includes(day)) {
+      const diff = (index - today.weekday + 7) % 7 || 7;
+      return addDays(today, diff);
+    }
   }
 
   const dateMatch = lower.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
   if (!dateMatch) return null;
 
-  const month = Number(dateMatch[1]) - 1;
+  const month = Number(dateMatch[1]);
   const day = Number(dateMatch[2]);
   const year = dateMatch[3]
     ? Number(dateMatch[3].length === 2 ? `20${dateMatch[3]}` : dateMatch[3])
-    : today.getFullYear();
-  const parsed = new Date(year, month, day);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+    : today.year;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  // Normalize through addDays so weekday and day overflow resolve correctly.
+  return addDays({ year, month, day, weekday: 0 }, 0);
 }
 
 function parseRequestedTime(text: string) {
@@ -672,11 +662,11 @@ export async function applyIntakeChanges(analysis: IntakeAnalysis): Promise<Appl
     analysis.routing.primary === "schedule" &&
     /\b(add|create|schedule|book|block|put|set up)\b/.test(lower)
   ) {
-    const date = parseRequestedDate(analysis.text);
-    if (date) {
+    const timeZone = await getHouseholdTimezone(analysis.householdId);
+    const dateParts = parseRequestedDateParts(analysis.text, timeZone);
+    if (dateParts) {
       const { hours, minutes } = parseRequestedTime(analysis.text);
-      const start = new Date(date);
-      start.setHours(hours, minutes, 0, 0);
+      const start = zonedTimeToUtc(dateParts.year, dateParts.month, dateParts.day, hours, minutes, timeZone);
       const end = new Date(start.getTime() + parseDurationMinutes(analysis.text) * 60_000);
       const title = cleanEventTitle(analysis.text) || buildTitle(analysis.text);
       const id = crypto.randomUUID();

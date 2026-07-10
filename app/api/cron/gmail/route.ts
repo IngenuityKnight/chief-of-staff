@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { google } from "googleapis";
 import { getOAuthClient } from "@/lib/server/google-calendar";
 import { analyzeIntake, persistIntake } from "@/lib/server/intake";
+import { isCronAuthorized } from "@/lib/server/cron-auth";
 
 // GET /api/cron/gmail
 //
@@ -11,9 +12,7 @@ import { analyzeIntake, persistIntake } from "@/lib/server/intake";
 // Invoked every 10 minutes by Vercel Cron. Secured with CRON_SECRET.
 
 function isAuthorized(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // no secret configured — allow all (dev mode)
-  return req.headers.get("authorization") === `Bearer ${secret}`;
+  return isCronAuthorized(req);
 }
 
 export async function GET(req: NextRequest) {

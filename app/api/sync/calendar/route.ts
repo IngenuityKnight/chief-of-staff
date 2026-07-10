@@ -26,9 +26,10 @@ function jsonResponse(body: Record<string, unknown>, status = 200) {
   });
 }
 
+// Fail closed (audit S8): the webhook only runs unsecured in development.
 function verifySecret(req: NextRequest): boolean {
   const expected = process.env.N8N_CALENDAR_WEBHOOK_SECRET;
-  if (!expected) return true; // no secret configured — allow all (dev mode)
+  if (!expected) return process.env.NODE_ENV !== "production";
   const provided = req.headers.get("x-webhook-secret");
   return provided === expected;
 }

@@ -14,18 +14,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PREFIXES = [
-  "/login",
-  "/api/auth/",
-  "/api/cron/",
-  "/api/jobs/",
-  "/api/intake/email",
-  "/api/sync/calendar",
-];
+const PUBLIC_PREFIXES = ["/api/auth/", "/api/cron/", "/api/jobs/"];
+// Exact paths only — /api/sync/calendar/outbound is browser-called and must
+// stay behind the session wall.
+const PUBLIC_EXACT = ["/login", "/api/intake/email", "/api/sync/calendar"];
 
 function isPublic(pathname: string): boolean {
-  return PUBLIC_PREFIXES.some(
-    (prefix) => pathname === prefix.replace(/\/$/, "") || pathname.startsWith(prefix)
+  return (
+    PUBLIC_EXACT.includes(pathname) ||
+    PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))
   );
 }
 

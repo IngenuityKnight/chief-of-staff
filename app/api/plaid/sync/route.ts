@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getPlaidConnections, syncAccounts, syncRecurringToBills, syncTransactions, autoMatchBillPayments } from "@/lib/server/plaid";
+import { isCronAuthorized } from "@/lib/server/cron-auth";
 
 // POST /api/plaid/sync
 //
@@ -16,10 +17,7 @@ function json(body: Record<string, unknown>, status = 200) {
 }
 
 function verifySecret(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // dev: no secret configured
-  const auth = req.headers.get("authorization");
-  return auth === `Bearer ${secret}`;
+  return isCronAuthorized(req);
 }
 
 export async function POST(req: NextRequest) {

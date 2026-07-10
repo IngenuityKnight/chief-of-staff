@@ -36,9 +36,11 @@ interface InboundPayload {
   };
 }
 
+// Fail closed (audit S8): without the shared secret, inbound email is only
+// accepted in development. Anyone can POST to a public webhook URL.
 function verifySignature(req: NextRequest): boolean {
   const expected = process.env.RESEND_WEBHOOK_SECRET;
-  if (!expected) return true; // dev: no secret = allow
+  if (!expected) return process.env.NODE_ENV !== "production";
   const provided = req.headers.get("x-resend-secret") ?? req.headers.get("authorization");
   return provided === expected || provided === `Bearer ${expected}`;
 }

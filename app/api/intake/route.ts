@@ -110,9 +110,12 @@ async function runIntakePipeline(text: string, source: string, householdId: stri
     );
   }
 
+  // The heuristic side-writes predate the specialist pipeline; running both
+  // double-creates shopping items and calendar events (audit B7). Keep the
+  // heuristics only as the degraded path when Claude is unavailable.
   const [proposals, appliedChanges] = await Promise.all([
     createProposalsFromIntake(intake),
-    applyIntakeChanges(intake),
+    isAnthropicConfigured() ? Promise.resolve([]) : applyIntakeChanges(intake),
   ]);
 
   const autoExecuted = proposals.filter((p) => p.gateDecision === "auto").length;

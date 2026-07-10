@@ -6,6 +6,7 @@
 
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { getHouseholdForJob } from "@/lib/server/household";
+import { getHouseholdTimezone, zonedTimeToUtc } from "@/lib/server/timezone";
 import type {
   AddRulePayload,
   BlockTimePayload,
@@ -253,8 +254,10 @@ async function _addRule(payload: AddRulePayload, householdId: string): Promise<b
 async function _blockCalendar(payload: BlockTimePayload, householdId: string): Promise<boolean> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return false;
-  const start = new Date(payload.date);
-  start.setHours(payload.startHour, 0, 0, 0);
+  // startHour is a wall-clock hour in the household's timezone (audit B5).
+  const timeZone = await getHouseholdTimezone(householdId);
+  const [year, month, day] = String(payload.date).slice(0, 10).split("-").map(Number);
+  const start = zonedTimeToUtc(year, month, day, payload.startHour, 0, timeZone);
   const end = new Date(start.getTime() + payload.durationMinutes * 60_000);
   const { error } = await supabase.from("calendar_events").insert({
     id: crypto.randomUUID(),

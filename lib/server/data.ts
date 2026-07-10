@@ -28,7 +28,7 @@ import type {
   Task,
   Vehicle,
 } from "@/lib/types";
-import { getSupabaseAdmin } from "@/lib/server/supabase";
+import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/server/supabase";
 import { getCurrentHousehold } from "@/lib/server/household";
 
 export interface HouseholdContextRow {
@@ -101,6 +101,11 @@ function logTableError(table: string, error: unknown) {
 // Every read is tenant-scoped (audit S2). A null household — auth enforced
 // but no session/membership, e.g. the shell rendering behind /login — reads
 // as empty, never as another tenant's rows and never as mock data.
+//
+// Mock data renders ONLY when Supabase is entirely unconfigured (demo mode).
+// A query error against a real database throws (audit B12/U2): showing the
+// fictional demo household during an outage is a trust failure, not a
+// fallback — app/error.tsx turns the throw into an honest error screen.
 async function selectRows<T>(
   table: string,
   fallback: T[],
@@ -123,7 +128,7 @@ async function selectRows<T>(
   const { data, error } = await query;
   if (error) {
     logTableError(table, error);
-    return fallback;
+    throw new Error(`Could not load ${table} from the database.`);
   }
 
   if (!data) return [];
@@ -181,6 +186,9 @@ function mapTask(row: Record<string, unknown>): Task {
     createdAt: String(row.created_at),
     completedAt: typeof row.completed_at === "string" ? row.completed_at : undefined,
     recurringRule: typeof row.recurring_rule === "string" ? row.recurring_rule : undefined,
+    templateId: typeof row.template_id === "string" ? row.template_id : undefined,
+    autoCreateTask: typeof row.auto_create_task === "boolean" ? row.auto_create_task : undefined,
+    lastTaskId: typeof row.last_task_id === "string" ? row.last_task_id : undefined,
   };
 }
 
@@ -655,6 +663,8 @@ async function getWeeklyActivityCounts(): Promise<{ itemsCaptured: number; tasks
 }
 
 export async function getBriefingSummary(): Promise<BriefingSummary> {
+  if (!isSupabaseConfigured()) return mockBriefing;
+
   const [tasks, bills, maintenance, calendar, inventory] = await Promise.all([
     getTasks(),
     getBills(),
@@ -662,15 +672,6 @@ export async function getBriefingSummary(): Promise<BriefingSummary> {
     getCalendarEvents(),
     getInventoryItems(),
   ]);
-
-  if (
-    tasks === mockTasks &&
-    bills === mockBills &&
-    maintenance === mockMaintenance &&
-    calendar === mockCalendar
-  ) {
-    return mockBriefing;
-  }
 
   const lowStockItems = inventory.filter((i) => i.quantity <= i.minQuantity).length;
   const [savingsRatePercent, weeklyCounts] = await Promise.all([
