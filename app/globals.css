@@ -1,20 +1,14 @@
-@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700&family=Spline+Sans+Mono:wght@400;500;600&display=swap");
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* ── HEARTH DESIGN SYSTEM ──────────────────────────────────────
-   Font variables keep their historical names so tailwind.config.js
-   and every component continue to resolve without edits.
+   Fonts are self-hosted via next/font in app/layout.tsx, which sets
+   --font-space / --font-inter-tight / --font-jetbrains on <html>.
    display  → Bricolage Grotesque  (authority without coldness)
    body/UI  → Instrument Sans      (legible at arm's length)
    data     → Spline Sans Mono     (amounts, dates, metadata)      */
 :root {
-  --font-inter-tight: "Instrument Sans", "Avenir Next", "Segoe UI", system-ui, sans-serif;
-  --font-space: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
-  --font-jetbrains: "Spline Sans Mono", "SFMono-Regular", ui-monospace, monospace;
-
   /* House state — set on <html> by the shell, consumed by the Hearth line */
   --hearth-steady: #97B873;
   --hearth-tending: #E8A857;

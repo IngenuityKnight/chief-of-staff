@@ -1,5 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { Bricolage_Grotesque, Instrument_Sans, Spline_Sans_Mono } from "next/font/google";
 import { CommandDock } from "@/components/command-dock";
 import { BottomNav } from "@/components/bottom-nav";
 import { DomainRail } from "@/components/domain-rail";
@@ -12,6 +13,14 @@ import {
   getMaintenanceItems,
   getTasks,
 } from "@/lib/server/data";
+
+// Self-hosted via next/font (audit P3): removes the render-blocking Google
+// Fonts @import and the third-party origin, and eliminates font-swap CLS.
+// Variable names match the historical ones so tailwind.config.js and every
+// component resolve unchanged.
+const displayFont = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-space" });
+const bodyFont = Instrument_Sans({ subsets: ["latin"], variable: "--font-inter-tight" });
+const monoFont = Spline_Sans_Mono({ subsets: ["latin"], variable: "--font-jetbrains" });
 
 export const metadata: Metadata = {
   title: "Burden House — Household OS",
@@ -77,14 +86,20 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const { state, attentionCount, railAttention } = await getHouseSignals();
 
   return (
-    <html lang="en">
+    <html lang="en" className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable}`}>
       <body className="font-sans antialiased">
+        <a
+          href="#main"
+          className="sr-only z-[70] rounded-lg bg-signal-blue px-4 py-2 text-sm font-semibold text-ink-950 focus:not-sr-only focus:fixed focus:left-4 focus:top-4"
+        >
+          Skip to content
+        </a>
         <HearthLine state={state} />
         <div className="flex min-h-screen">
           <DomainRail attention={railAttention} />
           <div className="flex flex-1 flex-col">
             <StatusBar state={state} attentionCount={attentionCount} />
-            <main className="flex-1 px-6 py-6 pb-24 md:px-10 md:py-8 md:pb-8">
+            <main id="main" className="flex-1 px-6 py-6 pb-24 md:px-10 md:py-8 md:pb-8">
               {children}
             </main>
           </div>
