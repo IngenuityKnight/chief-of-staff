@@ -29,6 +29,7 @@ import type {
   Vehicle,
 } from "@/lib/types";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
+import { getCurrentHousehold } from "@/lib/server/household";
 
 export interface HouseholdContextRow {
   householdName: string | undefined;
@@ -54,17 +55,20 @@ const DEFAULT_HOUSEHOLD_CONTEXT: HouseholdContextRow = {
   preferences: {},
 };
 
-export async function getHouseholdContext(): Promise<HouseholdContextRow> {
+export async function getHouseholdContext(householdIdOverride?: string): Promise<HouseholdContextRow> {
   noStore();
   const supabase = getSupabaseAdmin();
   if (!supabase) return DEFAULT_HOUSEHOLD_CONTEXT;
+
+  const householdId = householdIdOverride ?? (await getCurrentHousehold());
+  if (!householdId) return DEFAULT_HOUSEHOLD_CONTEXT;
 
   try {
     const { data, error } = await supabase
       .from("household_context")
       .select("*")
-      .eq("id", "default")
-      .single();
+      .eq("household_id", householdId)
+      .maybeSingle();
 
     if (error || !data) return DEFAULT_HOUSEHOLD_CONTEXT;
 
@@ -94,17 +98,24 @@ function logTableError(table: string, error: unknown) {
   console.error(`Supabase query failed for ${table}:`, error);
 }
 
+// Every read is tenant-scoped (audit S2). A null household — auth enforced
+// but no session/membership, e.g. the shell rendering behind /login — reads
+// as empty, never as another tenant's rows and never as mock data.
 async function selectRows<T>(
   table: string,
   fallback: T[],
   mapRow: (row: Record<string, unknown>) => T,
-  orderBy?: { column: string; ascending?: boolean }
+  orderBy?: { column: string; ascending?: boolean },
+  householdIdOverride?: string
 ) {
   noStore();
   const supabase = getSupabaseAdmin();
   if (!supabase) return fallback;
 
-  let query = supabase.from(table).select("*");
+  const householdId = householdIdOverride ?? (await getCurrentHousehold());
+  if (!householdId) return [];
+
+  let query = supabase.from(table).select("*").eq("household_id", householdId);
   if (orderBy) {
     query = query.order(orderBy.column, { ascending: orderBy.ascending ?? true });
   }
@@ -394,40 +405,40 @@ function buildCrossAgentInsights(
   return insights;
 }
 
-export async function getInboxItems() {
-  return selectRows("inbox_items", mockInboxItems, mapInboxItem, { column: "created_at", ascending: false });
+export async function getInboxItems(householdId?: string) {
+  return selectRows("inbox_items", mockInboxItems, mapInboxItem, { column: "created_at", ascending: false }, householdId);
 }
 
-export async function getTasks() {
-  return selectRows("tasks", mockTasks, mapTask, { column: "created_at", ascending: false });
+export async function getTasks(householdId?: string) {
+  return selectRows("tasks", mockTasks, mapTask, { column: "created_at", ascending: false }, householdId);
 }
 
-export async function getDecisions() {
-  return selectRows("decisions", mockDecisions, mapDecision, { column: "created_at", ascending: false });
+export async function getDecisions(householdId?: string) {
+  return selectRows("decisions", mockDecisions, mapDecision, { column: "created_at", ascending: false }, householdId);
 }
 
-export async function getMaintenanceItems() {
-  return selectRows("maintenance_items", mockMaintenance, mapMaintenanceItem, { column: "next_due" });
+export async function getMaintenanceItems(householdId?: string) {
+  return selectRows("maintenance_items", mockMaintenance, mapMaintenanceItem, { column: "next_due" }, householdId);
 }
 
-export async function getBills() {
-  return selectRows("bills", mockBills, mapBillItem, { column: "due_date" });
+export async function getBills(householdId?: string) {
+  return selectRows("bills", mockBills, mapBillItem, { column: "due_date" }, householdId);
 }
 
-export async function getCalendarEvents() {
-  return selectRows("calendar_events", mockCalendar, mapCalendarEvent, { column: "start_at" });
+export async function getCalendarEvents(householdId?: string) {
+  return selectRows("calendar_events", mockCalendar, mapCalendarEvent, { column: "start_at" }, householdId);
 }
 
-export async function getHouseholdMembers() {
-  return selectRows("household_members", mockHousehold, mapHouseMember, { column: "name" });
+export async function getHouseholdMembers(householdId?: string) {
+  return selectRows("household_members", mockHousehold, mapHouseMember, { column: "name" }, householdId);
 }
 
-export async function getRules() {
-  return selectRows("rules", mockRules, mapRule, { column: "title" });
+export async function getRules(householdId?: string) {
+  return selectRows("rules", mockRules, mapRule, { column: "title" }, householdId);
 }
 
-export async function getMealPlan() {
-  return selectRows("meal_plan_days", mockMealPlan, mapMealPlanDay, { column: "date" });
+export async function getMealPlan(householdId?: string) {
+  return selectRows("meal_plan_days", mockMealPlan, mapMealPlanDay, { column: "date" }, householdId);
 }
 
 function mapInventoryItem(row: Record<string, unknown>): InventoryItem {
@@ -460,9 +471,13 @@ export async function getPurchasePriceHistory(): Promise<Map<string, number[]>> 
   const supabase = getSupabaseAdmin();
   if (!supabase) return new Map();
 
+  const householdId = await getCurrentHousehold();
+  if (!householdId) return new Map();
+
   const { data } = await supabase
     .from("inventory_purchases")
     .select("inventory_item_id, price, recorded_at")
+    .eq("household_id", householdId)
     .not("price", "is", null)
     .order("recorded_at", { ascending: true });
 
@@ -534,16 +549,20 @@ function mapShoppingListItem(row: Record<string, unknown>): ShoppingListItem {
   };
 }
 
-export async function getInventoryItems(): Promise<InventoryItem[]> {
+export async function getInventoryItems(householdIdOverride?: string): Promise<InventoryItem[]> {
   noStore();
   const supabase = getSupabaseAdmin();
   if (!supabase) return [];
 
+  const householdId = householdIdOverride ?? (await getCurrentHousehold());
+  if (!householdId) return [];
+
   const [itemsRes, purchasesRes] = await Promise.all([
-    supabase.from("inventory_items").select("*").order("name"),
+    supabase.from("inventory_items").select("*").eq("household_id", householdId).order("name"),
     supabase
       .from("inventory_purchases")
       .select("inventory_item_id, store, recorded_at")
+      .eq("household_id", householdId)
       .order("recorded_at", { ascending: false }),
   ]);
 
@@ -571,25 +590,28 @@ export async function getInventoryItems(): Promise<InventoryItem[]> {
   });
 }
 
-export async function getVehicles() {
-  return selectRows<Vehicle>("vehicles", [], mapVehicle, { column: "year", ascending: false });
+export async function getVehicles(householdId?: string) {
+  return selectRows<Vehicle>("vehicles", [], mapVehicle, { column: "year", ascending: false }, householdId);
 }
 
-export async function getAppliances() {
-  return selectRows<Appliance>("appliances", [], mapAppliance, { column: "name" });
+export async function getAppliances(householdId?: string) {
+  return selectRows<Appliance>("appliances", [], mapAppliance, { column: "name" }, householdId);
 }
 
-export async function getShoppingList() {
-  return selectRows<ShoppingListItem>("shopping_list_items", [], mapShoppingListItem, { column: "created_at", ascending: false });
+export async function getShoppingList(householdId?: string) {
+  return selectRows<ShoppingListItem>("shopping_list_items", [], mapShoppingListItem, { column: "created_at", ascending: false }, householdId);
 }
 
 async function getPlaidSavingsRate(): Promise<number | null> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return null;
+  const householdId = await getCurrentHousehold();
+  if (!householdId) return null;
   try {
     const { data } = await supabase
       .from("plaid_accounts")
-      .select("type, balance_current");
+      .select("type, balance_current")
+      .eq("household_id", householdId);
     if (!data || data.length === 0) return null;
     const savings = data
       .filter((a: Record<string, unknown>) => a.type === "depository")
@@ -610,11 +632,15 @@ async function getWeeklyActivityCounts(): Promise<{ itemsCaptured: number; tasks
   const supabase = getSupabaseAdmin();
   if (!supabase) return { itemsCaptured: 0, tasksCompleted: 0 };
 
+  const householdId = await getCurrentHousehold();
+  if (!householdId) return { itemsCaptured: 0, tasksCompleted: 0 };
+
   const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
   try {
     const { data } = await supabase
       .from("activity_log")
       .select("event_type")
+      .eq("household_id", householdId)
       .gte("occurred_at", weekAgo);
 
     if (!data) return { itemsCaptured: 0, tasksCompleted: 0 };
@@ -697,10 +723,14 @@ export async function getRecentActivity(limit = 20): Promise<ActivityLog[]> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return [];
 
+  const householdId = await getCurrentHousehold();
+  if (!householdId) return [];
+
   try {
     const { data, error } = await supabase
       .from("activity_log")
       .select("*")
+      .eq("household_id", householdId)
       .order("occurred_at", { ascending: false })
       .limit(limit);
 

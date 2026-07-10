@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAnthropicClient } from "@/lib/server/anthropic";
 import { getHouseholdContext } from "@/lib/server/data";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
+import { getCurrentHousehold } from "@/lib/server/household";
 
 export async function POST(
   _req: Request,
@@ -12,11 +13,15 @@ export async function POST(
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: "No database" }, { status: 500 });
 
+  const householdId = await getCurrentHousehold();
+  if (!householdId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+
   const { data: decision } = await supabase
     .from("decisions")
     .select("title, context, options, cost_estimate, time_estimate_minutes, category")
     .eq("id", id)
-    .single();
+    .eq("household_id", householdId)
+    .maybeSingle();
 
   if (!decision) return NextResponse.json({ error: "Decision not found" }, { status: 404 });
 

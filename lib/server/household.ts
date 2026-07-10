@@ -1,43 +1,82 @@
 // Household resolution — single source of truth used by every server read/write.
-// Phase 1 of the multi-tenant migration (NEXT-LEVEL-BRIEF.md Phase 1).
 //
-// Resolution order:
-//   1. Cookie set by the magic-link callback (`cos_household_id`)
-//   2. DEFAULT_HOUSEHOLD_ID env (for cron/scanner jobs that have no request)
-//   3. The seeded default household ('00000000-0000-0000-0000-000000000001')
+// Request scope (pages, route handlers):
+//   getCurrentHousehold() derives the household from the Supabase session's
+//   memberships. The cos_household_id cookie is only an *active-household
+//   selector* for users with multiple memberships — it is validated against
+//   the membership list and never trusted on its own.
 //
-// Once Supabase Auth ships fully (@supabase/ssr), step 1 will be replaced by
-// reading the Supabase session cookie and looking up household_memberships
-// for auth.uid(). Until then, the cookie is set explicitly on magic-link
-// callback and rotated on logout.
+// Job scope (cron, scanners — no request cookies):
+//   getHouseholdForJob() uses the explicit id, DEFAULT_HOUSEHOLD_ID env, or
+//   the seeded default household.
+//
+// Demo scope (Supabase entirely unconfigured):
+//   the seeded default id keeps the mock-data UI working.
 
 import { cookies } from "next/headers";
+import { isSupabaseConfigured } from "@/lib/server/supabase";
+import { getMemberships, isAuthConfigured } from "@/lib/server/auth";
 
 export const DEFAULT_HOUSEHOLD_ID = "00000000-0000-0000-0000-000000000001";
 
 export const HOUSEHOLD_COOKIE = "cos_household_id";
 
+const UUID_RE = /^[0-9a-f-]{36}$/i;
+
 function envFallback(): string | null {
   const v = process.env.DEFAULT_HOUSEHOLD_ID;
-  return v && /^[0-9a-f-]{36}$/i.test(v) ? v : null;
+  return v && UUID_RE.test(v) ? v : null;
 }
 
 /**
  * Resolve the active household for the current request.
- * Always returns a household id — never throws. Used inside server components,
- * route handlers, and server actions.
+ * Returns null when auth is enforced and the caller has no session or no
+ * membership — callers must treat null as "no data, no writes".
  */
-export async function getCurrentHousehold(): Promise<string> {
+export async function getCurrentHousehold(): Promise<string | null> {
+  // Demo mode: no database at all — the mock UI still needs an id.
+  if (!isSupabaseConfigured()) return DEFAULT_HOUSEHOLD_ID;
+
+  let cookieValue: string | undefined;
   try {
     const store = await cookies();
-    const cookieValue = store.get(HOUSEHOLD_COOKIE)?.value;
-    if (cookieValue && /^[0-9a-f-]{36}$/i.test(cookieValue)) {
+    cookieValue = store.get(HOUSEHOLD_COOKIE)?.value;
+  } catch {
+    // No request scope (cron/scanner job) — fall through to the job default.
+    return envFallback() ?? DEFAULT_HOUSEHOLD_ID;
+  }
+
+  if (isAuthConfigured()) {
+    const memberships = await getMemberships();
+    if (memberships.length === 0) return null;
+    if (cookieValue && memberships.some((m) => m.householdId === cookieValue)) {
       return cookieValue;
     }
-  } catch {
-    // cookies() throws outside the request scope (e.g. scanner jobs). That's fine.
+    return memberships[0].householdId;
   }
+
+  // Legacy mode (service key without anon key): sessions are impossible, so
+  // the pre-auth cookie/env resolution applies. middleware.ts fails closed in
+  // production for this configuration.
+  if (cookieValue && UUID_RE.test(cookieValue)) return cookieValue;
   return envFallback() ?? DEFAULT_HOUSEHOLD_ID;
+}
+
+/**
+ * Like getCurrentHousehold(), but for route handlers that must not proceed
+ * without a tenant. Throws instead of returning null.
+ */
+export async function requireHousehold(): Promise<string> {
+  const householdId = await getCurrentHousehold();
+  if (!householdId) throw new HouseholdRequiredError();
+  return householdId;
+}
+
+export class HouseholdRequiredError extends Error {
+  constructor() {
+    super("Authentication with a household membership is required.");
+    this.name = "HouseholdRequiredError";
+  }
 }
 
 /**
@@ -46,6 +85,6 @@ export async function getCurrentHousehold(): Promise<string> {
  * households in a job.
  */
 export function getHouseholdForJob(explicit?: string): string {
-  if (explicit && /^[0-9a-f-]{36}$/i.test(explicit)) return explicit;
+  if (explicit && UUID_RE.test(explicit)) return explicit;
   return envFallback() ?? DEFAULT_HOUSEHOLD_ID;
 }

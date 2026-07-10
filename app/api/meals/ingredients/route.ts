@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { getAnthropicClient } from "@/lib/server/anthropic";
 import { getMealPlan, getInventoryItems } from "@/lib/server/data";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
+import { getCurrentHousehold } from "@/lib/server/household";
 import type { MealSlot } from "@/lib/types";
 
 interface Ingredient {
@@ -20,7 +21,13 @@ export async function POST() {
   const client = getAnthropicClient();
   if (!client) return NextResponse.json({ error: "AI not configured" }, { status: 503 });
 
-  const [mealPlan, inventory] = await Promise.all([getMealPlan(), getInventoryItems()]);
+  const householdId = await getCurrentHousehold();
+  if (!householdId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+
+  const [mealPlan, inventory] = await Promise.all([
+    getMealPlan(householdId),
+    getInventoryItems(householdId),
+  ]);
 
   const cookMeals = mealPlan.flatMap((day) =>
     (["breakfast", "lunch", "dinner"] as const)
@@ -69,6 +76,7 @@ Only return items that need to be purchased. No markdown, no explanation.`;
 
   const rows = ingredients.map((ing) => ({
     id: crypto.randomUUID(),
+    household_id: householdId,
     name: ing.name,
     quantity: ing.quantity ?? 1,
     unit: ing.unit ?? "count",

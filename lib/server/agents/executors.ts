@@ -131,7 +131,7 @@ async function _writeMealPlan(payload: MealPlanPayload, householdId: string): Pr
   }));
   const { error } = await supabase
     .from("meal_plan_days")
-    .upsert(rows, { onConflict: "date" });
+    .upsert(rows, { onConflict: "household_id,date" });
   if (error) console.error("executor meal_plan failed:", error);
   return !error;
 }

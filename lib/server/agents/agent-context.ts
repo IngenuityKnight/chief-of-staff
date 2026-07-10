@@ -33,7 +33,7 @@ export interface SiblingDigests {
   roster?: string;
 }
 
-export async function buildMealsDomainState(): Promise<MealsDomainState> {
+export async function buildMealsDomainState(householdId: string): Promise<MealsDomainState> {
   const supabase = getSupabaseAdmin();
   if (!supabase) {
     return {
@@ -53,23 +53,27 @@ export async function buildMealsDomainState(): Promise<MealsDomainState> {
     supabase
       .from("meal_plan_days")
       .select("date, label, dinner, lunch")
+      .eq("household_id", householdId)
       .gte("date", todayISO)
       .lte("date", nextWeekISO)
       .order("date"),
     supabase
       .from("shopping_list_items")
       .select("name, quantity, unit, category, status")
+      .eq("household_id", householdId)
       .eq("status", "needed")
       .limit(20),
     supabase
       .from("inventory_items")
       .select("name, quantity, min_quantity, unit")
+      .eq("household_id", householdId)
       .eq("category", "food")
       .filter("quantity", "lte", "min_quantity")
       .limit(10),
     supabase
       .from("calendar_events")
       .select("title, start_at, end_at")
+      .eq("household_id", householdId)
       .gte("start_at", today.toISOString())
       .lte("start_at", nextWeek.toISOString())
       .order("start_at"),

@@ -9,9 +9,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseUrl } from "@/lib/server/supabase";
+import { rateLimit, rateLimitKey } from "@/lib/server/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
+    // Public endpoint — throttle per IP so it can't be used to spam inboxes.
+    const limit = rateLimit(rateLimitKey("magic-link", null, req), { limit: 5, windowMs: 300_000 });
+    if (!limit.ok) {
+      return NextResponse.json(
+        { ok: false, error: "Too many sign-in attempts — try again in a few minutes." },
+        { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } }
+      );
+    }
+
     const { email } = (await req.json()) as { email?: string };
     if (!email || typeof email !== "string" || !email.includes("@")) {
       return NextResponse.json({ ok: false, error: "Valid email required." }, { status: 400 });

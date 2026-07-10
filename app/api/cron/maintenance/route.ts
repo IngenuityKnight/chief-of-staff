@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { logActivity } from "@/lib/server/activity";
 import { getVehicles } from "@/lib/server/data";
+import { getHouseholdForJob } from "@/lib/server/household";
 
 function json(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(body, { status });
@@ -80,7 +81,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Auto-create maintenance items from vehicle state
-    const vehicles = await getVehicles();
+    const vehicles = await getVehicles(getHouseholdForJob());
     for (const vehicle of vehicles) {
       const label = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
       const checks: { title: string; condition: boolean; priority: "high" | "medium" }[] = [];

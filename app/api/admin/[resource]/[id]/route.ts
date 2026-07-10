@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import type { AdminResource } from "@/lib/server/admin";
-import { updateAdminResource } from "@/lib/server/admin";
+import { AdminAuthError, isAdminResource, requireAdminHousehold, updateAdminResource } from "@/lib/server/admin";
 import { logActivity } from "@/lib/server/activity";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 
@@ -17,7 +16,8 @@ function response(body: Record<string, unknown>, status = 200) {
 async function handleSideEffects(
   resource: string,
   id: string,
-  values: Record<string, unknown>
+  values: Record<string, unknown>,
+  householdId: string
 ): Promise<void> {
   if (resource === "tasks" && values.status !== undefined) {
     await logActivity({
@@ -26,6 +26,7 @@ async function handleSideEffects(
       entity_title: typeof values.title === "string" ? values.title : id,
       entity_id: id,
       metadata: { status: values.status },
+      household_id: householdId,
     });
 
     // Spawn next instance for recurring tasks when marked done
@@ -37,6 +38,7 @@ async function handleSideEffects(
             .from("tasks")
             .select("title, agent, category, priority, recurring_rule, due_date")
             .eq("id", id)
+            .eq("household_id", householdId)
             .single();
 
           if (task?.recurring_rule) {
@@ -48,6 +50,7 @@ async function handleSideEffects(
 
             await supabase.from("tasks").insert({
               id: crypto.randomUUID(),
+              household_id: householdId,
               created_at: new Date().toISOString(),
               title: task.title,
               agent: task.agent,
@@ -76,6 +79,7 @@ async function handleSideEffects(
         status: values.status,
         chosen_option: values.chosenOption ?? null,
       },
+      household_id: householdId,
     });
   }
 
@@ -86,6 +90,7 @@ async function handleSideEffects(
       entity_title: typeof values.item === "string" ? values.item : id,
       entity_id: id,
       metadata: { last_done: values.lastDone },
+      household_id: householdId,
     });
   }
 
@@ -97,6 +102,7 @@ async function handleSideEffects(
           .from("maintenance_items")
           .select("item, system, last_task_id")
           .eq("id", id)
+          .eq("household_id", householdId)
           .single();
 
         if (maint) {
@@ -115,6 +121,7 @@ async function handleSideEffects(
             const newTaskId = crypto.randomUUID();
             await supabase.from("tasks").insert({
               id: newTaskId,
+              household_id: householdId,
               created_at: new Date().toISOString(),
               title: `${itemTitle} — maintenance ${values.status === "overdue" ? "overdue" : "due soon"}`,
               agent: "home",
@@ -133,6 +140,7 @@ async function handleSideEffects(
               entity_title: itemTitle,
               entity_id: id,
               metadata: { task_id: newTaskId, status: values.status },
+              household_id: householdId,
             });
           }
         }
@@ -150,6 +158,7 @@ async function handleSideEffects(
           .from("shopping_list_items")
           .select("inventory_item_id, quantity, name")
           .eq("id", id)
+          .eq("household_id", householdId)
           .single();
 
         if (item && item.inventory_item_id) {
@@ -171,6 +180,7 @@ async function handleSideEffects(
               entity_title: item.name as string,
               entity_id: item.inventory_item_id as string,
               metadata: { quantity_added: item.quantity, via: "shopping_list" },
+              household_id: householdId,
             });
           }
         }
@@ -187,6 +197,9 @@ export async function PATCH(
 ) {
   try {
     const { resource, id } = await params;
+    if (!isAdminResource(resource)) {
+      return response({ ok: false, error: "Unknown resource." }, 404);
+    }
     const decodedId = decodeURIComponent(id);
 
     const body = await req.json();
@@ -201,11 +214,15 @@ export async function PATCH(
 
     const valuesObj = values as Record<string, unknown>;
 
-    await updateAdminResource(resource as AdminResource, decodedId, valuesObj);
-    await handleSideEffects(resource, decodedId, valuesObj);
+    const householdId = await requireAdminHousehold();
+    await updateAdminResource(resource, decodedId, valuesObj);
+    await handleSideEffects(resource, decodedId, valuesObj, householdId);
 
     return response({ ok: true });
   } catch (error) {
+    if (error instanceof AdminAuthError) {
+      return response({ ok: false, error: error.message }, error.status);
+    }
     const message = error instanceof Error ? error.message : "Update failed.";
     return response({ ok: false, error: message }, 400);
   }

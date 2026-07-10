@@ -46,10 +46,10 @@ async function runSpecialist(
     siblingDigests: SiblingDigests;
   },
 ): Promise<ProposalDraft[]> {
-  const allRules = await getRules();
+  const allRules = await getRules(base.householdId);
 
   if (agent === "meals") {
-    const domainState = await buildMealsDomainState();
+    const domainState = await buildMealsDomainState(base.householdId);
     return runMeals({
       ...base,
       domainState,
@@ -79,7 +79,7 @@ async function runSpecialist(
 // so each specialist sees the cross-domain picture without re-querying.
 async function buildSiblingDigests(householdId: string): Promise<SiblingDigests> {
   const [meals, schedule, money] = await Promise.allSettled([
-    buildMealsDomainState(),
+    buildMealsDomainState(householdId),
     buildScheduleDomainState(householdId),
     buildMoneyDomainState(householdId),
   ]);

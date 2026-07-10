@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAnthropicClient } from "@/lib/server/anthropic";
 import { getCurrentHousehold } from "@/lib/server/household";
+import { rateLimit, rateLimitKey } from "@/lib/server/rate-limit";
 import { logAgentRun } from "@/lib/server/agents/agent-runs";
 import { TOOL_DEFS, dispatchTool } from "@/lib/server/ask-tools";
 
@@ -43,6 +44,19 @@ export async function POST(req: NextRequest) {
   }
 
   const householdId = await getCurrentHousehold();
+  if (!householdId) {
+    return NextResponse.json({ ok: false, error: "Authentication required." }, { status: 401 });
+  }
+
+  // Each ask can loop up to MAX_TURNS Anthropic calls — rate-cap per household.
+  const limit = rateLimit(rateLimitKey("ask", householdId, req), { limit: 15, windowMs: 60_000 });
+  if (!limit.ok) {
+    return NextResponse.json(
+      { ok: false, error: "Too many questions — try again shortly." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } }
+    );
+  }
+
   const t0 = Date.now();
 
   const messages: Array<{ role: "user" | "assistant"; content: unknown }> = [

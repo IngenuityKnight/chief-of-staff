@@ -10,6 +10,7 @@ export async function getPendingPlays(): Promise<PlayView[]> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return [];
   const householdId = await getCurrentHousehold();
+  if (!householdId) return [];
 
   const { data: plays } = await supabase
     .from("plays")

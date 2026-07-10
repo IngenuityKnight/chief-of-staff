@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resetAdminTarget, type AdminResetTarget } from "@/lib/server/admin";
+import { AdminAuthError, resetAdminTarget, type AdminResetTarget } from "@/lib/server/admin";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,6 +20,9 @@ export async function POST(req: NextRequest) {
       { headers: { "Cache-Control": "no-store, max-age=0" } }
     );
   } catch (err) {
+    if (err instanceof AdminAuthError) {
+      return NextResponse.json({ ok: false, error: err.message }, { status: err.status });
+    }
     const message = err instanceof Error ? err.message : "Unknown error.";
     return NextResponse.json({ ok: false, error: message }, { status: 400 });
   }

@@ -1,22 +1,25 @@
 import { getSupabaseAdmin } from "@/lib/server/supabase";
+import { getCurrentHousehold } from "@/lib/server/household";
 import { getHouseholdContext, getRules } from "@/lib/server/data";
 import type { Rule } from "@/lib/types";
 
-export async function assembleHouseholdContext(): Promise<string> {
+export async function assembleHouseholdContext(householdIdOverride?: string): Promise<string> {
   const [ctx, rules] = await Promise.all([
-    getHouseholdContext(),
-    getRules(),
+    getHouseholdContext(householdIdOverride),
+    getRules(householdIdOverride),
   ]);
 
   const activeRules = rules.filter((r) => r.active);
 
   const supabase = getSupabaseAdmin();
+  const householdId = householdIdOverride ?? (await getCurrentHousehold());
   let recentActivity: Array<{ occurred_at: string; event_type: string; domain: string; entity_title: string }> = [];
-  if (supabase) {
+  if (supabase && householdId) {
     try {
       const { data } = await supabase
         .from("activity_log")
         .select("occurred_at, event_type, domain, entity_title")
+        .eq("household_id", householdId)
         .order("occurred_at", { ascending: false })
         .limit(20);
       if (data) recentActivity = data as typeof recentActivity;
@@ -57,20 +60,25 @@ export async function assembleHouseholdContext(): Promise<string> {
 
 // Variant for the intake/chief pipeline: same content but rules include IDs
 // so the LLM can cite them in rules_consulted, and we can track usage.
-export async function assembleContextForIntake(): Promise<{
+export async function assembleContextForIntake(householdIdOverride?: string): Promise<{
   text: string;
   activeRules: Rule[];
 }> {
-  const [ctx, rules] = await Promise.all([getHouseholdContext(), getRules()]);
+  const [ctx, rules] = await Promise.all([
+    getHouseholdContext(householdIdOverride),
+    getRules(householdIdOverride),
+  ]);
   const activeRules = rules.filter((r) => r.active);
 
   const supabase = getSupabaseAdmin();
+  const householdId = householdIdOverride ?? (await getCurrentHousehold());
   let recentActivity: Array<{ occurred_at: string; event_type: string; domain: string; entity_title: string }> = [];
-  if (supabase) {
+  if (supabase && householdId) {
     try {
       const { data } = await supabase
         .from("activity_log")
         .select("occurred_at, event_type, domain, entity_title")
+        .eq("household_id", householdId)
         .order("occurred_at", { ascending: false })
         .limit(20);
       if (data) recentActivity = data as typeof recentActivity;

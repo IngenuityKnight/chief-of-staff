@@ -1,14 +1,14 @@
 // GET /api/auth/callback — magic-link landing.
 //
-// Exchanges the access_token in the URL hash for a Supabase session, looks up
-// the user's first household_membership, and sets the cos_household_id cookie
-// so getCurrentHousehold() resolves correctly on subsequent requests.
-//
-// If the email has never seen a household, creates one and adds the user as owner.
+// Verifies the token via a cookie-bound Supabase client so the session is
+// persisted as httpOnly auth cookies (middleware.ts enforces them from then
+// on). Then resolves the user's first household membership — creating a
+// household + owner membership for brand-new users — and sets the
+// cos_household_id cookie as the active-household selector.
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { getSupabaseAdmin, getSupabaseUrl } from "@/lib/server/supabase";
+import { getSupabaseAdmin } from "@/lib/server/supabase";
+import { getSupabaseServer, isAuthConfigured } from "@/lib/server/auth";
 import { HOUSEHOLD_COOKIE } from "@/lib/server/household";
 
 export async function GET(req: NextRequest) {
@@ -16,23 +16,21 @@ export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type") ?? "email";
 
   if (!tokenHash) {
-    return NextResponse.redirect(new URL("/?auth=error", req.nextUrl.origin));
+    return NextResponse.redirect(new URL("/login?auth=error", req.nextUrl.origin));
+  }
+  if (!isAuthConfigured()) {
+    return NextResponse.redirect(new URL("/login?auth=not_configured", req.nextUrl.origin));
   }
 
-  const url = getSupabaseUrl();
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anonKey) {
-    return NextResponse.redirect(new URL("/?auth=not_configured", req.nextUrl.origin));
-  }
-
-  const supabase = createClient(url, anonKey);
+  // Cookie-bound client: verifyOtp persists the session into auth cookies.
+  const supabase = await getSupabaseServer();
   const { data, error } = await supabase.auth.verifyOtp({
     token_hash: tokenHash,
-    type: type as "email" | "magiclink",
+    type: type === "magiclink" ? "magiclink" : "email",
   });
 
   if (error || !data.user) {
-    return NextResponse.redirect(new URL("/?auth=verify_failed", req.nextUrl.origin));
+    return NextResponse.redirect(new URL("/login?auth=verify_failed", req.nextUrl.origin));
   }
 
   const userId = data.user.id;

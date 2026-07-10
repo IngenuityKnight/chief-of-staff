@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
+import { getCurrentHousehold } from "@/lib/server/household";
 
 export async function POST(
   request: Request,
@@ -13,8 +14,20 @@ export async function POST(
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: "No database" }, { status: 500 });
 
+  const householdId = await getCurrentHousehold();
+  if (!householdId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+
+  const { data: item } = await supabase
+    .from("inventory_items")
+    .select("id")
+    .eq("id", id)
+    .eq("household_id", householdId)
+    .maybeSingle();
+  if (!item) return NextResponse.json({ error: "Item not found." }, { status: 404 });
+
   const { error } = await supabase.from("inventory_purchases").insert({
     inventory_item_id: id,
+    household_id: householdId,
     store: store || null,
     quantity: quantity ? Number(quantity) : null,
     price: price ? Number(price) : null,

@@ -48,7 +48,7 @@ export async function run(opts: {
   const anthropic = getAnthropicClient();
   if (!anthropic) return null;
 
-  const { text: householdCtx, activeRules } = await assembleContextForIntake();
+  const { text: householdCtx, activeRules } = await assembleContextForIntake(opts.householdId);
 
   const prompt = `${householdCtx}You are the Chief of Staff routing engine for a frugal household. Analyze this capture and return JSON.
 

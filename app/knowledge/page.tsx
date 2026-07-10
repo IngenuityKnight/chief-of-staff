@@ -25,7 +25,7 @@ export default async function KnowledgePage() {
   let vehicles: Array<{ id: string; year: number; make: string; model: string; mileage: number | null; insurance_expires: string | null }> = [];
   let services: Array<{ id: string; item: string; system: string; last_done: string; next_due: string; vendor: string | null; last_cost: number | null }> = [];
 
-  if (supabase) {
+  if (supabase && householdId) {
     const [rulesR, appR, vehR, mainR] = await Promise.all([
       supabase.from("rules").select("id, category, title, description, priority, active, times_consulted, last_consulted_at").eq("household_id", householdId).order("times_consulted", { ascending: false }),
       supabase.from("appliances").select("id, name, brand, location, warranty_expires, last_serviced").eq("household_id", householdId).order("name"),

@@ -30,6 +30,33 @@ import {
   getVehicles,
 } from "@/lib/server/data";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
+import { getCurrentHousehold } from "@/lib/server/household";
+import { getMemberships, isAuthConfigured } from "@/lib/server/auth";
+
+// ─── Authorization (audit S1) ────────────────────────────────────────────────
+// Every admin mutation requires an authenticated caller with the owner role in
+// the active household. Middleware already requires a session for /api/admin;
+// this adds the role check and yields the tenant every write is scoped to.
+
+export class AdminAuthError extends Error {
+  constructor(message: string, public readonly status: 401 | 403) {
+    super(message);
+    this.name = "AdminAuthError";
+  }
+}
+
+export async function requireAdminHousehold(): Promise<string> {
+  const householdId = await getCurrentHousehold();
+  if (!householdId) throw new AdminAuthError("Authentication required.", 401);
+  if (isAuthConfigured()) {
+    const memberships = await getMemberships();
+    const membership = memberships.find((m) => m.householdId === householdId);
+    if (!membership || membership.role !== "owner") {
+      throw new AdminAuthError("Owner role required for data administration.", 403);
+    }
+  }
+  return householdId;
+}
 
 export type AdminResource =
   | "inbox"
@@ -733,6 +760,10 @@ export async function getAdminCollections() {
   >;
 }
 
+export function isAdminResource(value: string): value is AdminResource {
+  return Object.prototype.hasOwnProperty.call(adminConfig, value);
+}
+
 export async function createAdminResource(resource: AdminResource, payload: Record<string, unknown>) {
   const config = adminConfig[resource];
   if (!config) throw new Error("Unknown resource.");
@@ -740,13 +771,15 @@ export async function createAdminResource(resource: AdminResource, payload: Reco
   const supabase = getSupabaseAdmin();
   if (!supabase) throw new Error("Supabase is not configured.");
 
+  const householdId = await requireAdminHousehold();
+
   const id = resource === "meal-plan"
     ? (payload.date as string ?? new Date().toISOString().slice(0, 10))
     : crypto.randomUUID();
 
   const { error } = await supabase
     .from(config.table)
-    .insert(config.toDbInsert(payload, id));
+    .insert({ ...config.toDbInsert(payload, id), household_id: householdId });
 
   if (error) throw new Error(error.message);
 
@@ -762,10 +795,13 @@ export async function updateAdminResource(resource: AdminResource, id: string, p
   const supabase = getSupabaseAdmin();
   if (!supabase) throw new Error("Supabase is not configured.");
 
+  const householdId = await requireAdminHousehold();
+
   const { data, error } = await supabase
     .from(config.table)
     .update(config.toDbPatch(payload))
     .eq(config.idKey, id)
+    .eq("household_id", householdId)
     .select(config.idKey);
 
   if (error) throw new Error(error.message);
@@ -781,10 +817,13 @@ export async function deleteAdminResource(resource: AdminResource, id: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) throw new Error("Supabase is not configured.");
 
+  const householdId = await requireAdminHousehold();
+
   const { data, error } = await supabase
     .from(config.table)
     .delete()
     .eq(config.idKey, id)
+    .eq("household_id", householdId)
     .select(config.idKey);
 
   if (error) throw new Error(error.message);
@@ -793,13 +832,14 @@ export async function deleteAdminResource(resource: AdminResource, id: string) {
   revalidateAdminPaths();
 }
 
-async function deleteAllRows(table: string, idKey = "id") {
+async function deleteAllRows(table: string, householdId: string, idKey = "id") {
   const supabase = getSupabaseAdmin();
   if (!supabase) throw new Error("Supabase is not configured.");
 
   const { data, error } = await supabase
     .from(table)
     .delete()
+    .eq("household_id", householdId)
     .not(idKey, "is", null)
     .select(idKey);
 
@@ -808,6 +848,8 @@ async function deleteAllRows(table: string, idKey = "id") {
 }
 
 export async function resetAdminTarget(target: AdminResetTarget) {
+  const householdId = await requireAdminHousehold();
+
   if (target === "all") {
     const deleteOrder: AdminResource[] = [
       "tasks",
@@ -828,7 +870,7 @@ export async function resetAdminTarget(target: AdminResetTarget) {
     let deleted = 0;
 
     for (const resource of deleteOrder) {
-      const count = await deleteAllRows(adminConfig[resource].table, adminConfig[resource].idKey);
+      const count = await deleteAllRows(adminConfig[resource].table, householdId, adminConfig[resource].idKey);
       details[`${resource}Deleted`] = count;
       deleted += count;
     }
@@ -843,8 +885,8 @@ export async function resetAdminTarget(target: AdminResetTarget) {
   }
 
   if (target === "inbox-and-tasks") {
-    const tasksDeleted = await deleteAllRows("tasks", "id");
-    const inboxDeleted = await deleteAllRows("inbox_items", "id");
+    const tasksDeleted = await deleteAllRows("tasks", householdId, "id");
+    const inboxDeleted = await deleteAllRows("inbox_items", householdId, "id");
 
     revalidateAdminPaths();
 
@@ -858,7 +900,7 @@ export async function resetAdminTarget(target: AdminResetTarget) {
   const config = adminConfig[target];
   if (!config) throw new Error("Unknown reset target.");
 
-  const deleted = await deleteAllRows(config.table, config.idKey);
+  const deleted = await deleteAllRows(config.table, householdId, config.idKey);
 
   revalidateAdminPaths();
 

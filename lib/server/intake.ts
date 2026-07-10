@@ -414,6 +414,9 @@ export async function analyzeIntake(text: string, source = "web", householdIdOve
   const id = `inb_${crypto.randomUUID()}`;
   const capturedAt = new Date().toISOString();
   const householdId = householdIdOverride ?? (await getCurrentHousehold());
+  if (!householdId) {
+    throw new Error("Intake requires an authenticated household context.");
+  }
 
   // Prefer the new chief.run module (chief.ts). Fall back to the legacy
   // analyzeWithClaude (which still runs but is being retired) if that fails.
@@ -511,6 +514,9 @@ export async function persistAndGateProposals(
   const supabase = getSupabaseAdmin();
   if (!supabase) return [];
 
+  // Trust is granted per (agent, kind) — a batch can mix agents and kinds, so
+  // each draft must be gated against its own trust row (audit B6). Unknown
+  // pairs default to level 0: always ask.
   const [rulesResult, trustResult] = await Promise.all([
     supabase
       .from("rules")
@@ -520,17 +526,18 @@ export async function persistAndGateProposals(
       .eq("active", true),
     supabase
       .from("agent_trust")
-      .select("level")
-      .eq("household_id", analysis.householdId)
-      .eq("agent", analysis.routing.primary)
-      .eq("kind", drafts[0].kind)
-      .maybeSingle(),
+      .select("agent, kind, level")
+      .eq("household_id", analysis.householdId),
   ]);
 
   const mustFollowRuleIds = new Set(
     ((rulesResult.data ?? []) as { id: string }[]).map((r) => r.id)
   );
-  const trustLevel: number = (trustResult.data as { level: number } | null)?.level ?? 0;
+  const trustByAgentKind = new Map<string, number>(
+    ((trustResult.data ?? []) as Array<{ agent: string; kind: string; level: number }>).map(
+      (row) => [`${row.agent}:${row.kind}`, row.level]
+    )
+  );
   const now = new Date().toISOString();
 
   const rows = drafts.map((d) => ({
@@ -558,6 +565,7 @@ export async function persistAndGateProposals(
 
   const results: ProposalResult[] = [];
   for (const row of rows) {
+    const trustLevel = trustByAgentKind.get(`${row.agent}:${row.kind}`) ?? 0;
     const verdict = gate(
       { kind: row.kind, estimatedCostCents: row.estimated_cost_cents, rulesConflicts: row.rules_conflicts },
       mustFollowRuleIds,
@@ -566,7 +574,13 @@ export async function persistAndGateProposals(
 
     if (verdict.decision === "auto") {
       await executeProposal(
-        { id: row.id, kind: row.kind, payload: row.payload, inbox_item_id: row.inbox_item_id },
+        {
+          id: row.id,
+          kind: row.kind,
+          payload: row.payload,
+          inbox_item_id: row.inbox_item_id,
+          household_id: analysis.householdId,
+        },
         "policy",
       );
     }
@@ -638,6 +652,7 @@ export async function applyIntakeChanges(analysis: IntakeAnalysis): Promise<Appl
     const title = buildDecisionTitle(analysis.text);
     const { error } = await supabase.from("decisions").insert({
       id,
+      household_id: analysis.householdId,
       title,
       context: analysis.text,
       status: "open",
@@ -668,6 +683,7 @@ export async function applyIntakeChanges(analysis: IntakeAnalysis): Promise<Appl
 
       const { error } = await supabase.from("calendar_events").insert({
         id,
+        household_id: analysis.householdId,
         title,
         start_at: start.toISOString(),
         end_at: end.toISOString(),
@@ -687,6 +703,7 @@ export async function applyIntakeChanges(analysis: IntakeAnalysis): Promise<Appl
     if (items.length > 0) {
       const rows = items.map((name) => ({
         id: crypto.randomUUID(),
+        household_id: analysis.householdId,
         name,
         quantity: 1,
         unit: "count",
