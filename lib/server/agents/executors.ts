@@ -19,6 +19,8 @@ import type {
   GigPostPayload,
   GigApprovePayload,
   PaydayDisbursementPayload,
+  GigClaimPayload,
+  GigSubmitPayload,
 } from "./schemas";
 
 export type ExecuteResult = { ok: boolean; error?: string };
@@ -72,6 +74,12 @@ export async function executeProposal(
         break;
       case "gig_approve":
         ok = await _approveGig(proposal.payload as unknown as GigApprovePayload, householdId);
+        break;
+      case "gig_claim":
+        ok = await _claimGig(proposal.payload as unknown as GigClaimPayload, householdId);
+        break;
+      case "gig_submit":
+        ok = await _submitGig(proposal.payload as unknown as GigSubmitPayload, householdId);
         break;
       case "payday_disbursement":
         ok = await _payrollDisbursement(proposal.payload as unknown as PaydayDisbursementPayload, householdId);
@@ -318,6 +326,39 @@ async function _postGig(payload: GigPostPayload, householdId: string): Promise<b
     created_at: new Date().toISOString(),
   });
   if (error) console.error("executor gig_post failed:", error);
+  return !error;
+}
+
+async function _claimGig(payload: GigClaimPayload, householdId: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return false;
+
+  const { error } = await supabase
+    .from("gigs")
+    .update({
+      status: "claimed",
+      claimed_by: payload.claimedBy,
+    })
+    .eq("id", payload.gigId)
+    .eq("household_id", householdId);
+
+  if (error) console.error("executor gig_claim failed:", error);
+  return !error;
+}
+
+async function _submitGig(payload: GigSubmitPayload, householdId: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return false;
+
+  const { error } = await supabase
+    .from("gigs")
+    .update({
+      status: "submitted",
+    })
+    .eq("id", payload.gigId)
+    .eq("household_id", householdId);
+
+  if (error) console.error("executor gig_submit failed:", error);
   return !error;
 }
 
