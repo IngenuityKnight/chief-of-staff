@@ -90,7 +90,7 @@ export default async function RosterPage() {
                     ))}
                   </ul>
                 ) : (
-                  <div className="text-sm text-slate-600">No rules yet.</div>
+                  <div className="text-sm text-slate-500">No rules yet.</div>
                 )}
                 <InlineForm
                   resource="rules" fields={ruleFields}

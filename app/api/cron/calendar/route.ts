@@ -3,6 +3,7 @@ import { google } from "googleapis";
 import { revalidatePath } from "next/cache";
 import { getOAuthClient } from "@/lib/server/google-calendar";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
+import { isCronAuthorized } from "@/lib/server/cron-auth";
 
 // GET /api/cron/calendar
 //
@@ -13,9 +14,7 @@ import { getSupabaseAdmin } from "@/lib/server/supabase";
 // Invoked every 10 minutes by Vercel Cron. Secured with CRON_SECRET.
 
 function isAuthorized(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // no secret configured — allow all (dev mode)
-  return req.headers.get("authorization") === `Bearer ${secret}`;
+  return isCronAuthorized(req);
 }
 
 export async function GET(req: NextRequest) {

@@ -3,6 +3,8 @@ import { revalidatePath } from "next/cache";
 import { getAnthropicClient } from "@/lib/server/anthropic";
 import { getInventoryItems } from "@/lib/server/data";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
+import { getCurrentHousehold, getHouseholdForJob } from "@/lib/server/household";
+import { isCronAuthorized } from "@/lib/server/cron-auth";
 import { isKrogerConfigured, lookupPricesBatch } from "@/lib/server/kroger";
 
 // POST /api/shopping/generate
@@ -126,7 +128,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const clearExisting = body.clearExisting === true;
 
-    const allInventory = await getInventoryItems();
+    // Session callers get their own household; the weekly cron fan-out
+    // authenticates with CRON_SECRET and runs against the job household.
+    const householdId =
+      (await getCurrentHousehold()) ?? (isCronAuthorized(req) ? getHouseholdForJob() : null);
+    if (!householdId) return json({ ok: false, error: "Authentication required." }, 401);
+
+    const allInventory = await getInventoryItems(householdId);
     const lowStock = allInventory.filter((i) => i.quantity <= i.minQuantity);
 
     const items = await generateWithAI(lowStock, allInventory);
@@ -135,6 +143,7 @@ export async function POST(req: NextRequest) {
       await supabase
         .from("shopping_list_items")
         .delete()
+        .eq("household_id", householdId)
         .in("source", ["auto", "ai"])
         .eq("status", "needed");
     }
@@ -166,6 +175,7 @@ export async function POST(req: NextRequest) {
 
     const rows = items.map((item) => ({
       id: crypto.randomUUID(),
+      household_id: householdId,
       name: item.name,
       quantity: item.quantity,
       unit: item.unit,

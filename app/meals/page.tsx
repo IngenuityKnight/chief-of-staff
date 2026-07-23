@@ -99,7 +99,7 @@ export default async function MealsPage() {
                 <div className="space-y-2 p-3">
                   {(["breakfast", "lunch", "dinner"] as const).map((mealSlot) => (
                     <div key={mealSlot}>
-                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 capitalize">{mealSlot}</div>
+                      <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 capitalize">{mealSlot}</div>
                       {day[mealSlot] ? (
                         <MealCard slot={day[mealSlot]!} dayDate={day.date} mealSlot={mealSlot} />
                       ) : (

@@ -77,7 +77,7 @@ export function DomainRail({ attention = {} }: { attention?: RailAttention }) {
       <nav className="flex-1 space-y-5 overflow-y-auto">
         {SECTIONS.map((section) => (
           <div key={section.label}>
-            <div className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-600">
+            <div className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
               {section.label}
             </div>
             <ul className="space-y-0.5">
@@ -112,7 +112,7 @@ export function DomainRail({ attention = {} }: { attention?: RailAttention }) {
         ))}
       </nav>
 
-      <div className="px-2 pt-3 text-[10px] leading-relaxed text-slate-600">
+      <div className="px-2 pt-3 text-[10px] leading-relaxed text-slate-500">
         Nothing runs past $200, or past a binding rule, without you.
       </div>
     </aside>

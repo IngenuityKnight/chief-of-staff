@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { analyzeIntake, applyIntakeChanges, createProposalsFromIntake, persistIntake } from "@/lib/server/intake";
 import { isSupabaseConfigured } from "@/lib/server/supabase";
 import { isAnthropicConfigured } from "@/lib/server/anthropic";
+import { getCurrentHousehold } from "@/lib/server/household";
+import { rateLimit, rateLimitKey } from "@/lib/server/rate-limit";
 import { extractFromAttachment, ALLOWED_MEDIA } from "@/lib/server/vision";
 
 // POST /api/intake
@@ -25,7 +27,7 @@ function json(body: Record<string, unknown>, status = 200) {
   });
 }
 
-async function handleJson(req: NextRequest) {
+async function handleJson(req: NextRequest, householdId: string) {
   const body: unknown = await req.json();
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return json({ ok: false, error: "Request body must be a JSON object." }, 400);
@@ -42,10 +44,10 @@ async function handleJson(req: NextRequest) {
   const source = typeof (body as Record<string, unknown>).source === "string"
     ? String((body as Record<string, unknown>).source) : "web";
 
-  return runIntakePipeline(text, source);
+  return runIntakePipeline(text, source, householdId);
 }
 
-async function handleMultipart(req: NextRequest) {
+async function handleMultipart(req: NextRequest, householdId: string) {
   const form = await req.formData();
   const userText = ((form.get("text") as string | null) ?? "").trim().slice(0, MAX_TEXT_LENGTH);
   const files = form.getAll("files").filter((f): f is File => f instanceof File);
@@ -61,8 +63,6 @@ async function handleMultipart(req: NextRequest) {
   // logged against the same agent_runs.inbox_item_id once the inbox row exists.
   // We generate the id here and reuse it for the analysis below.
   const draftInboxId = `inb_${crypto.randomUUID()}`;
-  const { getCurrentHousehold } = await import("@/lib/server/household");
-  const householdId = await getCurrentHousehold();
 
   const extractions: string[] = [];
   for (const file of files) {
@@ -90,8 +90,8 @@ async function handleMultipart(req: NextRequest) {
   return runIntakePipeline(composed.slice(0, MAX_TEXT_LENGTH * 4), "upload", householdId);
 }
 
-async function runIntakePipeline(text: string, source: string, householdIdOverride?: string) {
-  const intake = await analyzeIntake(text, source, householdIdOverride);
+async function runIntakePipeline(text: string, source: string, householdId: string) {
+  const intake = await analyzeIntake(text, source, householdId);
 
   const persistence = await persistIntake(intake);
   if (!persistence.persisted) {
@@ -110,9 +110,12 @@ async function runIntakePipeline(text: string, source: string, householdIdOverri
     );
   }
 
+  // The heuristic side-writes predate the specialist pipeline; running both
+  // double-creates shopping items and calendar events (audit B7). Keep the
+  // heuristics only as the degraded path when Claude is unavailable.
   const [proposals, appliedChanges] = await Promise.all([
     createProposalsFromIntake(intake),
-    applyIntakeChanges(intake),
+    isAnthropicConfigured() ? Promise.resolve([]) : applyIntakeChanges(intake),
   ]);
 
   const autoExecuted = proposals.filter((p) => p.gateDecision === "auto").length;
@@ -141,9 +144,27 @@ async function runIntakePipeline(text: string, source: string, householdIdOverri
 
 export async function POST(req: NextRequest) {
   try {
+    const householdId = await getCurrentHousehold();
+    if (!householdId) {
+      return json({ ok: false, error: "Authentication required." }, 401);
+    }
+
+    // Each capture can fan out to several Anthropic calls — cap the rate
+    // per household so a runaway client can't drain the LLM budget.
+    const limit = rateLimit(rateLimitKey("intake", householdId, req), {
+      limit: 20,
+      windowMs: 60_000,
+    });
+    if (!limit.ok) {
+      return NextResponse.json(
+        { ok: false, error: "Too many captures — try again shortly." },
+        { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } }
+      );
+    }
+
     const ct = req.headers.get("content-type")?.toLowerCase() ?? "";
-    if (ct.includes("multipart/form-data")) return await handleMultipart(req);
-    if (ct.includes("application/json")) return await handleJson(req);
+    if (ct.includes("multipart/form-data")) return await handleMultipart(req, householdId);
+    if (ct.includes("application/json")) return await handleJson(req, householdId);
     return json({ ok: false, error: "Content-Type must be application/json or multipart/form-data." }, 415);
   } catch {
     return json({ ok: false, error: "Malformed request." }, 400);

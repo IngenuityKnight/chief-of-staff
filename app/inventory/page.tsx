@@ -56,7 +56,7 @@ function ItemRow({ item, fields, priceHistory }: { item: InventoryItem; fields: 
           {isEmpty && <span className="pill-red text-[10px]">OUT</span>}
           {!isEmpty && isLow && <span className="pill-amber text-[10px]">Low</span>}
           {item.lastPurchasedStore && (
-            <span className="text-[11px] text-slate-600">@ {item.lastPurchasedStore}</span>
+            <span className="text-[11px] text-slate-500">@ {item.lastPurchasedStore}</span>
           )}
         </div>
         <div className="mt-1.5">

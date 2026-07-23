@@ -5,11 +5,10 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { generateChiefsReport } from "@/lib/server/sunday-report";
+import { isCronAuthorized } from "@/lib/server/cron-auth";
 
 function authorized(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
-  return req.headers.get("authorization") === `Bearer ${secret}`;
+  return isCronAuthorized(req);
 }
 
 async function handle(req: NextRequest) {

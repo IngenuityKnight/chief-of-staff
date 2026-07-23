@@ -99,7 +99,7 @@ export function MealSlotEditor({
           "group flex items-center justify-center rounded-md border px-3 py-4 text-xs transition",
           current
             ? "border-edge bg-ink-900/40 text-slate-500 hover:border-slate-500 hover:text-slate-300"
-            : "border-dashed border-edge text-slate-600 hover:border-signal-blue/50 hover:text-signal-blue"
+            : "border-dashed border-edge text-slate-500 hover:border-signal-blue/50 hover:text-signal-blue"
         )}
       >
         {current ? (
@@ -138,7 +138,7 @@ export function MealSlotEditor({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Meal name"
-            className="w-full rounded border border-edge bg-ink-800 px-2 py-1.5 text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-signal-blue/50"
+            className="w-full rounded border border-edge bg-ink-800 px-2 py-1.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-signal-blue/50"
           />
 
           <input
@@ -146,7 +146,7 @@ export function MealSlotEditor({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="Notes (optional)"
-            className="w-full rounded border border-edge bg-ink-800 px-2 py-1.5 text-xs text-slate-300 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-signal-blue/50"
+            className="w-full rounded border border-edge bg-ink-800 px-2 py-1.5 text-xs text-slate-300 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-signal-blue/50"
           />
 
           <div className="flex gap-2">
@@ -156,7 +156,7 @@ export function MealSlotEditor({
               onChange={(e) => setPrepMinutes(e.target.value)}
               placeholder="Prep min"
               min="0"
-              className="w-full rounded border border-edge bg-ink-800 px-2 py-1.5 text-xs text-slate-300 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-signal-blue/50"
+              className="w-full rounded border border-edge bg-ink-800 px-2 py-1.5 text-xs text-slate-300 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-signal-blue/50"
             />
             <input
               type="number"
@@ -165,7 +165,7 @@ export function MealSlotEditor({
               placeholder="Est cost $"
               step="0.01"
               min="0"
-              className="w-full rounded border border-edge bg-ink-800 px-2 py-1.5 text-xs text-slate-300 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-signal-blue/50"
+              className="w-full rounded border border-edge bg-ink-800 px-2 py-1.5 text-xs text-slate-300 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-signal-blue/50"
             />
           </div>
 
@@ -182,7 +182,7 @@ export function MealSlotEditor({
                 type="button"
                 onClick={handleClear}
                 disabled={saving}
-                className="rounded px-2 py-1.5 text-xs text-slate-600 transition hover:text-signal-red"
+                className="rounded px-2 py-1.5 text-xs text-slate-500 transition hover:text-signal-red"
               >
                 Clear
               </button>
@@ -190,7 +190,7 @@ export function MealSlotEditor({
             <button
               type="button"
               onClick={() => { setOpen(false); reset(); }}
-              className="rounded px-2 py-1.5 text-xs text-slate-600 transition hover:text-slate-300"
+              className="rounded px-2 py-1.5 text-xs text-slate-500 transition hover:text-slate-300"
             >
               <X className="h-3 w-3" />
             </button>

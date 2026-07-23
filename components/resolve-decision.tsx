@@ -161,7 +161,7 @@ export function ResolveDecision({
       {/* Outcome notes */}
       <div>
         <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">
-          Outcome notes <span className="normal-case font-normal text-slate-600">(optional)</span>
+          Outcome notes <span className="normal-case font-normal text-slate-500">(optional)</span>
         </div>
         <textarea
           value={outcomeNotes}

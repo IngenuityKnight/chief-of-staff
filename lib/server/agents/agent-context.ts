@@ -23,6 +23,27 @@ export interface MoneyDomainState {
   activeSubscriptions: string;// recurring monthly debits
 }
 
+export interface EconomyDomainState {
+  activeAccounts: number;
+  totalGigsOpen: number;
+  totalGigsClaimed: number;
+  totalGigsApproved: number;
+  approvedGigsSinceLast: Array<{
+    id: string;
+    memberId: string;
+    title: string;
+    bountyCents: number;
+  }>;
+  paydayStatus: "due-today" | "due-soon" | "next-run" | "not-configured";
+  paydayNextRun?: string;
+  maintenanceItemsDue: Array<{
+    id: string;
+    item: string;
+    frequency: string;
+    suggestedBounty?: number;
+  }>;
+}
+
 // Cross-domain digests — short text summaries other specialists can read
 // without each specialist re-querying the database.
 export interface SiblingDigests {
@@ -31,9 +52,10 @@ export interface SiblingDigests {
   money?: string;
   home?: string;
   roster?: string;
+  economy?: string;
 }
 
-export async function buildMealsDomainState(): Promise<MealsDomainState> {
+export async function buildMealsDomainState(householdId: string): Promise<MealsDomainState> {
   const supabase = getSupabaseAdmin();
   if (!supabase) {
     return {
@@ -53,23 +75,27 @@ export async function buildMealsDomainState(): Promise<MealsDomainState> {
     supabase
       .from("meal_plan_days")
       .select("date, label, dinner, lunch")
+      .eq("household_id", householdId)
       .gte("date", todayISO)
       .lte("date", nextWeekISO)
       .order("date"),
     supabase
       .from("shopping_list_items")
       .select("name, quantity, unit, category, status")
+      .eq("household_id", householdId)
       .eq("status", "needed")
       .limit(20),
     supabase
       .from("inventory_items")
       .select("name, quantity, min_quantity, unit")
+      .eq("household_id", householdId)
       .eq("category", "food")
       .filter("quantity", "lte", "min_quantity")
       .limit(10),
     supabase
       .from("calendar_events")
       .select("title, start_at, end_at")
+      .eq("household_id", householdId)
       .gte("start_at", today.toISOString())
       .lte("start_at", nextWeek.toISOString())
       .order("start_at"),
@@ -216,3 +242,123 @@ export async function buildMoneyDomainState(householdId: string): Promise<MoneyD
   return { upcomingBills, monthSpend, budgetHeadroom, activeSubscriptions: "Tracked via bills + Plaid recurring." };
 }
 
+export async function buildEconomyDomainState(householdId: string): Promise<EconomyDomainState> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    return {
+      activeAccounts: 0,
+      totalGigsOpen: 0,
+      totalGigsClaimed: 0,
+      totalGigsApproved: 0,
+      approvedGigsSinceLast: [],
+      paydayStatus: "not-configured",
+      maintenanceItemsDue: [],
+    };
+  }
+
+  const now = new Date();
+  const [accountsResult, gigsResult, paydayResult, maintenanceResult] = await Promise.allSettled([
+    supabase
+      .from("economy_accounts")
+      .select("id", { count: "exact" })
+      .eq("household_id", householdId),
+    supabase
+      .from("gigs")
+      .select("id, status, member_id:claimed_by, title, bounty_cents")
+      .eq("household_id", householdId),
+    supabase
+      .from("payday_settings")
+      .select("frequency, anchor_day, active, next_run_at")
+      .eq("household_id", householdId)
+      .maybeSingle(),
+    supabase
+      .from("maintenance_items")
+      .select("id, item, frequency, status")
+      .eq("household_id", householdId)
+      .in("status", ["due-soon", "overdue"]),
+  ]);
+
+  const activeAccounts = accountsResult.status === "fulfilled" ? (accountsResult.value.count ?? 0) : 0;
+
+  // Tally gigs by status
+  let totalGigsOpen = 0;
+  let totalGigsClaimed = 0;
+  let totalGigsApproved = 0;
+  const approvedGigsSinceLast: EconomyDomainState["approvedGigsSinceLast"] = [];
+
+  if (gigsResult.status === "fulfilled" && gigsResult.value.data) {
+    const gigs = gigsResult.value.data as Array<{
+      id: string;
+      status: string;
+      member_id?: string;
+      title: string;
+      bounty_cents: number;
+    }>;
+    for (const g of gigs) {
+      if (g.status === "open") totalGigsOpen++;
+      else if (g.status === "claimed") totalGigsClaimed++;
+      else if (g.status === "approved") {
+        totalGigsApproved++;
+        if (g.member_id) {
+          approvedGigsSinceLast.push({
+            id: g.id,
+            memberId: g.member_id,
+            title: g.title,
+            bountyCents: g.bounty_cents,
+          });
+        }
+      }
+    }
+  }
+
+  // Payday status
+  let paydayStatus: EconomyDomainState["paydayStatus"] = "not-configured";
+  let paydayNextRun: string | undefined;
+  if (paydayResult.status === "fulfilled" && paydayResult.value.data) {
+    const settings = paydayResult.value.data as {
+      frequency: string;
+      anchor_day: string;
+      active: boolean;
+      next_run_at: string | null;
+    };
+    if (settings.active) {
+      if (settings.next_run_at) {
+        const nextRun = new Date(settings.next_run_at);
+        const daysUntil = Math.ceil((nextRun.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+        paydayNextRun = nextRun.toISOString();
+        if (daysUntil <= 0) paydayStatus = "due-today";
+        else if (daysUntil <= 2) paydayStatus = "due-soon";
+        else paydayStatus = "next-run";
+      }
+    }
+  }
+
+  // Maintenance items due
+  const maintenanceItemsDue: EconomyDomainState["maintenanceItemsDue"] = [];
+  if (maintenanceResult.status === "fulfilled" && maintenanceResult.value.data) {
+    const items = maintenanceResult.value.data as Array<{
+      id: string;
+      item: string;
+      frequency: string;
+      status: string;
+    }>;
+    for (const item of items) {
+      maintenanceItemsDue.push({
+        id: item.id,
+        item: item.item,
+        frequency: item.frequency,
+      });
+    }
+  }
+
+  return {
+    activeAccounts,
+    totalGigsOpen,
+    totalGigsClaimed,
+    totalGigsApproved,
+    approvedGigsSinceLast,
+    paydayStatus,
+    paydayNextRun,
+    maintenanceItemsDue,
+  };
+}

@@ -19,6 +19,9 @@ export async function GET() {
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured." }, { status: 503 });
   const householdId = await getCurrentHousehold();
+  if (!householdId) {
+    return NextResponse.json({ ok: false, error: "Authentication required." }, { status: 401 });
+  }
 
   const { data, error } = await supabase
     .from("agent_trust")
@@ -33,6 +36,9 @@ export async function POST(req: NextRequest) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ ok: false, error: "Supabase not configured." }, { status: 503 });
   const householdId = await getCurrentHousehold();
+  if (!householdId) {
+    return NextResponse.json({ ok: false, error: "Authentication required." }, { status: 401 });
+  }
 
   let body: { agent?: string; kind?: string; level?: number };
   try { body = await req.json(); } catch {

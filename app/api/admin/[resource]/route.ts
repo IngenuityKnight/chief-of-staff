@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  AdminAuthError,
   createAdminResource,
   deleteAdminResource,
+  isAdminResource,
   updateAdminResource,
-  type AdminResource,
 } from "@/lib/server/admin";
+
+function errorResponse(err: unknown) {
+  if (err instanceof AdminAuthError) {
+    return NextResponse.json({ ok: false, error: err.message }, { status: err.status });
+  }
+  const message = err instanceof Error ? err.message : "Unknown error.";
+  return NextResponse.json({ ok: false, error: message }, { status: 400 });
+}
 
 export async function POST(
   req: NextRequest,
@@ -12,6 +21,9 @@ export async function POST(
 ) {
   try {
     const { resource } = await params;
+    if (!isAdminResource(resource)) {
+      return NextResponse.json({ ok: false, error: "Unknown resource." }, { status: 404 });
+    }
 
     const body = await req.json();
     if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -23,15 +35,14 @@ export async function POST(
       return NextResponse.json({ ok: false, error: "Missing values object." }, { status: 400 });
     }
 
-    const id = await createAdminResource(resource as AdminResource, values);
+    const id = await createAdminResource(resource, values);
 
     return NextResponse.json(
       { ok: true, id },
       { headers: { "Cache-Control": "no-store, max-age=0" } }
     );
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error.";
-    return NextResponse.json({ ok: false, error: message }, { status: 400 });
+    return errorResponse(err);
   }
 }
 
@@ -41,6 +52,9 @@ export async function PATCH(
 ) {
   try {
     const { resource } = await params;
+    if (!isAdminResource(resource)) {
+      return NextResponse.json({ ok: false, error: "Unknown resource." }, { status: 404 });
+    }
 
     const body = await req.json();
     if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -55,15 +69,14 @@ export async function PATCH(
       return NextResponse.json({ ok: false, error: "Missing values object." }, { status: 400 });
     }
 
-    await updateAdminResource(resource as AdminResource, id, values);
+    await updateAdminResource(resource, id, values);
 
     return NextResponse.json(
       { ok: true, id },
       { headers: { "Cache-Control": "no-store, max-age=0" } }
     );
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error.";
-    return NextResponse.json({ ok: false, error: message }, { status: 400 });
+    return errorResponse(err);
   }
 }
 
@@ -73,6 +86,9 @@ export async function DELETE(
 ) {
   try {
     const { resource } = await params;
+    if (!isAdminResource(resource)) {
+      return NextResponse.json({ ok: false, error: "Unknown resource." }, { status: 404 });
+    }
 
     const body = await req.json();
     if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -84,14 +100,13 @@ export async function DELETE(
       return NextResponse.json({ ok: false, error: "Missing id." }, { status: 400 });
     }
 
-    await deleteAdminResource(resource as AdminResource, id);
+    await deleteAdminResource(resource, id);
 
     return NextResponse.json(
       { ok: true },
       { headers: { "Cache-Control": "no-store, max-age=0" } }
     );
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error.";
-    return NextResponse.json({ ok: false, error: message }, { status: 400 });
+    return errorResponse(err);
   }
 }

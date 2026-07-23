@@ -75,6 +75,16 @@ export const AGENTS: Record<AgentId, {
     dotClass: "bg-signal-pink",
     accent: "#D98E9F",
   },
+  economy: {
+    id: "economy",
+    name: "Economy",
+    shortName: "Economy",
+    role: "Gigs · Payday · Invest",
+    color: "indigo",
+    pillClass: "pill-indigo",
+    dotClass: "bg-signal-indigo",
+    accent: "#9B8AC6",
+  },
 };
 
 export const CATEGORIES: Record<Category, { pillClass: string }> = {

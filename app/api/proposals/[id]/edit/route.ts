@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
+import { getCurrentHousehold } from "@/lib/server/household";
 import { executeProposal } from "@/lib/server/agents/executors";
 
 interface EditBody {
@@ -36,10 +37,16 @@ export async function POST(
     return NextResponse.json({ ok: false, error: "Body must be JSON." }, { status: 400 });
   }
 
+  const householdId = await getCurrentHousehold();
+  if (!householdId) {
+    return NextResponse.json({ ok: false, error: "Authentication required." }, { status: 401 });
+  }
+
   const { data: proposal, error: fetchError } = await supabase
     .from("proposals")
     .select("id, kind, payload, title, rationale, estimated_cost_cents, inbox_item_id, status, household_id")
     .eq("id", id)
+    .eq("household_id", householdId)
     .maybeSingle();
 
   if (fetchError) return NextResponse.json({ ok: false, error: fetchError.message }, { status: 500 });
@@ -59,7 +66,11 @@ export async function POST(
   }
 
   if (Object.keys(patch).length > 0) {
-    const { error: updateError } = await supabase.from("proposals").update(patch).eq("id", id);
+    const { error: updateError } = await supabase
+      .from("proposals")
+      .update(patch)
+      .eq("id", id)
+      .eq("household_id", householdId);
     if (updateError) return NextResponse.json({ ok: false, error: updateError.message }, { status: 500 });
     await supabase.from("events").insert({
       household_id: proposal.household_id,

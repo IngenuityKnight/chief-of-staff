@@ -8,7 +8,7 @@ import type { AgentId } from "@/lib/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type CreatedTask = { id: string; title: string; agent: AgentId };
+type ProposalResult = { id: string; title: string; gateDecision: string; gateReason: string };
 type AppliedChange = { id: string; resource: "calendar" | "decisions" | "shopping"; label: string };
 
 type Msg = {
@@ -17,7 +17,7 @@ type Msg = {
   text: string;
   routing?: { primary: AgentId; secondary: AgentId[]; category: string };
   urgency?: string;
-  createdTasks?: CreatedTask[];
+  proposals?: ProposalResult[];
   appliedChanges?: AppliedChange[];
   error?: boolean;
 };
@@ -65,27 +65,47 @@ function RoutingBadge({ routing, urgency }: { routing: NonNullable<Msg["routing"
   );
 }
 
-function TaskList({ tasks }: { tasks: CreatedTask[] }) {
-  if (tasks.length === 0) return null;
+// The pipeline's real output (audit B2/U3): what auto-executed under the
+// policy gate, and what is waiting on the human.
+function ProposalList({ proposals }: { proposals: ProposalResult[] }) {
+  if (proposals.length === 0) return null;
+  const executed = proposals.filter((p) => p.gateDecision === "auto");
+  const waiting = proposals.filter((p) => p.gateDecision !== "auto");
   return (
     <div className="mt-3 space-y-1.5 border-t border-white/10 pt-2.5">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-signal-green">
-          <CheckSquare className="h-3 w-3" />
-          {tasks.length} task{tasks.length !== 1 ? "s" : ""} created
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-slate-400">
+          <CheckSquare className="h-3 w-3" aria-hidden="true" />
+          {executed.length > 0 && (
+            <span className="text-signal-green">{executed.length} done</span>
+          )}
+          {executed.length > 0 && waiting.length > 0 && <span aria-hidden="true">·</span>}
+          {waiting.length > 0 && (
+            <span className="text-signal-amber">{waiting.length} waiting on you</span>
+          )}
         </div>
         <a
-          href="/tasks"
+          href={waiting.length > 0 ? "/" : "/inbox"}
           className="flex items-center gap-1 text-[10px] font-semibold text-signal-blue hover:underline"
         >
-          View all <ArrowRight className="h-2.5 w-2.5" />
+          {waiting.length > 0 ? "Review" : "View"} <ArrowRight className="h-2.5 w-2.5" aria-hidden="true" />
         </a>
       </div>
       <ul className="space-y-1">
-        {tasks.map((t) => (
-          <li key={t.id} className="flex items-start gap-2 rounded-md bg-white/5 px-2.5 py-1.5">
-            <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-signal-green" />
-            <span className="flex-1 text-xs leading-relaxed text-slate-300">{t.title}</span>
+        {proposals.map((p) => (
+          <li key={p.id} className="flex items-start gap-2 rounded-md bg-white/5 px-2.5 py-1.5">
+            <span
+              className={cn(
+                "mt-1 h-1.5 w-1.5 shrink-0 rounded-full",
+                p.gateDecision === "auto" ? "bg-signal-green" : "bg-signal-amber"
+              )}
+            />
+            <span className="min-w-0 flex-1 text-xs leading-relaxed text-slate-300">
+              {p.title}
+              <span className="ml-1.5 text-[10px] uppercase tracking-wider text-slate-500">
+                {p.gateDecision === "auto" ? "auto-run" : "needs approval"}
+              </span>
+            </span>
           </li>
         ))}
       </ul>
@@ -139,7 +159,7 @@ function ChiefBubble({ msg }: { msg: Msg }) {
         <div>{msg.text}</div>
         {msg.routing && <RoutingBadge routing={msg.routing} urgency={msg.urgency} />}
         {msg.appliedChanges && <AppliedChangeList changes={msg.appliedChanges} />}
-        {msg.createdTasks && <TaskList tasks={msg.createdTasks} />}
+        {msg.proposals && <ProposalList proposals={msg.proposals} />}
       </div>
     </div>
   );
@@ -188,7 +208,8 @@ export function CommandDock() {
     const onOpen = () => setOpen(true);
     const onKey  = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setOpen((v) => !v); }
-      if (e.key === "Escape") setOpen(false);
+      // Only claim Escape while the dock is open — other overlays own it otherwise.
+      if (e.key === "Escape") setOpen((v) => (v ? false : v));
     };
     window.addEventListener("cos:open-dock", onOpen);
     window.addEventListener("keydown", onKey);
@@ -228,7 +249,7 @@ export function CommandDock() {
         text: data.analysis ?? "Captured and routed.",
         routing: data.routing,
         urgency: data.urgency,
-        createdTasks: data.createdTasks ?? [],
+        proposals: data.proposals ?? [],
         appliedChanges: data.appliedChanges ?? [],
       }]);
     } catch (error) {
@@ -276,7 +297,11 @@ export function CommandDock() {
           {/* Dock panel
               Mobile:  full-width bottom sheet, 85svh tall, rounded top corners
               Desktop: fixed-size popup anchored bottom-right               */}
-          <div className="fixed z-50 flex flex-col overflow-hidden border border-edge bg-ink-950 shadow-2xl shadow-black/60 animate-slide-up
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Household capture"
+            className="fixed z-50 flex flex-col overflow-hidden border border-edge bg-ink-950 shadow-2xl shadow-black/60 animate-slide-up
             inset-x-0 bottom-0 h-[85svh] rounded-t-2xl
             sm:inset-x-auto sm:bottom-6 sm:right-6 sm:h-[600px] sm:w-[440px] sm:rounded-2xl">
 
@@ -337,7 +362,7 @@ export function CommandDock() {
                     </p>
                   </div>
                   <div>
-                    <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-600">Quick starts</div>
+                    <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Quick starts</div>
                     <div className="space-y-2 sm:space-y-1.5">
                       {QUICK_PROMPTS.map((prompt) => (
                         <button
@@ -379,7 +404,7 @@ export function CommandDock() {
                   }}
                   placeholder="Anything on your mind…"
                   rows={1}
-                  className="flex-1 resize-none bg-transparent text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none max-h-32"
+                  className="flex-1 resize-none bg-transparent text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none max-h-32"
                   style={{ fieldSizing: "content" } as React.CSSProperties}
                 />
                 <button
@@ -392,7 +417,7 @@ export function CommandDock() {
                   <Send className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
                 </button>
               </div>
-              <div className="mt-1.5 hidden px-1 text-[10px] text-slate-600 sm:block">
+              <div className="mt-1.5 hidden px-1 text-[10px] text-slate-400 sm:block">
                 Enter to send · Shift+Enter for newline
               </div>
             </div>

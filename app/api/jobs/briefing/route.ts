@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { generateDailyBriefing } from "@/lib/server/briefing";
+import { isCronAuthorized } from "@/lib/server/cron-auth";
 
 // GET  /api/jobs/briefing  — Vercel Cron (daily 07:00)
 // POST /api/jobs/briefing  — n8n or manual trigger
@@ -7,9 +8,7 @@ import { generateDailyBriefing } from "@/lib/server/briefing";
 // Protected by CRON_SECRET. Idempotent — upserts on date.
 
 function authorized(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
-  return req.headers.get("authorization") === `Bearer ${secret}`;
+  return isCronAuthorized(req);
 }
 
 async function handle(req: NextRequest) {

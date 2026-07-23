@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { revalidateAdminPaths } from "@/lib/server/admin";
+import { AdminAuthError, requireAdminHousehold, revalidateAdminPaths } from "@/lib/server/admin";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { executeProposal } from "@/lib/server/agents/executors";
 
@@ -23,10 +23,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Supabase is not configured." }, { status: 400 });
     }
 
+    const householdId = await requireAdminHousehold();
+
     const { data: proposals, error: fetchError } = await supabase
       .from("proposals")
       .select("id, kind, payload, inbox_item_id, household_id")
       .eq("inbox_item_id", inboxItemId)
+      .eq("household_id", householdId)
       .eq("status", "awaiting_approval");
 
     if (fetchError) throw new Error(fetchError.message);

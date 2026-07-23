@@ -82,7 +82,7 @@ export function BottomNav() {
         </div>
         {MORE_SECTIONS.map((section) => (
           <div key={section.label} className="px-4 pb-3">
-            <div className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-widest text-slate-600">
+            <div className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
               {section.label}
             </div>
             <div className="grid grid-cols-4 gap-1">

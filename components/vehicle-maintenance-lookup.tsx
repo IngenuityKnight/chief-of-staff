@@ -106,7 +106,7 @@ export function VehicleMaintenanceLookup({
             Check maintenance online
           </button>
           {!mileage && (
-            <span className="text-[11px] text-slate-600">Add mileage for better suggestions</span>
+            <span className="text-[11px] text-slate-500">Add mileage for better suggestions</span>
           )}
           {error && <span className="text-[11px] text-signal-red">{error}</span>}
         </div>
@@ -203,7 +203,7 @@ export function VehicleMaintenanceLookup({
           <button
             type="button"
             onClick={() => setState("idle")}
-            className="text-[11px] text-slate-600 hover:text-slate-400 transition"
+            className="text-[11px] text-slate-500 hover:text-slate-400 transition"
           >
             Dismiss
           </button>

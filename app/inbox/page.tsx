@@ -83,7 +83,7 @@ export default async function InboxPage() {
                       <ul className="space-y-1">
                         {item.proposedTasks.map((t, i) => (
                           <li key={i} className="flex gap-2 text-xs text-slate-300">
-                            <span className="font-mono text-slate-600">{i + 1}.</span>
+                            <span className="font-mono text-slate-500">{i + 1}.</span>
                             <span>{t}</span>
                           </li>
                         ))}
@@ -114,17 +114,17 @@ export default async function InboxPage() {
         <div className="space-y-2">
           <div className="flex items-center gap-3">
             <div className="h-px flex-1 bg-edge/60" />
-            <span className="text-2xs font-semibold uppercase tracking-[0.18em] text-slate-600">Reviewed · {reviewed.length}</span>
+            <span className="text-2xs font-semibold uppercase tracking-[0.18em] text-slate-500">Reviewed · {reviewed.length}</span>
             <div className="h-px flex-1 bg-edge/60" />
           </div>
           {reviewed.map((item) => {
             const SourceIcon = SOURCE_ICONS[item.source as keyof typeof SOURCE_ICONS] ?? InboxIcon;
             return (
               <div key={item.id} className="flex items-center gap-3 rounded-lg border border-edge/50 bg-ink-900/20 px-4 py-3 opacity-60">
-                <SourceIcon className="h-3.5 w-3.5 shrink-0 text-slate-600" />
+                <SourceIcon className="h-3.5 w-3.5 shrink-0 text-slate-500" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm text-slate-400">{item.title}</div>
-                  <div className="text-[11px] text-slate-600">{relativeDay(item.createdAt)}</div>
+                  <div className="text-[11px] text-slate-500">{relativeDay(item.createdAt)}</div>
                 </div>
                 <span className={INBOX_STATUS[item.status].pillClass}>{INBOX_STATUS[item.status].label}</span>
               </div>

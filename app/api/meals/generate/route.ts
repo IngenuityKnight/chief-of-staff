@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { getAnthropicClient } from "@/lib/server/anthropic";
 import { getHouseholdContext, getInventoryItems, getRules } from "@/lib/server/data";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
+import { getCurrentHousehold } from "@/lib/server/household";
 import type { MealSlot } from "@/lib/types";
 
 interface GeneratedDay {
@@ -35,10 +36,13 @@ export async function POST() {
   const client = getAnthropicClient();
   if (!client) return NextResponse.json({ error: "AI not configured" }, { status: 503 });
 
+  const householdId = await getCurrentHousehold();
+  if (!householdId) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
+
   const [ctx, inventory, rules] = await Promise.all([
-    getHouseholdContext(),
-    getInventoryItems(),
-    getRules(),
+    getHouseholdContext(householdId),
+    getInventoryItems(householdId),
+    getRules(householdId),
   ]);
 
   const dates = nextWeekDates();
@@ -95,13 +99,14 @@ Respond with ONLY a JSON array — no markdown, no explanation:
     await supabase.from("meal_plan_days").upsert(
       {
         date: day.date,
+        household_id: householdId,
         label: day.label,
         theme: day.theme ?? null,
         breakfast: day.breakfast ?? null,
         lunch: day.lunch ?? null,
         dinner: day.dinner ?? null,
       },
-      { onConflict: "date" }
+      { onConflict: "household_id,date" }
     );
   }
 

@@ -8,6 +8,7 @@ import { getAnthropicClient } from "@/lib/server/anthropic";
 import { logActivity } from "@/lib/server/activity";
 import { assembleContextForIntake } from "@/lib/server/context";
 import { getCurrentHousehold } from "@/lib/server/household";
+import { addDays, getHouseholdTimezone, todayInTz, zonedTimeToUtc, type DateParts } from "@/lib/server/timezone";
 
 export type IntakeAnalysis = {
   id: string;
@@ -143,28 +144,13 @@ function buildTitle(text: string) {
   return normalized.length <= 72 ? normalized : `${normalized.slice(0, 69).trimEnd()}…`;
 }
 
-function startOfToday() {
-  const date = new Date();
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-function nextWeekday(target: number) {
-  const date = startOfToday();
-  const diff = (target - date.getDay() + 7) % 7 || 7;
-  date.setDate(date.getDate() + diff);
-  return date;
-}
-
-function parseRequestedDate(text: string) {
+// Dates are resolved on the household's wall clock (audit B5): "tomorrow"
+// captured at 8pm Chicago is Chicago's tomorrow, not UTC's.
+function parseRequestedDateParts(text: string, timeZone: string): DateParts | null {
   const lower = text.toLowerCase();
-  const today = startOfToday();
+  const today = todayInTz(timeZone);
   if (lower.includes("today")) return today;
-  if (lower.includes("tomorrow")) {
-    const date = startOfToday();
-    date.setDate(date.getDate() + 1);
-    return date;
-  }
+  if (lower.includes("tomorrow")) return addDays(today, 1);
 
   const weekdays: Record<string, number> = {
     sunday: 0,
@@ -176,19 +162,23 @@ function parseRequestedDate(text: string) {
     saturday: 6,
   };
   for (const [day, index] of Object.entries(weekdays)) {
-    if (lower.includes(day)) return nextWeekday(index);
+    if (lower.includes(day)) {
+      const diff = (index - today.weekday + 7) % 7 || 7;
+      return addDays(today, diff);
+    }
   }
 
   const dateMatch = lower.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
   if (!dateMatch) return null;
 
-  const month = Number(dateMatch[1]) - 1;
+  const month = Number(dateMatch[1]);
   const day = Number(dateMatch[2]);
   const year = dateMatch[3]
     ? Number(dateMatch[3].length === 2 ? `20${dateMatch[3]}` : dateMatch[3])
-    : today.getFullYear();
-  const parsed = new Date(year, month, day);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+    : today.year;
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  // Normalize through addDays so weekday and day overflow resolve correctly.
+  return addDays({ year, month, day, weekday: 0 }, 0);
 }
 
 function parseRequestedTime(text: string) {
@@ -414,6 +404,9 @@ export async function analyzeIntake(text: string, source = "web", householdIdOve
   const id = `inb_${crypto.randomUUID()}`;
   const capturedAt = new Date().toISOString();
   const householdId = householdIdOverride ?? (await getCurrentHousehold());
+  if (!householdId) {
+    throw new Error("Intake requires an authenticated household context.");
+  }
 
   // Prefer the new chief.run module (chief.ts). Fall back to the legacy
   // analyzeWithClaude (which still runs but is being retired) if that fails.
@@ -511,6 +504,9 @@ export async function persistAndGateProposals(
   const supabase = getSupabaseAdmin();
   if (!supabase) return [];
 
+  // Trust is granted per (agent, kind) — a batch can mix agents and kinds, so
+  // each draft must be gated against its own trust row (audit B6). Unknown
+  // pairs default to level 0: always ask.
   const [rulesResult, trustResult] = await Promise.all([
     supabase
       .from("rules")
@@ -520,17 +516,18 @@ export async function persistAndGateProposals(
       .eq("active", true),
     supabase
       .from("agent_trust")
-      .select("level")
-      .eq("household_id", analysis.householdId)
-      .eq("agent", analysis.routing.primary)
-      .eq("kind", drafts[0].kind)
-      .maybeSingle(),
+      .select("agent, kind, level")
+      .eq("household_id", analysis.householdId),
   ]);
 
   const mustFollowRuleIds = new Set(
     ((rulesResult.data ?? []) as { id: string }[]).map((r) => r.id)
   );
-  const trustLevel: number = (trustResult.data as { level: number } | null)?.level ?? 0;
+  const trustByAgentKind = new Map<string, number>(
+    ((trustResult.data ?? []) as Array<{ agent: string; kind: string; level: number }>).map(
+      (row) => [`${row.agent}:${row.kind}`, row.level]
+    )
+  );
   const now = new Date().toISOString();
 
   const rows = drafts.map((d) => ({
@@ -558,6 +555,7 @@ export async function persistAndGateProposals(
 
   const results: ProposalResult[] = [];
   for (const row of rows) {
+    const trustLevel = trustByAgentKind.get(`${row.agent}:${row.kind}`) ?? 0;
     const verdict = gate(
       { kind: row.kind, estimatedCostCents: row.estimated_cost_cents, rulesConflicts: row.rules_conflicts },
       mustFollowRuleIds,
@@ -566,7 +564,13 @@ export async function persistAndGateProposals(
 
     if (verdict.decision === "auto") {
       await executeProposal(
-        { id: row.id, kind: row.kind, payload: row.payload, inbox_item_id: row.inbox_item_id },
+        {
+          id: row.id,
+          kind: row.kind,
+          payload: row.payload,
+          inbox_item_id: row.inbox_item_id,
+          household_id: analysis.householdId,
+        },
         "policy",
       );
     }
@@ -638,6 +642,7 @@ export async function applyIntakeChanges(analysis: IntakeAnalysis): Promise<Appl
     const title = buildDecisionTitle(analysis.text);
     const { error } = await supabase.from("decisions").insert({
       id,
+      household_id: analysis.householdId,
       title,
       context: analysis.text,
       status: "open",
@@ -657,17 +662,18 @@ export async function applyIntakeChanges(analysis: IntakeAnalysis): Promise<Appl
     analysis.routing.primary === "schedule" &&
     /\b(add|create|schedule|book|block|put|set up)\b/.test(lower)
   ) {
-    const date = parseRequestedDate(analysis.text);
-    if (date) {
+    const timeZone = await getHouseholdTimezone(analysis.householdId);
+    const dateParts = parseRequestedDateParts(analysis.text, timeZone);
+    if (dateParts) {
       const { hours, minutes } = parseRequestedTime(analysis.text);
-      const start = new Date(date);
-      start.setHours(hours, minutes, 0, 0);
+      const start = zonedTimeToUtc(dateParts.year, dateParts.month, dateParts.day, hours, minutes, timeZone);
       const end = new Date(start.getTime() + parseDurationMinutes(analysis.text) * 60_000);
       const title = cleanEventTitle(analysis.text) || buildTitle(analysis.text);
       const id = crypto.randomUUID();
 
       const { error } = await supabase.from("calendar_events").insert({
         id,
+        household_id: analysis.householdId,
         title,
         start_at: start.toISOString(),
         end_at: end.toISOString(),
@@ -687,6 +693,7 @@ export async function applyIntakeChanges(analysis: IntakeAnalysis): Promise<Appl
     if (items.length > 0) {
       const rows = items.map((name) => ({
         id: crypto.randomUUID(),
+        household_id: analysis.householdId,
         name,
         quantity: 1,
         unit: "count",

@@ -6,6 +6,7 @@
 
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { getHouseholdForJob } from "@/lib/server/household";
+import { getHouseholdTimezone, zonedTimeToUtc } from "@/lib/server/timezone";
 import type {
   AddRulePayload,
   BlockTimePayload,
@@ -15,6 +16,11 @@ import type {
   RecordServicePayload,
   UpsertAppliancePayload,
   UpsertVehiclePayload,
+  GigPostPayload,
+  GigApprovePayload,
+  PaydayDisbursementPayload,
+  GigClaimPayload,
+  GigSubmitPayload,
 } from "./schemas";
 
 export type ExecuteResult = { ok: boolean; error?: string };
@@ -62,6 +68,21 @@ export async function executeProposal(
         break;
       case "add_rule":
         ok = await _addRule(proposal.payload as unknown as AddRulePayload, householdId);
+        break;
+      case "gig_post":
+        ok = await _postGig(proposal.payload as unknown as GigPostPayload, householdId);
+        break;
+      case "gig_approve":
+        ok = await _approveGig(proposal.payload as unknown as GigApprovePayload, householdId);
+        break;
+      case "gig_claim":
+        ok = await _claimGig(proposal.payload as unknown as GigClaimPayload, householdId);
+        break;
+      case "gig_submit":
+        ok = await _submitGig(proposal.payload as unknown as GigSubmitPayload, householdId);
+        break;
+      case "payday_disbursement":
+        ok = await _payrollDisbursement(proposal.payload as unknown as PaydayDisbursementPayload, householdId);
         break;
       default:
         error = `No executor for proposal kind "${proposal.kind}"`;
@@ -131,7 +152,7 @@ async function _writeMealPlan(payload: MealPlanPayload, householdId: string): Pr
   }));
   const { error } = await supabase
     .from("meal_plan_days")
-    .upsert(rows, { onConflict: "date" });
+    .upsert(rows, { onConflict: "household_id,date" });
   if (error) console.error("executor meal_plan failed:", error);
   return !error;
 }
@@ -253,8 +274,10 @@ async function _addRule(payload: AddRulePayload, householdId: string): Promise<b
 async function _blockCalendar(payload: BlockTimePayload, householdId: string): Promise<boolean> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return false;
-  const start = new Date(payload.date);
-  start.setHours(payload.startHour, 0, 0, 0);
+  // startHour is a wall-clock hour in the household's timezone (audit B5).
+  const timeZone = await getHouseholdTimezone(householdId);
+  const [year, month, day] = String(payload.date).slice(0, 10).split("-").map(Number);
+  const start = zonedTimeToUtc(year, month, day, payload.startHour, 0, timeZone);
   const end = new Date(start.getTime() + payload.durationMinutes * 60_000);
   const { error } = await supabase.from("calendar_events").insert({
     id: crypto.randomUUID(),
@@ -268,4 +291,196 @@ async function _blockCalendar(payload: BlockTimePayload, householdId: string): P
   });
   if (error) console.error("executor block_time failed:", error);
   return !error;
+}
+
+// ─── Economy Executors ────────────────────────────────────────────────────────
+
+async function _postGig(payload: GigPostPayload, householdId: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return false;
+
+  // posted_by is required; use the first principal/partner if not provided
+  let postedBy = payload.claimedBy;
+  if (!postedBy) {
+    const { data: member } = await supabase
+      .from("household_members")
+      .select("id")
+      .eq("household_id", householdId)
+      .in("role", ["principal", "partner"])
+      .limit(1)
+      .maybeSingle();
+    if (!member) return false;
+    postedBy = (member as { id: string }).id;
+  }
+
+  const { error } = await supabase.from("gigs").insert({
+    id: crypto.randomUUID(),
+    household_id: householdId,
+    title: payload.title,
+    description: payload.description ?? null,
+    bounty_cents: payload.bountyCents,
+    posted_by: postedBy,
+    status: "open",
+    source_type: payload.sourceType,
+    linked_maintenance_item_id: payload.linkedMaintenanceItemId ?? null,
+    created_at: new Date().toISOString(),
+  });
+  if (error) console.error("executor gig_post failed:", error);
+  return !error;
+}
+
+async function _claimGig(payload: GigClaimPayload, householdId: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return false;
+
+  const { error } = await supabase
+    .from("gigs")
+    .update({
+      status: "claimed",
+      claimed_by: payload.claimedBy,
+    })
+    .eq("id", payload.gigId)
+    .eq("household_id", householdId);
+
+  if (error) console.error("executor gig_claim failed:", error);
+  return !error;
+}
+
+async function _submitGig(payload: GigSubmitPayload, householdId: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return false;
+
+  const { error } = await supabase
+    .from("gigs")
+    .update({
+      status: "submitted",
+    })
+    .eq("id", payload.gigId)
+    .eq("household_id", householdId);
+
+  if (error) console.error("executor gig_submit failed:", error);
+  return !error;
+}
+
+async function _approveGig(payload: GigApprovePayload, householdId: string): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return false;
+
+  const { error } = await supabase
+    .from("gigs")
+    .update({
+      status: "approved",
+      completed_at: new Date().toISOString(),
+    })
+    .eq("id", payload.gigId)
+    .eq("household_id", householdId);
+
+  if (error) console.error("executor gig_approve failed:", error);
+  return !error;
+}
+
+async function _payrollDisbursement(
+  payload: PaydayDisbursementPayload,
+  householdId: string,
+): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return false;
+
+  // 1. Create or update payday_run
+  const now = new Date();
+  const paydayRunId = crypto.randomUUID();
+  const { error: runError } = await supabase.from("payday_runs").insert({
+    id: paydayRunId,
+    household_id: householdId,
+    period_start: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    period_end: now.toISOString().slice(0, 10),
+    status: "approved",
+    created_at: now.toISOString(),
+    approved_at: now.toISOString(),
+  });
+  if (runError) {
+    console.error("executor payday_disbursement: create run failed:", runError);
+    return false;
+  }
+
+  // 2. Mark gigs as paid
+  const { error: gigError } = await supabase
+    .from("gigs")
+    .update({
+      status: "paid",
+      payday_run_id: paydayRunId,
+    })
+    .in("id", payload.gigIds)
+    .eq("household_id", householdId);
+  if (gigError) {
+    console.error("executor payday_disbursement: update gigs failed:", gigError);
+    return false;
+  }
+
+  // 3. Split bounty across buckets; get the account
+  const { data: account } = await supabase
+    .from("economy_accounts")
+    .select("id")
+    .eq("household_id", householdId)
+    .eq("member_id", payload.memberId)
+    .maybeSingle();
+  if (!account) return false;
+
+  const accountId = (account as { id: string }).id;
+
+  // 4. For each split, get the bucket and create a transaction
+  for (const split of payload.splits) {
+    const { data: bucket } = await supabase
+      .from("economy_buckets")
+      .select("id, balance_cents")
+      .eq("account_id", accountId)
+      .eq("type", split.bucketType)
+      .maybeSingle();
+
+    if (!bucket) continue; // skip if bucket doesn't exist
+
+    const bucketId = (bucket as { id: string; balance_cents: number }).id;
+    const oldBalance = (bucket as { id: string; balance_cents: number }).balance_cents;
+
+    // Update bucket balance
+    await supabase
+      .from("economy_buckets")
+      .update({
+        balance_cents: oldBalance + split.amountCents,
+      })
+      .eq("id", bucketId);
+
+    // Log the transaction
+    await supabase.from("economy_transactions").insert({
+      id: crypto.randomUUID(),
+      household_id: householdId,
+      account_id: accountId,
+      bucket_id: bucketId,
+      amount_cents: split.amountCents,
+      kind: "payday_disbursement",
+      ref_id: paydayRunId,
+      created_at: now.toISOString(),
+    });
+  }
+
+  // 5. Update maintenance items if any gigs were maintenance-sourced
+  for (const gigId of payload.gigIds) {
+    const { data: gig } = await supabase
+      .from("gigs")
+      .select("linked_maintenance_item_id")
+      .eq("id", gigId)
+      .maybeSingle();
+    if (!gig || !(gig as any).linked_maintenance_item_id) continue;
+
+    const maintenanceId = (gig as any).linked_maintenance_item_id;
+    await supabase
+      .from("maintenance_items")
+      .update({
+        last_done: now.toISOString().slice(0, 10),
+      })
+      .eq("id", maintenanceId)
+      .eq("household_id", householdId);
+  }
+
+  return true;
 }

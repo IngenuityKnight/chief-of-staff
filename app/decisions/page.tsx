@@ -107,7 +107,7 @@ export default async function DecisionsPage() {
         <div className="space-y-2 pt-2">
           <div className="flex items-center gap-3">
             <div className="h-px flex-1 bg-edge/60" />
-            <span className="text-2xs font-semibold uppercase tracking-[0.18em] text-slate-600">Resolved · {resolved.length}</span>
+            <span className="text-2xs font-semibold uppercase tracking-[0.18em] text-slate-500">Resolved · {resolved.length}</span>
             <div className="h-px flex-1 bg-edge/60" />
           </div>
           {resolved.map((d) => (

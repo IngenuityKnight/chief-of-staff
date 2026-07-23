@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { runScanner, SCANNER_NAMES } from "@/lib/server/scanners";
+import { isCronAuthorized } from "@/lib/server/cron-auth";
 
 // GET  /api/jobs/scan/:scanner  — Vercel Cron (uses GET)
 // POST /api/jobs/scan/:scanner  — n8n or manual trigger
@@ -7,9 +8,7 @@ import { runScanner, SCANNER_NAMES } from "@/lib/server/scanners";
 // Protected by CRON_SECRET. Idempotent — scanners deduplicate internally.
 
 function authorized(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
-  return req.headers.get("authorization") === `Bearer ${secret}`;
+  return isCronAuthorized(req);
 }
 
 async function handle(

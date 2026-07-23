@@ -16,6 +16,7 @@ import {
   buildMealsDomainState,
   buildScheduleDomainState,
   buildMoneyDomainState,
+  buildEconomyDomainState,
   type SiblingDigests,
 } from "./agent-context";
 import type { IntakeAnalysis, ProposalResult } from "@/lib/server/intake";
@@ -23,6 +24,7 @@ import { persistAndGateProposals } from "@/lib/server/intake";
 import { run as runMeals } from "./meals";
 import { run as runSchedule } from "./schedule";
 import { run as runMoney } from "./money";
+import { run as runEconomy } from "./economy";
 import { extractMemories } from "./memory";
 
 export interface OrchestrationResult {
@@ -46,10 +48,10 @@ async function runSpecialist(
     siblingDigests: SiblingDigests;
   },
 ): Promise<ProposalDraft[]> {
-  const allRules = await getRules();
+  const allRules = await getRules(base.householdId);
 
   if (agent === "meals") {
-    const domainState = await buildMealsDomainState();
+    const domainState = await buildMealsDomainState(base.householdId);
     return runMeals({
       ...base,
       domainState,
@@ -72,16 +74,25 @@ async function runSpecialist(
       domainRules: allRules.filter((r) => r.category === "money" || r.category === "general"),
     });
   }
+  if (agent === "economy") {
+    const domainState = await buildEconomyDomainState(base.householdId);
+    return runEconomy({
+      ...base,
+      domainState,
+      domainRules: allRules.filter((r) => r.category === "economy" || r.category === "general"),
+    });
+  }
   return [];
 }
 
 // Build the per-specialist sibling digests in parallel — small text summaries
 // so each specialist sees the cross-domain picture without re-querying.
 async function buildSiblingDigests(householdId: string): Promise<SiblingDigests> {
-  const [meals, schedule, money] = await Promise.allSettled([
-    buildMealsDomainState(),
+  const [meals, schedule, money, economy] = await Promise.allSettled([
+    buildMealsDomainState(householdId),
     buildScheduleDomainState(householdId),
     buildMoneyDomainState(householdId),
+    buildEconomyDomainState(householdId),
   ]);
 
   return {
@@ -93,6 +104,9 @@ async function buildSiblingDigests(householdId: string): Promise<SiblingDigests>
       : undefined,
     money: money.status === "fulfilled"
       ? `${money.value.budgetHeadroom}. ${money.value.upcomingBills}`
+      : undefined,
+    economy: economy.status === "fulfilled"
+      ? `${economy.value.activeAccounts} active account(s); ${economy.value.totalGigsOpen} open gigs; payday ${economy.value.paydayStatus}.`
       : undefined,
   };
 }

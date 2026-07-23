@@ -42,7 +42,7 @@ export default async function TasksPage() {
             {open.length} open
             {overdue.length > 0 && <span className="ml-2 font-semibold text-signal-red">{overdue.length} overdue</span>}
             {blocked.length > 0 && <span className="ml-2 font-semibold text-signal-amber">{blocked.length} blocked</span>}
-            {done.length > 0 && <span className="ml-2 text-slate-600">{done.length} done</span>}
+            {done.length > 0 && <span className="ml-2 text-slate-500">{done.length} done</span>}
           </p>
         </div>
       </div>
@@ -112,7 +112,7 @@ export default async function TasksPage() {
                       <span className="rounded bg-ink-800 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">{list.length}</span>
                     )}
                   </div>
-                  <span className="text-2xs uppercase tracking-wider text-slate-600">{a.role}</span>
+                  <span className="text-2xs uppercase tracking-wider text-slate-500">{a.role}</span>
                 </header>
                 {list.length > 0 && (
                   <ul className="divide-y divide-edge/60">
@@ -137,14 +137,14 @@ export default async function TasksPage() {
         <div className="space-y-2 pt-2">
           <div className="flex items-center gap-3">
             <div className="h-px flex-1 bg-edge/60" />
-            <span className="text-2xs font-semibold uppercase tracking-[0.18em] text-slate-600">Done · {done.length}</span>
+            <span className="text-2xs font-semibold uppercase tracking-[0.18em] text-slate-500">Done · {done.length}</span>
             <div className="h-px flex-1 bg-edge/60" />
           </div>
           {done.slice(0, 5).map((t) => (
             <div key={t.id} className="flex items-center gap-3 rounded-lg border border-edge/50 bg-ink-900/20 px-4 py-2.5 opacity-50">
               <input type="checkbox" checked readOnly className="h-4 w-4 rounded border-edge bg-ink-800 text-signal-green" />
               <span className="min-w-0 flex-1 truncate text-sm text-slate-500 line-through">{t.title}</span>
-              <span className="text-[11px] text-slate-600">{formatDate(t.createdAt)}</span>
+              <span className="text-[11px] text-slate-500">{formatDate(t.createdAt)}</span>
             </div>
           ))}
         </div>

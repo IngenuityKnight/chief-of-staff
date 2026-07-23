@@ -279,12 +279,12 @@ export function ShoppingListClient({
 
         {groups.length === 0 && done.length === 0 ? (
           <div className="py-12 text-center space-y-2">
-            <ShoppingCart className="mx-auto h-8 w-8 text-slate-600" />
+            <ShoppingCart className="mx-auto h-8 w-8 text-slate-500" />
             <p className="text-sm text-slate-500">
               {activeStore === "all" ? "Your shopping list is empty." : `No items for this store.`}
             </p>
             {activeStore === "all" && (
-              <p className="text-xs text-slate-600">
+              <p className="text-xs text-slate-500">
                 Click "Generate from inventory" to auto-populate based on low-stock items.
               </p>
             )}
@@ -298,7 +298,7 @@ export function ShoppingListClient({
                   <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 capitalize">
                     {category}
                   </span>
-                  <span className="text-[11px] text-slate-600">({catItems.length})</span>
+                  <span className="text-[11px] text-slate-500">({catItems.length})</span>
                 </div>
                 <div className="space-y-1.5">
                   {catItems.map((item) => (

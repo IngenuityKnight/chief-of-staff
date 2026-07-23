@@ -137,7 +137,7 @@ export default async function AppliancesPage() {
 
       {appliances.length === 0 ? (
         <div className="rounded-xl border border-edge bg-ink-900/20 px-5 py-12 text-center">
-          <Zap className="mx-auto h-6 w-6 text-slate-600" />
+          <Zap className="mx-auto h-6 w-6 text-slate-500" />
           <div className="mt-2 text-sm text-slate-500">No appliances tracked yet.</div>
         </div>
       ) : (
