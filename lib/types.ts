@@ -1,4 +1,4 @@
-export type AgentId = "chief" | "meals" | "home" | "money" | "schedule" | "roster";
+export type AgentId = "chief" | "meals" | "home" | "money" | "schedule" | "roster" | "economy";
 
 export type Category = "Meals" | "Cleaning" | "Household" | "Admin" | "Planning" | "Finance" | "Social";
 
@@ -28,7 +28,18 @@ export type ProposalKind =
   | "add_rule"
   | "upsert_appliance"
   | "upsert_vehicle"
-  | "record_service";
+  | "record_service"
+  | "gig_post"
+  | "gig_bounty_edit"
+  | "gig_claim"
+  | "gig_submit"
+  | "gig_approve"
+  | "payday_disbursement"
+  | "bucket_transfer"
+  | "invest_contribution"
+  | "venture_buyin"
+  | "venture_distribution"
+  | "give_out";
 
 export interface Proposal {
   id: string;
