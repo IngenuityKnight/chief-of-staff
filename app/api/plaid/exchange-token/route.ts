@@ -4,7 +4,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
-import { getHouseholdForRequest } from "@/lib/server/household";
+import { getCurrentHousehold } from "@/lib/server/household";
 
 const PLAID_CLIENT_ID = process.env.PLAID_CLIENT_ID || "";
 const PLAID_SECRET = process.env.PLAID_SECRET || "";
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing publicToken or memberId" }, { status: 400 });
     }
 
-    const householdId = await getHouseholdForRequest(req);
+    const householdId = await getCurrentHousehold();
     if (!householdId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Plaid not configured" }, { status: 503 });
     }
 
-    const { Configuration, PlaidApi, PlaidEnvironments } = await import("@plaid/plaid-node");
+    const { Configuration, PlaidApi, PlaidEnvironments } = await import("plaid");
 
     const configuration = new Configuration({
       basePath: PlaidEnvironments[PLAID_ENV],

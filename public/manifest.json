@@ -3,7 +3,7 @@
   "short_name": "COS",
   "description": "Household management command center",
   "display": "standalone",
-  "start_url": "/mobile",
+  "start_url": "/loop",
   "scope": "/",
   "theme_color": "#07090d",
   "background_color": "#07090d",

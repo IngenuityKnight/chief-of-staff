@@ -17,7 +17,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC_PREFIXES = ["/api/auth/", "/api/cron/", "/api/jobs/"];
 // Exact paths only — /api/sync/calendar/outbound is browser-called and must
 // stay behind the session wall.
-const PUBLIC_EXACT = ["/login", "/api/intake/email", "/api/sync/calendar"];
+const PUBLIC_EXACT = ["/login", "/api/intake/email", "/api/loop/email", "/api/sync/calendar"];
 
 function isPublic(pathname: string): boolean {
   return (

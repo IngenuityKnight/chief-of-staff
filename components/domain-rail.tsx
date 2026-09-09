@@ -26,6 +26,7 @@ const SECTIONS: {
   {
     label: "Flow",
     items: [
+      { href: "/loop", label: "Household loop", icon: Inbox },
       { href: "/inbox", label: "Inbox", icon: Inbox },
       { href: "/tasks", label: "Tasks", icon: ListTodo },
       { href: "/decisions", label: "Decisions", icon: Scale },

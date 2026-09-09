@@ -10,7 +10,7 @@ import type { AgentId, ProposalKind } from "@/lib/types";
 
 const AGENT_ORDER: AgentId[] = ["meals", "home", "money", "schedule", "roster", "chief"];
 
-const KIND_LABELS: Record<ProposalKind, string> = {
+const KIND_LABELS: Partial<Record<ProposalKind, string>> = {
   create_task: "Tasks",
   block_time: "Calendar blocks",
   meal_plan: "Meal plans",
@@ -31,6 +31,7 @@ const KINDS_BY_AGENT: Record<AgentId, ProposalKind[]> = {
   schedule: ["block_time", "create_task"],
   roster: ["create_task"],
   chief: ["add_rule", "create_task"],
+  economy: [],
 };
 
 const LEVEL_LABELS = [

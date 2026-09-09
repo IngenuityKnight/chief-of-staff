@@ -49,6 +49,7 @@ const KEYWORDS: Record<AgentId, string[]> = {
   schedule: ["schedule", "calendar", "appointment", "meeting", "book", "time", "busy", "when", "date", "reschedule", "conflict", "remind"],
   roster:   ["kids", "child", "spouse", "partner", "mom", "dad", "family", "guest", "party", "birthday", "anniversary", "dog", "pet"],
   chief:    [],
+  economy:  [],
 };
 
 export const CATEGORY_MAP: Record<AgentId, Category> = {
@@ -58,6 +59,7 @@ export const CATEGORY_MAP: Record<AgentId, Category> = {
   schedule: "Planning",
   roster:   "Social",
   chief:    "Admin",
+  economy:  "Finance",
 };
 
 const URGENCY_SIGNALS: Record<Priority, string[]> = {
@@ -135,6 +137,7 @@ function proposeTasks(primary: AgentId, text: string): string[] {
     schedule: ["Find open time slots", "Confirm and send invite"],
     roster:   ["Capture context", "Coordinate with household members"],
     chief:    ["Clarify the request", "Route to the right agent once clear"],
+    economy:  ["Review the request"],
   };
   return defaults[primary];
 }

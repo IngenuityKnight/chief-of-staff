@@ -16,6 +16,7 @@ const AGENT_ICONS: Record<AgentId, string> = {
   schedule: "📅",
   roster: "👥",
   chief: "⚡",
+  economy: "$",
 };
 
 export function MobileNav() {

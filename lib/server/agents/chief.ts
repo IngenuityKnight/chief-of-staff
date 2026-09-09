@@ -38,6 +38,7 @@ export interface ChiefDecision {
 const CATEGORY_FALLBACK: Record<AgentId, Category> = {
   meals: "Meals", home: "Household", money: "Finance",
   schedule: "Planning", roster: "Social", chief: "Admin",
+  economy: "Finance",
 };
 
 export async function run(opts: {

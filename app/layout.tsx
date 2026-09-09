@@ -5,6 +5,7 @@ import { CommandDock } from "@/components/command-dock";
 import { BottomNav } from "@/components/bottom-nav";
 import { DomainRail } from "@/components/domain-rail";
 import { StatusBar } from "@/components/status-bar";
+import { LoopShell } from "@/components/loop-shell";
 import { HearthLine, type HouseState } from "@/components/hearth-line";
 import {
   getBills,
@@ -94,7 +95,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         >
           Skip to content
         </a>
-        <HearthLine state={state} />
+        <LoopShell legacy={<><HearthLine state={state} />
         <div className="flex min-h-screen">
           <DomainRail attention={railAttention} />
           <div className="flex flex-1 flex-col">
@@ -106,6 +107,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </div>
         <BottomNav />
         <CommandDock />
+        </>}>{children}</LoopShell>
       </body>
     </html>
   );

@@ -14,7 +14,7 @@ const PRIMARY = [
   { href: "/",          label: "Today",   icon: LayoutDashboard },
   { href: "/tasks",     label: "Tasks",   icon: CheckSquare },
   { href: "/decisions", label: "Decide",  icon: HelpCircle },
-  { href: "/inbox",     label: "Inbox",   icon: Inbox },
+  { href: "/loop",      label: "Loop",    icon: Inbox },
 ];
 
 const MORE_SECTIONS = [

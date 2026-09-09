@@ -1,5 +1,10 @@
 # Chief of Staff
 
+**New: Cameron's household loop at `/loop`.** Paste or forward a notice, review
+source-backed obligations, explicitly accept responsibility, and record the
+outcome. It operates separately from the legacy specialist-agent application
+described below. See [setup, permissions and current limits](docs/HOUSEHOLD-LOOP.md).
+
 > A general-purpose Chief of Staff platform for the home. Multi-agent AI that coordinates meals, maintenance, money, and schedule — so you can stop being the household operating system.
 
 ```

@@ -4,7 +4,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
-import { getHouseholdForRequest } from "@/lib/server/household";
+import { getCurrentHousehold } from "@/lib/server/household";
 
 const PLAID_CLIENT_ID = process.env.PLAID_CLIENT_ID || "";
 const PLAID_SECRET = process.env.PLAID_SECRET || "";
@@ -13,7 +13,7 @@ const PLAID_ENV = (process.env.PLAID_ENV || "sandbox") as "sandbox" | "developme
 export async function POST(req: NextRequest) {
   try {
     const { memberId } = (await req.json()) as { memberId?: string };
-    const householdId = await getHouseholdForRequest(req);
+    const householdId = await getCurrentHousehold();
     if (!householdId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Plaid not configured" }, { status: 503 });
     }
 
-    const { Configuration, PlaidApi, PlaidEnvironments } = await import("@plaid/plaid-node");
+    const { Configuration, PlaidApi, PlaidEnvironments, Products, CountryCode, DepositoryAccountSubtype } = await import("plaid");
 
     const configuration = new Configuration({
       basePath: PlaidEnvironments[PLAID_ENV],
@@ -58,11 +58,11 @@ export async function POST(req: NextRequest) {
       user: { client_user_id: `${householdId}-${targetMemberId}` },
       client_name: "Chief of Staff — Family Bank",
       language: "en",
-      products: ["auth"],
-      country_codes: ["US"],
+      products: [Products.Auth],
+      country_codes: [CountryCode.Us],
       account_filters: {
         depository: {
-          account_subtypes: ["savings", "checking", "money market"],
+          account_subtypes: [DepositoryAccountSubtype.Savings, DepositoryAccountSubtype.Checking, DepositoryAccountSubtype.MoneyMarket],
         },
       },
     });

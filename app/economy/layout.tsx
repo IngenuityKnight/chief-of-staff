@@ -4,12 +4,10 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
-import { getHouseholdForRequest } from "@/lib/server/household";
-import { cookies } from "next/headers";
+import { getCurrentHousehold } from "@/lib/server/household";
 
 export default async function EconomyLayout({ children }: { children: ReactNode }) {
-  const cookieStore = await cookies();
-  const householdId = cookieStore.get("household_id")?.value;
+  const householdId = await getCurrentHousehold();
 
   if (!householdId) {
     return <div>Loading...</div>;
