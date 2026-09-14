@@ -91,7 +91,7 @@ Status: every phase of `claude-code-next-level-prompt.md` has at least a working
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_URL` | Supabase project URL | All DB |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role (server-only) | All writes |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon key for the magic-link client | Auth |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Publishable key for the magic-link client | Auth |
 | `ANTHROPIC_API_KEY` | Claude calls | Chief, specialists, vision, ask, memory, report |
 | `RESEND_API_KEY` | Outbound + inbound email | Sunday report email; inbound parsing |
 | `RESEND_WEBHOOK_SECRET` | Inbound webhook signature | `/api/intake/email` |

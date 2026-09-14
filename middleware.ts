@@ -7,7 +7,7 @@
 //
 // Configuration states:
 //   - Supabase entirely unconfigured → demo mode, everything open (mock data only).
-//   - Service key set but anon key missing → sessions are impossible; allow in
+//   - Service key set but public key missing → sessions are impossible; allow in
 //     development, fail closed with 503 in production (a live database must not
 //     sit behind no wall).
 
@@ -43,17 +43,19 @@ export async function middleware(req: NextRequest) {
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const publicKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const hasDatabase = Boolean(url && process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-  if (!url || !anonKey) {
+  if (!url || !publicKey) {
     if (!hasDatabase) return NextResponse.next(); // pure demo mode
     if (process.env.NODE_ENV !== "production") return NextResponse.next();
     return NextResponse.json(
       {
         ok: false,
         error:
-          "Auth is not configured: set NEXT_PUBLIC_SUPABASE_ANON_KEY so sessions can be enforced.",
+          "Auth is not configured: set NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY so sessions can be enforced.",
       },
       { status: 503 }
     );
@@ -61,7 +63,7 @@ export async function middleware(req: NextRequest) {
 
   // Refresh the session if needed and carry any rotated cookies forward.
   let res = NextResponse.next({ request: req });
-  const supabase = createServerClient(url, anonKey, {
+  const supabase = createServerClient(url, publicKey, {
     cookies: {
       getAll: () => req.cookies.getAll(),
       setAll: (cookiesToSet) => {

@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseUrl } from "@/lib/server/supabase";
+import { getSupabasePublicKey } from "@/lib/server/auth";
 import { rateLimit, rateLimitKey } from "@/lib/server/rate-limit";
 
 export async function POST(req: NextRequest) {
@@ -28,12 +29,12 @@ export async function POST(req: NextRequest) {
     }
 
     const url = getSupabaseUrl();
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !anonKey) {
+    const publicKey = getSupabasePublicKey();
+    if (!url || !publicKey) {
       return NextResponse.json({ ok: false, error: "Supabase auth is not configured." }, { status: 503 });
     }
 
-    const supabase = createClient(url, anonKey);
+    const supabase = createClient(url, publicKey);
     const origin = req.nextUrl.origin;
 
     const { error } = await supabase.auth.signInWithOtp({

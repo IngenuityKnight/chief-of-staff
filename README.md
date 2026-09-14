@@ -49,7 +49,7 @@ The app now supports a real backend path with `Supabase` for persistence and an 
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...  # required — enables sign-in and the session wall
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...  # required — enables sign-in and the session wall
 SUPABASE_SERVICE_ROLE_KEY=...
 CRON_SECRET=...                # required in production for /api/cron/* and /api/jobs/*
 N8N_INTAKE_WEBHOOK_URL=...     # optional

@@ -3,9 +3,9 @@
 //
 // Three configuration states:
 //   1. Supabase fully unconfigured        → demo mode, no auth (mock data only)
-//   2. Service key set, anon key missing  → legacy mode; middleware fails closed
-//      in production because a session wall is impossible without the anon key
-//   3. URL + anon key set                 → sessions enforced by middleware.ts
+//   2. Service key set, public key missing → legacy mode; middleware fails closed
+//      in production because a session wall is impossible without the public key
+//   3. URL + public key set                → sessions enforced by middleware.ts
 
 import { cache } from "react";
 import { cookies } from "next/headers";
@@ -13,12 +13,16 @@ import { createServerClient } from "@supabase/ssr";
 import type { User } from "@supabase/supabase-js";
 import { getSupabaseUrl } from "@/lib/server/supabase";
 
-export function getSupabaseAnonKey() {
-  return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+export function getSupabasePublicKey() {
+  return (
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    ""
+  );
 }
 
 export function isAuthConfigured() {
-  return Boolean(getSupabaseUrl() && getSupabaseAnonKey());
+  return Boolean(getSupabaseUrl() && getSupabasePublicKey());
 }
 
 // Request-bound Supabase client. Cookie writes are best-effort: they succeed
@@ -26,7 +30,7 @@ export function isAuthConfigured() {
 // owns session refresh, so a failed set here is safe to ignore.
 export async function getSupabaseServer() {
   const store = await cookies();
-  return createServerClient(getSupabaseUrl(), getSupabaseAnonKey(), {
+  return createServerClient(getSupabaseUrl(), getSupabasePublicKey(), {
     cookies: {
       getAll: () => store.getAll(),
       setAll: (cookiesToSet) => {
