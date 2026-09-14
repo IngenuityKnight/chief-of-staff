@@ -7,8 +7,9 @@
 // cos_household_id cookie as the active-household selector.
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSupabaseAdmin } from "@/lib/server/supabase";
-import { getSupabaseServer, isAuthConfigured } from "@/lib/server/auth";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { getSupabaseAdmin, getSupabaseUrl } from "@/lib/server/supabase";
+import { getSupabasePublicKey, isAuthConfigured } from "@/lib/server/auth";
 import { HOUSEHOLD_COOKIE } from "@/lib/server/household";
 
 export async function GET(req: NextRequest) {
@@ -22,8 +23,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL("/login?auth=not_configured", req.nextUrl.origin));
   }
 
-  // Cookie-bound client: verifyOtp persists the session into auth cookies.
-  const supabase = await getSupabaseServer();
+  // Attach session cookies directly to the response that reaches the browser.
+  // Writing through cookies() and then constructing a separate redirect can
+  // lose Set-Cookie headers in a route handler.
+  const response = NextResponse.redirect(new URL("/?auth=ok", req.nextUrl.origin));
+  const supabase = createServerClient(getSupabaseUrl(), getSupabasePublicKey(), {
+    cookies: {
+      getAll: () => req.cookies.getAll(),
+      setAll: (cookiesToSet) => {
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options as CookieOptions)
+        );
+      },
+    },
+  });
   const { data, error } = await supabase.auth.verifyOtp({
     token_hash: tokenHash,
     type: type === "magiclink" ? "magiclink" : "email",
@@ -65,7 +78,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const response = NextResponse.redirect(new URL("/?auth=ok", req.nextUrl.origin));
   if (householdId) {
     response.cookies.set(HOUSEHOLD_COOKIE, householdId, {
       httpOnly: true,
