@@ -27,6 +27,7 @@ export interface UpkeepItem {
   frequency: Frequency;
   lastDone?: string;
   nextDue: string;
+  estCost?: number;
 }
 
 export interface MealDay {
@@ -58,4 +59,16 @@ export interface TapEvent {
   slug: string;
   label: string;
   at: string; // ISO
+}
+
+export interface VehicleService {
+  id: string;
+  vehicleId: string;
+  item: string;
+  intervalMiles?: number;
+  intervalMonths?: number;
+  estCost: number;
+  lastDoneMiles?: number;
+  lastDoneDate?: string;
+  notes?: string;
 }
