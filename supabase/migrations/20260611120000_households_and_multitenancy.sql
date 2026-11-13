@@ -154,13 +154,15 @@ begin
       'agent_trust','daily_briefings','events','plays'
     ])
   loop
-    execute format(
-      'alter table public.%I add constraint %I_household_id_fk
-         foreign key (household_id) references public.households(id) on delete cascade
-         not valid',
-      t, t
-    );
-  exception when duplicate_object then null;
+    begin
+      execute format(
+        'alter table public.%I add constraint %I_household_id_fk
+           foreign key (household_id) references public.households(id) on delete cascade
+           not valid',
+        t, t
+      );
+    exception when duplicate_object then null;
+    end;
   end loop;
 end$$;
 
