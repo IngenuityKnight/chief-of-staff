@@ -4,7 +4,7 @@
 
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 
-const FALLBACK_TZ = "America/Chicago";
+const FALLBACK_TZ = process.env.HOUSEHOLD_TIMEZONE || "America/New_York";
 
 export async function getHouseholdTimezone(householdId: string): Promise<string> {
   const supabase = getSupabaseAdmin();

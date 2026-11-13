@@ -2,33 +2,25 @@
   "name": "chief-of-staff",
   "version": "0.1.0",
   "private": true,
-  "description": "A general-purpose Chief of Staff platform for the home. Multi-agent AI coordinating meals, maintenance, money, and schedule.",
+  "description": "The Burden household wall: schedule, meals, routine and what needs doing, on a hallway iPad.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:loop:browser": "node --experimental-strip-types scripts/household-loop-browser.mjs",
-    "test": "node --test --experimental-strip-types lib/server/agents/policy.test.ts lib/household-loop.test.ts scripts/household-loop-db.test.mjs scripts/household-loop-webhook.test.mjs lib/tap-token.test.ts lib/wall-auth.test.ts lib/wall-events.test.ts",
-    "tap:urls": "node --experimental-strip-types scripts/print-tap-urls.mjs",
-    "seed:supabase": "node --experimental-strip-types scripts/seed-supabase.ts"
+    "test": "node --test --experimental-strip-types lib/schedule.test.ts lib/tap-token.test.ts lib/wall-auth.test.ts lib/wall-events.test.ts",
+    "tap:urls": "node --experimental-strip-types scripts/print-tap-urls.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.110.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.57.4",
-    "clsx": "^2.1.1",
     "googleapis": "^171.4.0",
     "lucide-react": "^0.424.0",
     "next": "^15.5.20",
-    "plaid": "^42.1.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-plaid-link": "^4.1.1",
-    "svix": "^2.3.0"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "^0.5.8",
     "@types/node": "^20.14.10",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",

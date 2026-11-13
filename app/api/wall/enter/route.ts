@@ -25,7 +25,8 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const token = req.nextUrl.searchParams.get("t");
+  // "+" in an unencoded base64 token arrives as a space; restore it.
+  const token = req.nextUrl.searchParams.get("t")?.trim().replace(/ /g, "+") ?? null;
   const value = wallSessionCookieValue();
   if (!verifyWallToken(token) || !value) return new NextResponse("Not found", { status: 404 });
 

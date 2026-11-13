@@ -10,7 +10,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { rateLimit, rateLimitKey } from "@/lib/server/rate-limit";
-import { wallHouseholdId } from "@/lib/server/wall";
+import { listUpkeep, markUpkeepDone } from "@/lib/server/store";
+import { wallHouseholdId, wallToday } from "@/lib/server/wall";
 import { TAP_TAGS, isTapSlug } from "@/lib/tap-tags";
 import { verifyTapToken } from "@/lib/tap-token";
 
@@ -36,7 +37,7 @@ function escapeHtml(s: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const secret = process.env.TAP_SECRET ?? "";
+  const secret = (process.env.TAP_SECRET ?? "").trim();
   const slug = req.nextUrl.searchParams.get("tag") ?? "";
   const token = req.nextUrl.searchParams.get("k") ?? "";
 
@@ -53,6 +54,7 @@ export async function GET(req: NextRequest) {
 
   const householdId = wallHouseholdId();
   const since = new Date(Date.now() - DEDUPE_MS).toISOString();
+  let completed: string | null = null;
 
   try {
     const { data: recent, error: readErr } = await supabase
@@ -69,10 +71,22 @@ export async function GET(req: NextRequest) {
         .from("tap_events")
         .insert({ household_id: householdId, slug, label: tag.label });
       if (error) throw error;
+
+      // Some stickers also tick off the matching upkeep job, which then
+      // reschedules itself (tap the furnace sticker when you swap the filter).
+      if (tag.completes) {
+        const { today } = await wallToday(householdId);
+        const needle = tag.completes.toLowerCase();
+        const job = (await listUpkeep(householdId, today)).find((u) => u.item.toLowerCase().includes(needle));
+        if (job) {
+          await markUpkeepDone(householdId, job.id, today);
+          completed = job.item;
+        }
+      }
     }
   } catch {
     return page("Not saved", "Couldn't reach the household database. Try again shortly.", 503);
   }
 
-  return page("Logged ✓", escapeHtml(tag.label));
+  return page("Logged ✓", escapeHtml(completed ? `${tag.label}. "${completed}" is rescheduled.` : tag.label));
 }

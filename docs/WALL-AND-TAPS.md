@@ -1,11 +1,15 @@
 # Wall kiosk + NFC taps (hq.cameronburden.com)
 
 ## What it is
-- `/wall` — read-only dashboard for the hallway iPad: clock, 4-day schedule from
-  Google Calendar (live), dinner tonight, bills/maintenance due this week, open
-  tasks, recent NFC taps. Refreshes every 5 min and on wake; dims 10pm–6am.
-- `/api/tap?tag=<slug>&k=<token>` — URL written on each NFC sticker. Any phone
-  taps it, the tap is logged to `tap_events`, and the wall shows it.
+- `/wall` — hallway iPad: clock, weather, 3-day schedule from Google Calendar,
+  today's routine (next item highlighted), tonight's dinner and the week's
+  dinners, and one checklist of to-dos, upkeep and hand-paid bills due within a
+  week. Refreshes every 5 min and on wake; dims 10pm–6am.
+- Tapping the wall: a to-do toggles done/undone. Upkeep and bills ask "Done?"
+  first, then roll to their next due date. The wall cannot add, edit or delete.
+- Bill amounts never appear on the wall; autopay bills are left off it.
+- `/` — manage page (sign in on your phone) for everything the wall shows.
+- `/api/tap?tag=<slug>&k=<token>` — URL written on each NFC sticker.
 
 ## Security model
 - Wall: `WALL_TOKEN` (24+ chars). Open `/wall?t=TOKEN` once on the iPad; it sets a
@@ -17,7 +21,7 @@
   locations never reach the browser. Private events show as "Private".
 
 ## Setup
-1. Apply `supabase/migrations/20261112000000_tap_events.sql`.
+1. Apply the migrations in `supabase/migrations/` (latest: `20261113000000_routine_items.sql`).
 2. Vercel env (Production): `WALL_TOKEN`, `TAP_SECRET` (generate each with
    `openssl rand -base64 32`), `WALL_CALENDAR_IDS`, `WALL_CALENDAR_LABELS`,
    `WALL_BUSY_ONLY_IDS`, optionally `WALL_HOUSEHOLD_ID`. The Google account behind

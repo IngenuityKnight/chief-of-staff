@@ -5,16 +5,18 @@
 export interface TapTag {
   label: string;
   place: string;
+  /** If set, a tap also marks the upkeep job whose name contains this text as done. */
+  completes?: string;
 }
 
 export const TAP_TAGS: Record<string, TapTag> = {
   "front-door": { label: "Front door check-in", place: "Front door" },
-  "hvac-filter": { label: "HVAC filter changed", place: "HVAC" },
-  "water-heater": { label: "Water heater checked", place: "Water heater" },
+  "hvac-filter": { label: "HVAC filter changed", place: "HVAC", completes: "HVAC filter" },
+  "water-heater": { label: "Water heater flushed", place: "Water heater", completes: "Water heater" },
   "dishwasher-clean": { label: "Dishwasher is clean", place: "Kitchen" },
   "pantry-low": { label: "Pantry running low", place: "Pantry" },
   "medicine-given": { label: "Medicine given", place: "Medicine cabinet" },
-  "smoke-detectors": { label: "Smoke/CO detectors tested", place: "Hallway" },
+  "smoke-detectors": { label: "Smoke/CO detectors tested", place: "Hallway", completes: "Smoke" },
   "car-fuel": { label: "Car fuel/mileage logged", place: "Car" },
 };
 

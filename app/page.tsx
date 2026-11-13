@@ -1,263 +1,279 @@
-// ─── THE PULSE ────────────────────────────────────────────────────────────
-// Screen's single job: tell the household, in under two seconds, whether the
-// house is okay — and then surface exactly what's waiting on a human.
-//
-// Layout (sketched before build):
-//   ┌──────────────────────────────────────┐
-//   │  HOUSEHOLD PULSE  — state line + arc │  ← the house's heartbeat
-//   ├──────────────────────────────────────┤
-//   │  WAITING ON YOU   — calls w/ verbs   │  ← decisions, not checkboxes
-//   ├──────────────────────────────────────┤
-//   │  TODAY            — the day's rhythm │
-//   ├──────────────────────────────────────┤
-//   │  THE DESK         — agent narrative  │  ← what the system has done
-//   └──────────────────────────────────────┘
+// Manage page: the one place (on your phone) to edit what the wall shows.
+// Behind the Supabase session wall in middleware.ts.
 
-import Link from "next/link";
-import { AGENTS } from "@/lib/agents";
-import { formatMoney, relativeDay, daysUntil } from "@/lib/utils";
-import { HouseholdPulse, type PulseNode } from "@/components/household-pulse";
-import { HouseholdCallCard, type HouseholdCall } from "@/components/household-call-card";
-import { AgentActivityFeed, type ActivityEntry } from "@/components/agent-activity-feed";
-import { PlayCard } from "@/components/play-card";
-import { houseStatePhrase, type HouseState } from "@/components/hearth-line";
-import type { AgentId } from "@/lib/types";
-import {
-  getBills, getCalendarEvents, getDecisions, getInboxItems,
-  getMaintenanceItems, getTasks, getBriefingSummary,
-} from "@/lib/server/data";
-import { getPendingPlays } from "@/lib/server/plays";
+import * as actions from "./actions";
+import { getCurrentHousehold } from "@/lib/server/household";
+import { listBills, listMeals, listRoutine, listTasks, listUpkeep, listVehicles } from "@/lib/server/store";
+import { wallToday } from "@/lib/server/wall";
+import { FREQUENCIES, addDays, dueLabel, dueTone, formatTime } from "@/lib/schedule";
 
-function SectionRule({ label }: { label: string }) {
+export const dynamic = "force-dynamic";
+
+const input = "w-full rounded-lg border border-edge bg-ink-950 px-3 py-2 text-base text-slate-100 placeholder:text-slate-600 focus:border-signal-blue/50 focus:outline-none";
+const primary = "rounded-lg bg-signal-blue px-4 py-2 text-sm font-semibold text-ink-950";
+const ghost = "rounded-lg border border-edge px-3 py-2 text-sm text-slate-300";
+const label = "mb-1 block text-xs text-slate-400";
+const TONE = { overdue: "text-signal-red", today: "text-signal-amber", soon: "text-slate-400", later: "text-slate-500" } as const;
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const SECTIONS = [
+  ["todos", "To-dos"], ["meals", "Dinners"], ["routine", "Routine"], ["bills", "Bills"], ["upkeep", "Upkeep"], ["cars", "Cars"],
+] as const;
+
+function Section({ id, title, hint, children }: { id: string; title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center gap-3 pb-3 pt-7">
-      <span className="text-2xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-        {label}
-      </span>
-      <div className="rule flex-1" />
-    </div>
+    <section id={id} className="scroll-mt-16 rounded-stone border border-edge bg-ink-900 p-4">
+      <h2 className="font-display text-xl">{title}</h2>
+      {hint && <p className="mt-0.5 text-sm text-slate-400">{hint}</p>}
+      <div className="mt-3 space-y-3">{children}</div>
+    </section>
   );
 }
 
-export default async function PulsePage() {
-  const [bills, calendar, decisions, inboxItems, maintenance, tasks, briefing, plays] =
-    await Promise.all([
-      getBills(), getCalendarEvents(), getDecisions(), getInboxItems(),
-      getMaintenanceItems(), getTasks(), getBriefingSummary(), getPendingPlays(),
-    ]);
-
-  const now = Date.now();
-  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
-
-  // ── Per-domain load → the Pulse arc ──────────────────────────────────
-  const openTasks = tasks.filter((t) => t.status !== "done");
-  const overdueBills = bills.filter((b) => b.status === "overdue");
-  const dueBills = bills.filter((b) => b.dueDate && b.status !== "paid");
-  const overdueMaint = maintenance.filter((m) => m.status === "overdue");
-  const dueSoonMaint = maintenance.filter((m) => m.status === "due-soon");
-  const openDecisions = decisions.filter((d) => d.status === "open");
-  const urgentDecisions = openDecisions.filter(
-    (d) => d.priority === "critical" || d.priority === "high"
+function Delete({ action, id }: { action: (fd: FormData) => Promise<void>; id: string }) {
+  // Two steps without JavaScript: open the disclosure, then confirm.
+  return (
+    <details className="relative">
+      <summary className="cursor-pointer list-none px-2 py-2 text-sm text-slate-500">Delete</summary>
+      <form action={action} className="absolute right-0 z-10 mt-1">
+        <input type="hidden" name="id" value={id} />
+        <button className="whitespace-nowrap rounded-lg bg-signal-red px-3 py-2 text-sm font-semibold text-ink-950">Yes, delete</button>
+      </form>
+    </details>
   );
-  const unreviewed = inboxItems.filter((i) => i.status === "new");
-  const todayEvents = calendar
-    .filter((e) => {
-      const s = new Date(e.start).getTime();
-      return s >= now - 30 * 60_000 && s <= todayEnd.getTime();
-    })
-    .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+}
 
-  const domainOrder: AgentId[] = ["meals", "home", "money", "schedule", "roster", "chief"];
-  const nodes: PulseNode[] = domainOrder.map((agentId) => {
-    const agentTasks = openTasks.filter((t) => t.agent === agentId);
-    let extra = 0;
-    let urgent = agentTasks.some(
-      (t) => t.priority === "critical" || (t.dueDate && new Date(t.dueDate).getTime() < now)
+function daysLabel(days: number[]): string {
+  const key = [...days].sort().join("");
+  if (key === "0123456") return "Every day";
+  if (key === "12345") return "Weekdays";
+  if (key === "06") return "Weekends";
+  return days.map((d) => DAYS[d]).join(", ");
+}
+
+export default async function ManagePage() {
+  const hh = await getCurrentHousehold();
+  if (!hh) {
+    return (
+      <main className="mx-auto max-w-md px-5 py-24 text-center">
+        <h1 className="font-display text-2xl">No household for this login</h1>
+        <p className="mt-2 text-sm text-slate-400">This email isn&rsquo;t a member of the household yet.</p>
+        <form action="/api/auth/logout" method="post" className="mt-6"><button className={ghost}>Sign out</button></form>
+      </main>
     );
-    if (agentId === "money") { extra += dueBills.length; urgent = urgent || overdueBills.length > 0; }
-    if (agentId === "home") { extra += overdueMaint.length + dueSoonMaint.length; urgent = urgent || overdueMaint.length > 0; }
-    if (agentId === "schedule") { extra += todayEvents.length; }
-    if (agentId === "chief") { extra += unreviewed.length + openDecisions.length; urgent = urgent || urgentDecisions.length > 0; }
-    const count = agentTasks.length + extra;
-    const tone: HouseState = urgent ? "urgent" : count > 0 ? "tending" : "steady";
-    return { id: agentId, label: AGENTS[agentId].name, accent: AGENTS[agentId].accent, count, tone };
-  });
-
-  // ── Calls waiting on the human ───────────────────────────────────────
-  const calls: HouseholdCall[] = [];
-
-  for (const b of overdueBills) {
-    calls.push({
-      id: `bill-${b.id}`, tone: "urgent",
-      title: `${b.name} is overdue${b.amount ? ` — ${formatMoney(b.amount)}` : ""}`,
-      why: b.autopay ? "Autopay didn't clear." : "Autopay is off — the late fee clock is running.",
-      verb: "Pay", href: "/money",
-      agentName: AGENTS.money.name, accent: AGENTS.money.accent,
-    });
-  }
-  for (const m of overdueMaint) {
-    calls.push({
-      id: `maint-${m.id}`, tone: "urgent",
-      title: `${m.item} is past due`,
-      why: `${m.system} · was due ${relativeDay(m.nextDue)}`,
-      verb: "Schedule", href: "/home",
-      agentName: AGENTS.home.name, accent: AGENTS.home.accent,
-    });
-  }
-  for (const d of urgentDecisions.slice(0, 3)) {
-    calls.push({
-      id: `decision-${d.id}`, tone: "tending",
-      title: d.title,
-      why: "The desk has laid out the options — it's your call.",
-      verb: "Decide", href: "/decisions",
-      agentName: AGENTS.chief.name, accent: AGENTS.chief.accent,
-    });
-  }
-  if (unreviewed.length > 0) {
-    calls.push({
-      id: "inbox-review", tone: "tending",
-      title: unreviewed.length === 1
-        ? `“${unreviewed[0].title}” was captured and routed`
-        : `${unreviewed.length} captures routed and waiting`,
-      why: "Approve the proposed plan, or redirect it.",
-      verb: "Review", href: "/inbox",
-      agentName: AGENTS.chief.name, accent: AGENTS.chief.accent,
-    });
-  }
-  for (const b of dueBills) {
-    const d = daysUntil(b.dueDate!);
-    if (b.status !== "overdue" && d >= 0 && d <= 3 && !b.autopay) {
-      calls.push({
-        id: `bill-soon-${b.id}`, tone: "tending",
-        title: `${b.name} is due ${relativeDay(b.dueDate!)}${b.amount ? ` — ${formatMoney(b.amount)}` : ""}`,
-        why: "Autopay is off for this one.",
-        verb: "Pay", href: "/money",
-        agentName: AGENTS.money.name, accent: AGENTS.money.accent,
-      });
-    }
   }
 
-  // ── House state + headline ───────────────────────────────────────────
-  const urgentCount = calls.filter((c) => c.tone === "urgent").length;
-  const state: HouseState =
-    urgentCount > 0 ? "urgent" : calls.length > 0 ? "tending" : "steady";
-  const stateLine = houseStatePhrase(state, urgentCount > 0 ? urgentCount : calls.length);
-
-  // ── The desk: agent activity narrative ──────────────────────────────
-  const activity: ActivityEntry[] = inboxItems
-    .filter((i) => i.status !== "new")
-    .slice(0, 5)
-    .map((i) => {
-      const agent = AGENTS[i.primaryAgent] ?? AGENTS.chief;
-      const working = i.status === "processing";
-      const done = i.status === "processed" || i.status === "completed";
-      return {
-        id: i.id,
-        agentName: agent.name,
-        accent: agent.accent,
-        working,
-        headline: done
-          ? `Closed out “${i.title}”`
-          : `Routed “${i.title}” to ${agent.name}`,
-        detail:
-          i.proposedTasks?.length > 0 && !done
-            ? `${i.proposedTasks.length} task${i.proposedTasks.length === 1 ? "" : "s"} proposed — nothing runs without your approval`
-            : undefined,
-        when: relativeDay(i.createdAt),
-      };
-    });
-
-  for (const insight of (briefing.crossAgentInsights ?? []).slice(0, 2)) {
-    const first = insight.agents?.[0] as AgentId | undefined;
-    const agent = (first && AGENTS[first]) || AGENTS.chief;
-    activity.push({
-      id: insight.id,
-      agentName: `${AGENTS.chief.name} desk`,
-      accent: agent.accent,
-      working: false,
-      headline: insight.insight,
-      when: "Today",
-    });
-  }
+  const { today, dayStart } = await wallToday(hh);
+  const [tasks, bills, upkeep, meals, routine, vehicles] = await Promise.all([
+    listTasks(hh, today, dayStart),
+    listBills(hh, today),
+    listUpkeep(hh, today),
+    listMeals(hh, today, addDays(today, 6)),
+    listRoutine(hh, today),
+    listVehicles(hh, today),
+  ]);
+  const dinnerOn = new Map(meals.map((m) => [m.date, m.dinner ?? ""]));
+  const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "short", month: "numeric", day: "numeric" });
 
   return (
-    <div className="mx-auto max-w-2xl py-2">
-      {/* The heartbeat */}
-      <HouseholdPulse
-        stateLine={stateLine}
-        supportLine={state === "steady"
-          ? "Bills are current, maintenance is on schedule, and the desk has nothing waiting on you. Go live your life."
-          : briefing.headline}
-        nodes={nodes}
-      />
+    <main id="main" className="mx-auto max-w-xl px-4 pb-24">
+      <header className="flex items-center justify-between py-4">
+        <h1 className="font-display text-2xl font-semibold">Burden House</h1>
+        <div className="flex items-center gap-2">
+          <a href="/wall" className={ghost}>Wall</a>
+          <form action="/api/auth/logout" method="post"><button className={ghost}>Sign out</button></form>
+        </div>
+      </header>
 
-      {/* Waiting on you — Plays render above single proposals */}
-      {(plays.length > 0 || calls.length > 0) && (
-        <>
-          <SectionRule label="Waiting on you" />
-          <div className="space-y-3">
-            {plays.map((play) => (
-              <PlayCard key={play.id} play={play} />
-            ))}
-            {calls.slice(0, 6).map((call) => (
-              <HouseholdCallCard key={call.id} call={call} />
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* Today */}
-      <SectionRule label="Today" />
-      {todayEvents.length > 0 ? (
-        <ol className="space-y-px overflow-hidden rounded-xl border border-edge">
-          {todayEvents.map((e) => (
-            <li key={e.id}>
-              <Link
-                href="/schedule"
-                className="flex items-baseline gap-4 bg-ink-900/40 px-4 py-3 transition hover:bg-ink-800/60"
-              >
-                <span className="w-20 shrink-0 font-mono text-xs text-signal-cyan">
-                  {new Date(e.start).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-sm text-slate-200">{e.title}</span>
-                {e.location && (
-                  <span className="hidden shrink-0 text-xs text-slate-500 sm:inline">{e.location}</span>
-                )}
-              </Link>
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <p className="px-1 text-sm text-slate-500">
-          A clear calendar. {openTasks.length > 0
-            ? `If you want momentum, ${openTasks.length} open thread${openTasks.length === 1 ? "" : "s"} are on the board.`
-            : "Nothing scheduled, nothing pending."}
-          {" "}
-          <Link href="/tasks" className="text-slate-400 underline-offset-2 hover:underline">
-            See the board
-          </Link>
-        </p>
-      )}
-
-      {/* The desk */}
-      <SectionRule label="The desk" />
-      <AgentActivityFeed entries={activity} />
-
-      {/* Quiet footer nav */}
-      <div className="flex flex-wrap gap-x-5 gap-y-1 px-1 pb-2 pt-8 text-xs text-slate-400">
-        {[
-          { href: "/inbox", label: unreviewed.length > 0 ? `Inbox (${unreviewed.length})` : "Inbox" },
-          { href: "/decisions", label: openDecisions.length > 0 ? `Decisions (${openDecisions.length})` : "Decisions" },
-          { href: "/tasks", label: "Tasks" },
-          { href: "/money", label: "Money" },
-          { href: "/meals", label: "Meals" },
-          { href: "/schedule", label: "Schedule" },
-        ].map(({ href, label }) => (
-          <Link key={href} href={href} className="transition hover:text-slate-200">
-            {label}
-          </Link>
+      <nav aria-label="Sections" className="sticky top-0 z-20 -mx-4 mb-4 flex gap-2 overflow-x-auto border-b border-edge bg-ink-950/95 px-4 py-2 backdrop-blur">
+        {SECTIONS.map(([id, name]) => (
+          <a key={id} href={`#${id}`} className="shrink-0 rounded-full border border-edge px-3 py-1.5 text-sm text-slate-300">{name}</a>
         ))}
+      </nav>
+
+      <div className="space-y-4">
+        <Section id="todos" title="To-dos" hint="Anything due within a week shows on the wall, where it can be checked off.">
+          <form action={actions.addTask} className="flex flex-wrap gap-2">
+            <input name="title" required maxLength={120} placeholder="Add a to-do" aria-label="To-do" className={`${input} min-w-0 flex-1 basis-48`} />
+            <input name="due" type="date" aria-label="Due date (optional)" className={`${input} w-auto`} />
+            <button className={primary}>Add</button>
+          </form>
+          {tasks.length === 0 && <p className="text-sm text-slate-500">Nothing on the list.</p>}
+          <ul className="divide-y divide-edge">
+            {tasks.map((t) => (
+              <li key={t.id} className="flex items-center gap-2 py-2">
+                <form action={actions.toggleTask}>
+                  <input type="hidden" name="id" value={t.id} />
+                  <input type="hidden" name="done" value={t.done ? "0" : "1"} />
+                  <button
+                    aria-label={t.done ? `Reopen ${t.title}` : `Mark ${t.title} done`}
+                    className={`grid h-8 w-8 place-items-center rounded-full border-2 ${t.done ? "border-signal-green bg-signal-green text-ink-950" : "border-slate-500"}`}
+                  >
+                    {t.done ? "✓" : ""}
+                  </button>
+                </form>
+                <div className="min-w-0 flex-1">
+                  <p className={`truncate ${t.done ? "text-slate-500 line-through" : ""}`}>{t.title}</p>
+                  {!t.done && t.dueDate && <p className={`text-xs ${TONE[dueTone(t.dueDate, today)]}`}>{dueLabel(t.dueDate, today)}</p>}
+                </div>
+                <Delete action={actions.deleteTask} id={t.id} />
+              </li>
+            ))}
+          </ul>
+        </Section>
+
+        <Section id="meals" title="Dinners" hint="Tonight's dinner is the headline on the wall; the rest of the week sits below it.">
+          <form action={actions.saveMeals} className="space-y-2">
+            {Array.from({ length: 7 }, (_, i) => addDays(today, i)).map((day, i) => (
+              <label key={day} className="flex items-center gap-3">
+                <span className="w-20 shrink-0 text-sm text-slate-400">{i === 0 ? "Tonight" : weekday.format(new Date(`${day}T12:00:00Z`))}</span>
+                <input name={`dinner_${day}`} defaultValue={dinnerOn.get(day) ?? ""} maxLength={80} placeholder="Not planned" className={input} />
+              </label>
+            ))}
+            <button className={primary}>Save dinners</button>
+          </form>
+        </Section>
+
+        <Section id="routine" title="Routine" hint="The daily rhythm: drop-off, pickup, bath, bedtime. The wall highlights what's next.">
+          <form action={actions.addRoutine} className="grid grid-cols-2 gap-2">
+            <input name="label" required maxLength={80} placeholder="e.g. Daycare pickup" aria-label="Routine item" className={`${input} col-span-2`} />
+            <input name="time" type="time" required aria-label="Time" className={input} />
+            <select name="days" aria-label="Days" className={input} defaultValue="every">
+              <option value="every">Every day</option>
+              <option value="weekdays">Weekdays</option>
+              <option value="weekends">Weekends</option>
+            </select>
+            <input name="who" maxLength={30} placeholder="Who (optional)" aria-label="Who" className={input} />
+            <button className={primary}>Add</button>
+          </form>
+          {routine.length === 0 && <p className="text-sm text-slate-500">No routine yet.</p>}
+          <ul className="divide-y divide-edge">
+            {routine.map((r) => (
+              <li key={r.id} className="flex items-center gap-3 py-2">
+                <span className="w-20 shrink-0 tabular-nums text-slate-400">{formatTime(r.time)}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate">{r.label}</p>
+                  <p className="text-xs text-slate-500">{daysLabel(r.days)}{r.who ? ` · ${r.who}` : ""}</p>
+                </div>
+                <Delete action={actions.deleteRoutine} id={r.id} />
+              </li>
+            ))}
+          </ul>
+        </Section>
+
+        <Section id="bills" title="Bills" hint="Bills you pay by hand show on the wall the week they're due, without amounts. Autopay bills stay off it.">
+          <ul className="divide-y divide-edge">
+            {bills.map((b) => (
+              <li key={b.id} className="py-2">
+                <details>
+                  <summary className="flex cursor-pointer list-none items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate">{b.name}</p>
+                      <p className={`text-xs ${b.dueDate ? TONE[dueTone(b.dueDate, today)] : "text-slate-500"}`}>
+                        {b.dueDate ? dueLabel(b.dueDate, today) : "No due date"} · {b.frequency}{b.autopay ? " · autopay" : ""}
+                      </p>
+                    </div>
+                    <span className="tabular-nums text-slate-300">${b.amount.toFixed(2)}</span>
+                    <span className="text-xs text-slate-500">Edit</span>
+                  </summary>
+                  <BillForm bill={b} />
+                  <div className="mt-2 flex items-center justify-between">
+                    <form action={actions.payBill}>
+                      <input type="hidden" name="id" value={b.id} />
+                      <button className={ghost}>Mark paid</button>
+                    </form>
+                    <Delete action={actions.deleteBill} id={b.id} />
+                  </div>
+                </details>
+              </li>
+            ))}
+          </ul>
+          <details>
+            <summary className={`${ghost} inline-block cursor-pointer list-none`}>Add a bill</summary>
+            <BillForm />
+          </details>
+        </Section>
+
+        <Section id="upkeep" title="Upkeep" hint="Recurring home jobs. Marking one done schedules the next one automatically.">
+          <ul className="divide-y divide-edge">
+            {upkeep.map((u) => (
+              <li key={u.id} className="flex items-center gap-2 py-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate">{u.item}</p>
+                  <p className={`text-xs ${TONE[dueTone(u.nextDue, today)]}`}>{dueLabel(u.nextDue, today)} · {u.frequency}</p>
+                </div>
+                <form action={actions.completeUpkeep}>
+                  <input type="hidden" name="id" value={u.id} />
+                  <button className={ghost}>Done</button>
+                </form>
+                <Delete action={actions.deleteUpkeep} id={u.id} />
+              </li>
+            ))}
+          </ul>
+          <details>
+            <summary className={`${ghost} inline-block cursor-pointer list-none`}>Add an upkeep job</summary>
+            <form action={actions.addUpkeep} className="mt-3 grid grid-cols-2 gap-2">
+              <input name="item" required maxLength={80} placeholder="e.g. Clean dryer vent" aria-label="Job" className={`${input} col-span-2`} />
+              <select name="frequency" aria-label="How often" defaultValue="quarterly" className={input}>
+                {FREQUENCIES.filter((f) => f !== "seasonal").map((f) => <option key={f}>{f}</option>)}
+              </select>
+              <input name="due" type="date" aria-label="First due" className={input} />
+              <button className={`${primary} col-span-2`}>Add</button>
+            </form>
+          </details>
+        </Section>
+
+        <Section id="cars" title="Cars" hint="Keep mileage roughly current and the wall will flag oil changes and registration on its own.">
+          {vehicles.map((v) => (
+            <details key={v.id} className="rounded-lg border border-edge p-3">
+              <summary className="flex cursor-pointer list-none items-center justify-between">
+                <span>{v.year} {v.make} {v.model}</span>
+                <span className="text-sm text-slate-400">{v.mileage != null ? `${v.mileage.toLocaleString("en-US")} mi` : "Mileage?"}</span>
+              </summary>
+              <VehicleForm vehicle={v} />
+              <div className="mt-1 flex justify-end"><Delete action={actions.deleteVehicle} id={v.id} /></div>
+            </details>
+          ))}
+          <details>
+            <summary className={`${ghost} inline-block cursor-pointer list-none`}>Add a car</summary>
+            <VehicleForm />
+          </details>
+        </Section>
       </div>
-    </div>
+    </main>
+  );
+}
+
+function BillForm({ bill }: { bill?: Awaited<ReturnType<typeof listBills>>[number] }) {
+  return (
+    <form action={actions.saveBill} className="mt-3 grid grid-cols-2 gap-2">
+      {bill && <input type="hidden" name="id" value={bill.id} />}
+      <label className="col-span-2"><span className={label}>Name</span><input name="name" required maxLength={80} defaultValue={bill?.name} className={input} /></label>
+      <label><span className={label}>Amount ($)</span><input name="amount" required inputMode="decimal" pattern="\d+(\.\d{1,2})?" defaultValue={bill ? bill.amount.toFixed(2) : ""} className={input} /></label>
+      <label><span className={label}>Next due</span><input name="due" type="date" defaultValue={bill?.dueDate} className={input} /></label>
+      <label><span className={label}>Repeats</span>
+        <select name="frequency" defaultValue={bill?.frequency ?? "monthly"} className={input}>
+          {FREQUENCIES.filter((f) => f !== "seasonal" && f !== "semi-annual").map((f) => <option key={f}>{f}</option>)}
+        </select>
+      </label>
+      <label className="flex items-end gap-2 pb-2"><input type="checkbox" name="autopay" defaultChecked={bill?.autopay} className="h-5 w-5" /><span className="text-sm">Autopay</span></label>
+      <button className={`${primary} col-span-2`}>{bill ? "Save" : "Add bill"}</button>
+    </form>
+  );
+}
+
+function VehicleForm({ vehicle: v }: { vehicle?: Awaited<ReturnType<typeof listVehicles>>[number] }) {
+  return (
+    <form action={actions.saveVehicle} className="mt-3 grid grid-cols-2 gap-2">
+      {v && <input type="hidden" name="id" value={v.id} />}
+      <label><span className={label}>Year</span><input name="year" required inputMode="numeric" pattern="\d{4}" defaultValue={v?.year} className={input} /></label>
+      <label><span className={label}>Make</span><input name="make" required maxLength={40} defaultValue={v?.make} className={input} /></label>
+      <label className="col-span-2"><span className={label}>Model</span><input name="model" required maxLength={40} defaultValue={v?.model} className={input} /></label>
+      <label><span className={label}>Mileage now</span><input name="mileage" inputMode="numeric" pattern="\d*" defaultValue={v?.mileage} className={input} /></label>
+      <label><span className={label}>Mileage at last oil change</span><input name="lastOil" inputMode="numeric" pattern="\d*" defaultValue={v?.lastOilChangeMiles} className={input} /></label>
+      <label><span className={label}>Oil change every (mi)</span><input name="interval" inputMode="numeric" pattern="\d*" defaultValue={v?.oilChangeIntervalMiles ?? 5000} className={input} /></label>
+      <label><span className={label}>Registration expires</span><input name="registration" type="date" defaultValue={v?.registrationExpires} className={input} /></label>
+      <button className={`${primary} col-span-2`}>{v ? "Save" : "Add car"}</button>
+    </form>
   );
 }
