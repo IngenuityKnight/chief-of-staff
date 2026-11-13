@@ -36,7 +36,7 @@ function escapeHtml(s: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const secret = process.env.TAP_SECRET ?? "";
+  const secret = (process.env.TAP_SECRET ?? "").trim();
   const slug = req.nextUrl.searchParams.get("tag") ?? "";
   const token = req.nextUrl.searchParams.get("k") ?? "";
 
