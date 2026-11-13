@@ -25,10 +25,12 @@ export async function GET(req: NextRequest) {
 
   try {
     const now = new Date().toISOString();
+    const householdId = getHouseholdForJob();
 
     const { data: overdueItems, error } = await supabase
       .from("maintenance_items")
       .select("id, item, system, frequency, next_due, last_task_id")
+      .eq("household_id", householdId)
       .eq("auto_create_task", true)
       .lte("next_due", now)
       .in("status", ["overdue", "due-soon"]);
@@ -44,11 +46,23 @@ export async function GET(req: NextRequest) {
     let created = 0;
 
     for (const item of overdueItems as Array<Record<string, unknown>>) {
+      // Don't create another task while the previous one is still open —
+      // without this the job re-created the same task every day.
+      if (item.last_task_id) {
+        const { data: prior } = await supabase
+          .from("tasks")
+          .select("status")
+          .eq("id", String(item.last_task_id))
+          .maybeSingle();
+        if (prior && (prior as { status?: string }).status !== "done") continue;
+      }
+
       const taskId = crypto.randomUUID();
       const title = `${item.item} — ${item.frequency} maintenance`;
 
       const { error: taskError } = await supabase.from("tasks").insert({
         id: taskId,
+        household_id: householdId,
         title,
         agent: "home",
         category: "Household",
@@ -80,7 +94,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Auto-create maintenance items from vehicle state
-    const vehicles = await getVehicles(getHouseholdForJob());
+    const vehicles = await getVehicles(householdId);
     for (const vehicle of vehicles) {
       const label = `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
       const checks: { title: string; condition: boolean; priority: "high" | "medium" }[] = [];
@@ -120,6 +134,7 @@ export async function GET(req: NextRequest) {
         const { data: existing } = await supabase
           .from("maintenance_items")
           .select("id, status")
+          .eq("household_id", householdId)
           .ilike("item", check.title)
           .in("status", ["due-soon", "overdue", "in-progress"])
           .maybeSingle();
@@ -129,6 +144,7 @@ export async function GET(req: NextRequest) {
         const nextDue = new Date().toISOString();
         const { error: maintError } = await supabase.from("maintenance_items").insert({
           id: crypto.randomUUID(),
+          household_id: householdId,
           item: check.title,
           system: "Vehicle",
           frequency: "annual",
