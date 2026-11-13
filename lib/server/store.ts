@@ -9,7 +9,7 @@ import { randomUUID } from "node:crypto";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { sampleData } from "@/lib/sample-data";
 import { isYmd, nextBillDue, nextDue } from "@/lib/schedule";
-import type { Bill, Frequency, MealDay, RoutineItem, TapEvent, Task, UpkeepItem, Vehicle } from "@/lib/types";
+import type { Bill, Frequency, MealDay, RoutineItem, TapEvent, Task, UpkeepItem, Vehicle, VehicleService } from "@/lib/types";
 
 type Row = Record<string, unknown>;
 
@@ -177,6 +177,7 @@ const toUpkeep = (r: Row): UpkeepItem => ({
   frequency: String(r.frequency) as Frequency,
   lastDone: ymd(r.last_done),
   nextDue: ymd(r.next_due) ?? "9999-12-31",
+  estCost: num(r.est_cost),
 });
 
 export async function listUpkeep(householdId: string, today: string): Promise<UpkeepItem[]> {
@@ -184,7 +185,7 @@ export async function listUpkeep(householdId: string, today: string): Promise<Up
   if (!sb) return sampleData(today).upkeep;
   const { data, error } = await sb
     .from("maintenance_items")
-    .select("id,item,frequency,last_done,next_due")
+    .select("id,item,frequency,last_done,next_due,est_cost")
     .eq("household_id", householdId)
     .order("next_due", { ascending: true });
   check(error, "load upkeep");
@@ -374,4 +375,56 @@ export async function listTaps(householdId: string, today: string, limit = 5): P
     .limit(limit);
   check(error, "load taps");
   return (data ?? []).map((r: Row) => ({ slug: String(r.slug), label: String(r.label), at: String(r.created_at) }));
+}
+
+// ─── car services + cost estimates ───────────────────────────────────────────
+
+const toService = (r: Row): VehicleService => ({
+  id: String(r.id),
+  vehicleId: String(r.vehicle_id),
+  item: String(r.item),
+  intervalMiles: num(r.interval_miles),
+  intervalMonths: num(r.interval_months),
+  estCost: num(r.est_cost) ?? 0,
+  lastDoneMiles: num(r.last_done_miles),
+  lastDoneDate: ymd(r.last_done_date),
+  notes: typeof r.notes === "string" && r.notes ? r.notes : undefined,
+});
+
+export async function listVehicleServices(householdId: string): Promise<VehicleService[]> {
+  const sb = db();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("vehicle_services")
+    .select("id,vehicle_id,item,interval_miles,interval_months,est_cost,last_done_miles,last_done_date,notes")
+    .eq("household_id", householdId)
+    .order("item", { ascending: true });
+  check(error, "load car services");
+  return (data ?? []).map(toService);
+}
+
+/** Record a service as done at the given odometer reading and date. */
+export async function markServiceDone(householdId: string, id: string, miles: number | undefined, today: string) {
+  const sb = db();
+  if (!sb) return;
+  const { error } = await sb
+    .from("vehicle_services")
+    .update({ last_done_miles: miles ?? null, last_done_date: today })
+    .eq("household_id", householdId)
+    .eq("id", id);
+  check(error, "record the service");
+}
+
+export async function setServiceCost(householdId: string, id: string, cost: number) {
+  const sb = db();
+  if (!sb) return;
+  const { error } = await sb.from("vehicle_services").update({ est_cost: cost }).eq("household_id", householdId).eq("id", id);
+  check(error, "save the cost");
+}
+
+export async function setUpkeepCost(householdId: string, id: string, cost: number) {
+  const sb = db();
+  if (!sb) return;
+  const { error } = await sb.from("maintenance_items").update({ est_cost: cost }).eq("household_id", householdId).eq("id", id);
+  check(error, "save the cost");
 }

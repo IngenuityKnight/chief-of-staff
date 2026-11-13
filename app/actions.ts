@@ -164,3 +164,32 @@ export async function deleteVehicle(fd: FormData) {
   await store.deleteVehicle(hh, text(fd, "id", 64));
   done();
 }
+
+// ─── car services + cost estimates ───────────────────────────────────────────
+
+const money = (fd: FormData, key: string) => {
+  const v = text(fd, key, 12).replace(/[$,]/g, "");
+  if (!/^\d+(\.\d{1,2})?$/.test(v)) return undefined;
+  const n = Number(v);
+  return n <= 100_000 ? n : undefined;
+};
+
+export async function completeService(fd: FormData) {
+  const hh = await requireHousehold();
+  await store.markServiceDone(hh, text(fd, "id", 64), int(fd, "miles"), (await wallToday(hh)).today);
+  done();
+}
+
+export async function saveServiceCost(fd: FormData) {
+  const hh = await requireHousehold();
+  const cost = money(fd, "cost");
+  if (cost !== undefined) await store.setServiceCost(hh, text(fd, "id", 64), cost);
+  done();
+}
+
+export async function saveUpkeepCost(fd: FormData) {
+  const hh = await requireHousehold();
+  const cost = money(fd, "cost");
+  if (cost !== undefined) await store.setUpkeepCost(hh, text(fd, "id", 64), cost);
+  done();
+}
