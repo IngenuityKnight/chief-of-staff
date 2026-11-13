@@ -1,34 +1,41 @@
-// Server-side data assembly for the /wall kiosk. Read-only.
-// Each section is fetched independently so one failure (paused DB, Google
-// error) degrades to a notice instead of blanking the whole wall.
+// Server-side assembly of everything the /wall kiosk shows. Each section
+// loads independently, so one failure (database, Google, weather) becomes a
+// small notice instead of a blank wall.
 
 import { google } from "googleapis";
-import { getOAuthClient } from "@/lib/server/google-calendar";
-import { getBills, getMaintenanceItems, getMealPlan, getTasks } from "@/lib/server/data";
 import { getHouseholdForJob } from "@/lib/server/household";
-import { getSupabaseAdmin } from "@/lib/server/supabase";
-import { getHouseholdTimezone, todayInTz } from "@/lib/server/timezone";
-import { TAP_TAGS } from "@/lib/tap-tags";
-import {
-  addDaysYmd,
-  dayLabel,
-  groupEventsByDay,
-  parseCalendarConfig,
-  relativeAgo,
-  shortDate,
-  timeLabel,
-  toWallEvent,
-  type WallEvent,
-} from "@/lib/wall-events";
-import type { WallData, WallDay, WallDueItem, WallTapItem, WallTaskItem } from "@/lib/wall-types";
+import { listBills, listMeals, listRoutine, listTaps, listTasks, listUpkeep, listVehicles } from "@/lib/server/store";
+import { getHouseholdTimezone, todayInTz, zonedTimeToUtc } from "@/lib/server/timezone";
+import { getWeather } from "@/lib/server/weather";
+import { addDays, dueLabel, dueTone, formatTime, routineFor, vehicleAlerts, weekdayOf } from "@/lib/schedule";
+import { dayLabel, groupEventsByDay, parseCalendarConfig, relativeAgo, timeLabel, toWallEvent, type WallEvent } from "@/lib/wall-events";
+import type { WallData, WallDay, WallTodo } from "@/lib/wall-types";
 
-const DAYS_SHOWN = 4;
+const DAYS_SHOWN = 3;
+const TODO_HORIZON_DAYS = 7;
+const TODO_MAX = 9;
 
 export function wallHouseholdId(): string {
   return getHouseholdForJob(process.env.WALL_HOUSEHOLD_ID);
 }
 
-async function loadEvents(tz: string, todayYmd: string, notices: string[]): Promise<WallEvent[]> {
+export async function wallToday(householdId: string, now = new Date()) {
+  const tz = await getHouseholdTimezone(householdId);
+  const t = todayInTz(tz, now);
+  const today = `${t.year}-${String(t.month).padStart(2, "0")}-${String(t.day).padStart(2, "0")}`;
+  const dayStart = zonedTimeToUtc(t.year, t.month, t.day, 0, 0, tz).toISOString();
+  return { tz, today, dayStart };
+}
+
+function getOAuthClient() {
+  const { GOOGLE_CLIENT_ID: id, GOOGLE_CLIENT_SECRET: secret, GOOGLE_REFRESH_TOKEN: refresh } = process.env;
+  if (!id || !secret || !refresh) return null;
+  const client = new google.auth.OAuth2(id, secret);
+  client.setCredentials({ refresh_token: refresh });
+  return client;
+}
+
+async function loadEvents(tz: string, today: string, notices: string[]): Promise<WallEvent[]> {
   const configs = parseCalendarConfig(
     process.env.WALL_CALENDAR_IDS,
     process.env.WALL_BUSY_ONLY_IDS,
@@ -41,21 +48,14 @@ async function loadEvents(tz: string, todayYmd: string, notices: string[]): Prom
     return [];
   }
   const calendar = google.calendar({ version: "v3", auth });
-  // Pad the window by a day each side; exact bucketing happens in groupEventsByDay.
-  const timeMin = new Date(`${addDaysYmd(todayYmd, -1)}T00:00:00Z`).toISOString();
-  const timeMax = new Date(`${addDaysYmd(todayYmd, DAYS_SHOWN + 1)}T00:00:00Z`).toISOString();
-
+  // Pad the window a day each side; exact bucketing happens in groupEventsByDay.
+  const timeMin = new Date(`${addDays(today, -1)}T00:00:00Z`).toISOString();
+  const timeMax = new Date(`${addDays(today, DAYS_SHOWN + 1)}T00:00:00Z`).toISOString();
   const results = await Promise.all(
     configs.map(async (cal) => {
       try {
         const { data } = await calendar.events.list({
-          calendarId: cal.id,
-          timeMin,
-          timeMax,
-          singleEvents: true,
-          orderBy: "startTime",
-          maxResults: 50,
-          timeZone: tz,
+          calendarId: cal.id, timeMin, timeMax, singleEvents: true, orderBy: "startTime", maxResults: 50, timeZone: tz,
         });
         return (data.items ?? []).map((e) => toWallEvent(e, cal)).filter((e): e is WallEvent => e !== null);
       } catch {
@@ -67,25 +67,6 @@ async function loadEvents(tz: string, todayYmd: string, notices: string[]): Prom
   return results.flat();
 }
 
-async function loadTaps(householdId: string, now: Date): Promise<WallTapItem[]> {
-  const supabase = getSupabaseAdmin();
-  if (!supabase) return [];
-  const { data, error } = await supabase
-    .from("tap_events")
-    .select("slug,label,created_at")
-    .eq("household_id", householdId)
-    .order("created_at", { ascending: false })
-    .limit(5);
-  if (error) throw error;
-  return (data ?? []).map((r: { slug: string; label: string; created_at: string }) => ({
-    slug: r.slug,
-    label: r.label,
-    place: TAP_TAGS[r.slug]?.place ?? "",
-    at: r.created_at,
-    agoLabel: relativeAgo(r.created_at, now),
-  }));
-}
-
 async function safe<T>(label: string, notices: string[], fallback: T, fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
@@ -95,98 +76,75 @@ async function safe<T>(label: string, notices: string[], fallback: T, fn: () => 
   }
 }
 
-export async function getWallData(now = new Date()): Promise<WallData> {
-  const householdId = wallHouseholdId();
-  const notices: string[] = [];
-  const tz = await getHouseholdTimezone(householdId);
-  const t = todayInTz(tz, now);
-  const todayYmd = `${t.year}-${String(t.month).padStart(2, "0")}-${String(t.day).padStart(2, "0")}`;
-  const horizonYmd = addDaysYmd(todayYmd, 7);
+const TONE_ORDER = { overdue: 0, today: 1, soon: 2, later: 3, none: 4 } as const;
 
-  const [events, meals, maintenance, bills, tasks, taps] = await Promise.all([
-    loadEvents(tz, todayYmd, notices),
-    safe("Meals", notices, [], () => getMealPlan(householdId)),
-    safe("Maintenance", notices, [], () => getMaintenanceItems(householdId)),
-    safe("Bills", notices, [], () => getBills(householdId)),
-    safe("Tasks", notices, [], () => getTasks(householdId)),
-    safe("Taps", notices, [] as WallTapItem[], () => loadTaps(householdId, now)),
+export async function getWallData(now = new Date()): Promise<WallData> {
+  const hh = wallHouseholdId();
+  const notices: string[] = [];
+  const { tz, today, dayStart } = await wallToday(hh, now);
+  const horizon = addDays(today, TODO_HORIZON_DAYS);
+
+  const [events, weather, tasks, bills, upkeep, meals, routine, vehicles, taps] = await Promise.all([
+    loadEvents(tz, today, notices),
+    getWeather(tz),
+    safe("Tasks", notices, [], () => listTasks(hh, today, dayStart)),
+    safe("Bills", notices, [], () => listBills(hh, today)),
+    safe("Upkeep", notices, [], () => listUpkeep(hh, today)),
+    safe("Meals", notices, [], () => listMeals(hh, today, addDays(today, 6))),
+    safe("Routine", notices, [], () => listRoutine(hh, today)),
+    safe("Vehicles", notices, [], () => listVehicles(hh, today)),
+    safe("Taps", notices, [], () => listTaps(hh, today)),
   ]);
 
-  const days: WallDay[] = groupEventsByDay(events, tz, todayYmd, DAYS_SHOWN).map((d) => ({
+  const days: WallDay[] = groupEventsByDay(events, tz, today, DAYS_SHOWN).map((d) => ({
     ymd: d.ymd,
-    label: dayLabel(d.ymd, todayYmd),
-    isToday: d.ymd === todayYmd,
-    events: d.events.map((e) => ({
-      id: e.id,
-      who: e.who,
-      title: e.title,
-      timeLabel: timeLabel(e, tz),
-      location: e.location,
-      masked: e.masked,
-    })),
+    label: dayLabel(d.ymd, today),
+    isToday: d.ymd === today,
+    events: d.events.map((e) => ({ id: e.id, who: e.who, title: e.title, timeLabel: timeLabel(e, tz), masked: e.masked })),
   }));
 
-  const dinnerDay = meals.find((m) => m.date?.slice(0, 10) === todayYmd);
-  const dinner = dinnerDay?.dinner
-    ? { name: dinnerDay.dinner.name, kind: dinnerDay.dinner.kind, notes: dinnerDay.dinner.notes }
-    : null;
-
-  const dueSoon: WallDueItem[] = [];
-  for (const m of maintenance) {
-    const due = m.nextDue?.slice(0, 10);
-    if (!due || due > horizonYmd) continue;
-    dueSoon.push({
-      id: `m:${m.id}`,
-      label: m.item,
-      detail: due < todayYmd ? `Overdue (${shortDate(due)})` : `Due ${shortDate(due)}`,
-      tone: due < todayYmd ? "overdue" : "soon",
+  // One checklist: tasks, upkeep and bills that need a person this week.
+  const todo: WallTodo[] = [];
+  for (const t of tasks) {
+    if (!t.done && t.dueDate && t.dueDate > horizon) continue;
+    todo.push({
+      key: `task:${t.id}`, kind: "task", id: t.id, title: t.title, done: t.done,
+      detail: t.done ? "Done" : t.dueDate ? dueLabel(t.dueDate, today) : undefined,
+      tone: t.done || !t.dueDate ? "none" : dueTone(t.dueDate, today),
     });
+  }
+  for (const u of upkeep) {
+    if (u.nextDue > horizon) continue;
+    todo.push({ key: `upkeep:${u.id}`, kind: "upkeep", id: u.id, title: u.item, done: false, detail: dueLabel(u.nextDue, today), tone: dueTone(u.nextDue, today) });
   }
   for (const b of bills) {
-    if (b.status === "paid" || b.status === "canceled" || !b.dueDate) continue;
-    const due = b.dueDate.slice(0, 10);
-    if (due > horizonYmd) continue;
-    dueSoon.push({
-      id: `b:${b.id}`,
-      label: `${b.name} · $${Math.round(b.amount)}${b.autopay ? " (autopay)" : ""}`,
-      detail: due < todayYmd ? `Overdue (${shortDate(due)})` : `Due ${shortDate(due)}`,
-      tone: due < todayYmd ? "overdue" : "soon",
-    });
+    // Autopay bills need nobody; amounts stay off a wall that guests can see.
+    if (b.autopay || !b.dueDate || b.dueDate > horizon) continue;
+    todo.push({ key: `bill:${b.id}`, kind: "bill", id: b.id, title: `Pay ${b.name}`, done: false, detail: dueLabel(b.dueDate, today), tone: dueTone(b.dueDate, today) });
   }
-  dueSoon.sort((a, b) => (a.tone === b.tone ? a.detail.localeCompare(b.detail) : a.tone === "overdue" ? -1 : 1));
+  for (const a of vehicleAlerts(vehicles, today)) {
+    todo.push({ key: a.id, kind: "info", id: a.id, title: a.label, detail: a.detail, done: false, tone: "soon" });
+  }
+  todo.sort((a, b) => Number(a.done) - Number(b.done) || TONE_ORDER[a.tone] - TONE_ORDER[b.tone] || a.title.localeCompare(b.title));
 
-  const openTasks: WallTaskItem[] = tasks
-    .filter((tk) => tk.status !== "done" && !tk.completedAt)
-    .map((tk) => {
-      const due = tk.dueDate?.slice(0, 10);
-      return {
-        id: tk.id,
-        title: tk.title,
-        detail: due ? `Due ${shortDate(due)}` : undefined,
-        overdue: Boolean(due && due < todayYmd),
-        _due: due ?? "9999-12-31",
-      };
-    })
-    .sort((a, b) => a._due.localeCompare(b._due))
-    .slice(0, 6)
-    .map(({ _due, ...rest }) => rest);
-
-  const todayLabel = new Intl.DateTimeFormat("en-US", {
-    timeZone: tz,
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  }).format(now);
+  const mealByDate = new Map(meals.map((m) => [m.date, m]));
+  const tonight = mealByDate.get(today);
+  const weekdayFmt = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "short" });
 
   return {
-    generatedAt: now.toISOString(),
     timeZone: tz,
-    todayLabel,
+    todayLabel: new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "long", month: "long", day: "numeric" }).format(now),
+    weather,
     days,
-    dinner,
-    dueSoon: dueSoon.slice(0, 6),
-    tasks: openTasks,
-    taps,
+    dinner: tonight?.dinner ? { name: tonight.dinner, notes: tonight.notes } : null,
+    meals: Array.from({ length: 6 }, (_, i) => {
+      const ymd = addDays(today, i + 1);
+      return { ymd, label: weekdayFmt.format(new Date(`${ymd}T12:00:00Z`)), dinner: mealByDate.get(ymd)?.dinner };
+    }),
+    routine: routineFor(routine, weekdayOf(today)).map((r) => ({ id: r.id, time: r.time, timeLabel: formatTime(r.time), label: r.label, who: r.who })),
+    todo: todo.slice(0, TODO_MAX),
+    todoHidden: Math.max(0, todo.length - TODO_MAX),
+    taps: taps.map((t) => ({ key: `${t.slug}:${t.at}`, label: t.label, agoLabel: relativeAgo(t.at, now) })),
     notices: [...new Set(notices)],
   };
 }

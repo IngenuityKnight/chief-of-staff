@@ -3,13 +3,19 @@
 // Magic-link sign-in. Renders as a full-screen layer above the app shell so
 // the (empty, zero-count) rail behind it never reads as the product.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sparkles, MailCheck } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get("auth");
+    if (reason === "not_member") setError("That email isn't a member of this household.");
+    else if (reason) setError("That sign-in link didn't work. Send a new one.");
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -89,7 +95,7 @@ export default function LoginPage() {
         )}
 
         <p className="mt-8 text-center text-xs text-slate-500">
-          First time here? Signing in creates your household automatically.
+          Only household members can sign in.
         </p>
       </div>
     </div>

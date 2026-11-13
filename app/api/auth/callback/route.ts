@@ -2,15 +2,25 @@
 //
 // Verifies the token via a cookie-bound Supabase client so the session is
 // persisted as httpOnly auth cookies (middleware.ts enforces them from then
-// on). Then resolves the user's first household membership — creating a
-// household + owner membership for brand-new users — and sets the
-// cos_household_id cookie as the active-household selector.
+// on). Then resolves the user's household membership. Emails listed in
+// HOUSEHOLD_MEMBER_EMAILS join the household on first sign-in; anyone else
+// without a membership is signed straight back out.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { getSupabaseAdmin, getSupabaseUrl } from "@/lib/server/supabase";
 import { getSupabasePublicKey, isAuthConfigured } from "@/lib/server/auth";
-import { HOUSEHOLD_COOKIE } from "@/lib/server/household";
+import { HOUSEHOLD_COOKIE, getHouseholdForJob } from "@/lib/server/household";
+
+// HOUSEHOLD_MEMBER_EMAILS: comma-separated emails allowed to join the household.
+function isInvited(email: string | undefined): boolean {
+  if (!email) return false;
+  return (process.env.HOUSEHOLD_MEMBER_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+    .includes(email.toLowerCase());
+}
 
 export async function GET(req: NextRequest) {
   const tokenHash = req.nextUrl.searchParams.get("token_hash");
@@ -61,21 +71,21 @@ export async function GET(req: NextRequest) {
 
     if (existing) {
       householdId = (existing as { household_id: string }).household_id;
-    } else {
-      const { data: created } = await admin
-        .from("households")
-        .insert({ name: userEmail ? `${userEmail.split("@")[0]}'s household` : "New household" })
-        .select("id")
-        .single();
-      if (created) {
-        householdId = (created as { id: string }).id;
-        await admin.from("household_memberships").insert({
-          household_id: householdId,
-          user_id: userId,
-          role: "owner",
-        });
-      }
+    } else if (isInvited(userEmail)) {
+      // Invited family member signing in for the first time: join the household.
+      householdId = getHouseholdForJob(process.env.WALL_HOUSEHOLD_ID);
+      await admin.from("household_memberships").insert({
+        household_id: householdId,
+        user_id: userId,
+        role: "member",
+      });
     }
+  }
+
+  // This is one family's private app: no membership and no invite means no entry.
+  if (!householdId) {
+    await supabase.auth.signOut();
+    return NextResponse.redirect(new URL("/login?auth=not_member", req.nextUrl.origin));
   }
 
   if (householdId) {

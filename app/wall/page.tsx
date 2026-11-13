@@ -12,9 +12,9 @@ import WallView from "./wall-view";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "HQ",
+  title: "Wall",
   robots: { index: false, follow: false },
-  appleWebApp: { capable: true, title: "HQ", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "Wall", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {

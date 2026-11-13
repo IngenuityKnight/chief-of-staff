@@ -15,7 +15,7 @@ export default function NotFound() {
           href="/"
           className="mt-6 inline-block rounded-xl bg-signal-blue px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-signal-blue/85"
         >
-          Back to the Pulse
+          Back home
         </Link>
       </div>
     </div>

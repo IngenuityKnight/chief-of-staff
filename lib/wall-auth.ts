@@ -16,7 +16,7 @@ export const WALL_COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // seconds
 export const MIN_WALL_TOKEN_LENGTH = 24;
 
 function configuredToken(): string | null {
-  const value = process.env.WALL_TOKEN;
+  const value = process.env.WALL_TOKEN?.trim();
   return value && value.length >= MIN_WALL_TOKEN_LENGTH ? value : null;
 }
 

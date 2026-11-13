@@ -4,7 +4,7 @@
 import { tapToken, MIN_SECRET_LENGTH } from "../lib/tap-token.ts";
 import { TAP_TAGS } from "../lib/tap-tags.ts";
 
-const secret = process.env.TAP_SECRET ?? "";
+const secret = (process.env.TAP_SECRET ?? "").trim();
 if (secret.length < MIN_SECRET_LENGTH) {
   console.error(`Set TAP_SECRET (at least ${MIN_SECRET_LENGTH} chars) to the same value as in Vercel.`);
   process.exit(1);
