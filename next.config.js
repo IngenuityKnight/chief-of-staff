@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Turbopack (the default bundler in Next 16) infers the workspace root from
+  // the nearest lockfile, which can land outside the repo if one happens to
+  // sit in a parent directory. Pin it so builds don't depend on what else is
+  // on the machine.
+  turbopack: { root: __dirname },
   async headers() {
     return [
       {
