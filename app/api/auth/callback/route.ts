@@ -11,6 +11,7 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { getSupabaseAdmin, getSupabaseUrl } from "@/lib/server/supabase";
 import { getSupabasePublicKey, isAuthConfigured } from "@/lib/server/auth";
 import { HOUSEHOLD_COOKIE, getHouseholdForJob } from "@/lib/server/household";
+import { NEXT_COOKIE, safeNextPath } from "@/lib/safe-next";
 
 // HOUSEHOLD_MEMBER_EMAILS: comma-separated emails allowed to join the household.
 function isInvited(email: string | undefined): boolean {
@@ -33,10 +34,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL("/login?auth=not_configured", req.nextUrl.origin));
   }
 
+  // Finish where they were headed when the session wall stopped them. The
+  // cookie is re-validated here rather than trusted: it is set from a query
+  // string, and this is the redirect that actually fires.
+  const destination = safeNextPath(req.cookies.get(NEXT_COOKIE)?.value) ?? "/?auth=ok";
+
   // Attach session cookies directly to the response that reaches the browser.
   // Writing through cookies() and then constructing a separate redirect can
   // lose Set-Cookie headers in a route handler.
-  const response = NextResponse.redirect(new URL("/?auth=ok", req.nextUrl.origin));
+  const response = NextResponse.redirect(new URL(destination, req.nextUrl.origin));
+  response.cookies.delete(NEXT_COOKIE);
   const supabase = createServerClient(getSupabaseUrl(), getSupabasePublicKey(), {
     cookies: {
       getAll: () => req.cookies.getAll(),

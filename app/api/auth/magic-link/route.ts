@@ -11,6 +11,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getSupabaseUrl } from "@/lib/server/supabase";
 import { getSupabasePublicKey } from "@/lib/server/auth";
 import { rateLimit, rateLimitKey } from "@/lib/server/rate-limit";
+import { NEXT_COOKIE, NEXT_COOKIE_MAX_AGE, safeNextPath } from "@/lib/safe-next";
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { email } = (await req.json()) as { email?: string };
+    const { email, next } = (await req.json()) as { email?: string; next?: string };
     if (!email || typeof email !== "string" || !email.includes("@")) {
       return NextResponse.json({ ok: false, error: "Valid email required." }, { status: 400 });
     }
@@ -47,7 +48,24 @@ export async function POST(req: NextRequest) {
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
     }
-    return NextResponse.json({ ok: true });
+
+    // Remember where they were headed. This rides in a cookie rather than on
+    // the magic link, because a query string on emailRedirectTo can fall
+    // outside Supabase's Redirect URLs allow-list. If the link is opened on a
+    // different device the cookie simply isn't there and /api/auth/callback
+    // falls back to the home page.
+    const res = NextResponse.json({ ok: true });
+    const destination = safeNextPath(next);
+    if (destination) {
+      res.cookies.set(NEXT_COOKIE, destination, {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+        maxAge: NEXT_COOKIE_MAX_AGE,
+      });
+    }
+    return res;
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error.";
     return NextResponse.json({ ok: false, error: message }, { status: 400 });

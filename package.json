@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --test --experimental-strip-types lib/schedule.test.ts lib/tap-token.test.ts lib/wall-auth.test.ts lib/wall-events.test.ts lib/forecast.test.ts",
+    "test": "node --test --experimental-strip-types lib/schedule.test.ts lib/tap-token.test.ts lib/wall-auth.test.ts lib/wall-events.test.ts lib/forecast.test.ts lib/safe-next.test.ts",
     "tap:urls": "node --experimental-strip-types scripts/print-tap-urls.mjs"
   },
   "dependencies": {

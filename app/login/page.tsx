@@ -10,9 +10,14 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
+  // proxy.ts puts the page you were refused on in ?next=, so sign-in can
+  // finish where you were headed instead of dumping you on the home page.
+  const [next, setNext] = useState<string | null>(null);
 
   useEffect(() => {
-    const reason = new URLSearchParams(window.location.search).get("auth");
+    const params = new URLSearchParams(window.location.search);
+    setNext(params.get("next"));
+    const reason = params.get("auth");
     if (reason === "not_member") setError("That email isn't a member of this household.");
     else if (reason) setError("That sign-in link didn't work. Send a new one.");
   }, []);
@@ -27,7 +32,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/magic-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: email.trim(), next }),
       });
       const data = await res.json();
       if (!res.ok || data.ok === false) throw new Error(data.error ?? "Could not send the link.");
