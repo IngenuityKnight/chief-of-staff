@@ -13,6 +13,10 @@ export const dynamic = "force-dynamic";
 const input = "w-full rounded-lg border border-edge bg-ink-950 px-3 py-2 text-base text-slate-100 placeholder:text-slate-600 focus:border-signal-blue/50 focus:outline-none";
 const primary = "rounded-lg bg-signal-blue px-4 py-2 text-sm font-semibold text-ink-950";
 const ghost = "rounded-lg border border-edge px-3 py-2 text-sm text-slate-300";
+// Links that leave this page, styled apart from the section pills below the
+// header, which only jump within it.
+const pageLink =
+  "rounded-lg border border-signal-blue/30 bg-signal-blue/10 px-3 py-2 text-sm font-medium text-signal-blue";
 const label = "mb-1 block text-xs text-slate-400";
 const TONE = { overdue: "text-signal-red", today: "text-signal-amber", soon: "text-slate-400", later: "text-slate-500" } as const;
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -85,11 +89,16 @@ export default async function ManagePage() {
     <main id="main" className="mx-auto max-w-xl px-4 pb-24">
       <header className="flex items-center justify-between py-4">
         <h1 className="font-display text-2xl font-semibold">Burden House</h1>
-        <div className="flex items-center gap-2">
-          <a href="/wall" className={ghost}>Wall</a>
-          <form action="/api/auth/logout" method="post"><button className={ghost}>Sign out</button></form>
-        </div>
+        <form action="/api/auth/logout" method="post"><button className={ghost}>Sign out</button></form>
       </header>
+
+      {/* The only way to the other pages used to be typing their URLs, or
+          scrolling to Cars. The sticky row below is section anchors, so these
+          sit above it rather than mixing in with links that do not navigate. */}
+      <nav aria-label="Pages" className="mb-3 flex flex-wrap gap-2">
+        <a href="/vehicles-tracking" className={pageLink}>Fill-ups &amp; MPG</a>
+        <a href="/wall" className={pageLink}>Wall display</a>
+      </nav>
 
       <nav aria-label="Sections" className="sticky top-0 z-20 -mx-4 mb-4 flex gap-2 overflow-x-auto border-b border-edge bg-ink-950/95 px-4 py-2 backdrop-blur">
         {SECTIONS.map(([id, name]) => (
@@ -237,7 +246,15 @@ export default async function ManagePage() {
                 <span className="text-sm text-slate-400">{v.mileage != null ? `${v.mileage.toLocaleString("en-US")} mi` : "Mileage?"}</span>
               </summary>
               <VehicleForm vehicle={v} />
-              <div className="mt-1 flex justify-end"><Delete action={actions.deleteVehicle} id={v.id} /></div>
+              {/* The log form is what the NFC sticker opens; signed in, it is
+                  reachable without one. Useful when the sticker is on the other
+                  car, or the tag will not read. */}
+              <div className="mt-2 flex items-center justify-between">
+                <a href={`/vehicles/${v.id}/log`} className="text-sm text-signal-blue">
+                  Log a fill-up &rarr;
+                </a>
+                <Delete action={actions.deleteVehicle} id={v.id} />
+              </div>
             </details>
           ))}
           <details>

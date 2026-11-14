@@ -8,6 +8,9 @@
 //   - the vehicle log form and its POST, when the URL carries a `k` token
 //     (NFC car stickers; verified by a signed per-vehicle token)
 //
+// Two rules run before that check, because both fix sign-in links that arrive
+// slightly wrong and would otherwise fail silently. See docs/AUTH-SETUP.md.
+//
 // As with /wall, being listed here only gets the request past the session
 // check — the page and route handler still verify their own credential.
 //
@@ -36,8 +39,66 @@ function isPublic(pathname: string, params: URLSearchParams): boolean {
   return false;
 }
 
+const CALLBACK = "/api/auth/callback";
+
+// Supabase sends the sign-in token to whatever its dashboard's Site URL and
+// email template say, which this repo cannot hold and cannot validate. Both
+// have been wrong in practice, and both fail the same quiet way: the link
+// works, a session is created, and it lands somewhere the real domain cannot
+// read — so every later visit is signed out and bounces to /login.
+//
+// Rather than depend on that configuration being exact, accept the token
+// wherever it arrives and route it ourselves.
+
+// A session cookie belongs to one hostname. When the sign-in link points at a
+// deployment alias instead of the domain the household actually uses, the
+// session is set on the alias and the domain stays signed out forever. Send
+// every production request to the canonical host first, carrying the token
+// along, so there is only ever one cookie jar.
+//
+// Only in production: preview deployments each have their own hostname and
+// must keep serving themselves. A no-op when CANONICAL_HOST is unset.
+function canonicalRedirect(req: NextRequest): NextResponse | null {
+  const canonical = process.env.CANONICAL_HOST;
+  if (!canonical) return null;
+  if (process.env.VERCEL_ENV !== "production") return null;
+
+  const host = req.headers.get("host") ?? req.nextUrl.host;
+  if (!host || host === canonical) return null;
+
+  const target = new URL(req.nextUrl.toString());
+  target.host = canonical;
+  target.protocol = "https:";
+  target.port = "";
+  // 308 keeps the method, so a POST that lands on the alias is not silently
+  // turned into a GET.
+  return NextResponse.redirect(target, 308);
+}
+
+// The email template decides which path the token lands on. Point it at the
+// callback and this never fires; point it at "/" (or anywhere else) and the
+// token is still delivered rather than dropped on a page that cannot read it.
+function callbackRedirect(req: NextRequest): NextResponse | null {
+  const { pathname, searchParams } = req.nextUrl;
+  if (pathname === CALLBACK) return null;
+  const tokenHash = searchParams.get("token_hash");
+  if (!tokenHash) return null;
+
+  const target = new URL(CALLBACK, req.nextUrl.origin);
+  target.searchParams.set("token_hash", tokenHash);
+  target.searchParams.set("type", searchParams.get("type") ?? "email");
+  return NextResponse.redirect(target);
+}
+
 export async function proxy(req: NextRequest) {
   const { pathname, searchParams } = req.nextUrl;
+
+  const toCanonical = canonicalRedirect(req);
+  if (toCanonical) return toCanonical;
+
+  const toCallback = callbackRedirect(req);
+  if (toCallback) return toCallback;
+
   if (isPublic(pathname, searchParams)) return NextResponse.next();
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;

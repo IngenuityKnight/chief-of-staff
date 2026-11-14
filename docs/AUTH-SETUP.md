@@ -75,6 +75,24 @@ The `auth` query parameter on `/login` says which stage failed:
 | `/login?auth=not_member` | Verified fine, but no membership and not on the invite list (§3). |
 | `/login?auth=not_configured` | Supabase env vars missing on the deployment. |
 
+## What the app does to survive getting this wrong
+
+`proxy.ts` runs two rules before the session check, so a token that arrives
+slightly wrong is routed rather than dropped:
+
+- **Canonical host.** When `CANONICAL_HOST` is set, every *production* request
+  to any other hostname is redirected (308, so a POST stays a POST) to that
+  host, query string intact. A sign-in link pointing at a deployment alias
+  therefore still ends up setting its cookie on the one hostname the household
+  uses. Previews are untouched — they each have their own hostname and must
+  keep serving themselves.
+- **Callback forwarding.** A request carrying `token_hash` on any path is sent
+  to `/api/auth/callback` with `token_hash` and `type` preserved. The email
+  template can point at `/`, and the token still gets verified.
+
+These make the settings above forgiving, not optional: with the Site URL wrong,
+sign-in works but every link in the email still points at the wrong host first.
+
 ## One more trap
 
 The session cookie is per-hostname **and** per-browser. Opening the link in a
