@@ -1,5 +1,5 @@
 // /wall — read-only kiosk view for the hallway iPad. Not behind the Supabase
-// session wall (see middleware.ts); access requires the wall_session cookie
+// session wall (see proxy.ts); access requires the wall_session cookie
 // set by /api/wall/enter. Without it (or with WALL_TOKEN unset) this is a 404.
 
 import type { Metadata, Viewport } from "next";

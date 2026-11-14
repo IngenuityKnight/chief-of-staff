@@ -24,11 +24,13 @@ There is deliberately nothing else: no AI agents, no inbox, no background jobs. 
 
 ## Access
 
-- **Manage page:** Supabase session, enforced in `middleware.ts`. Only existing members, or emails in `HOUSEHOLD_MEMBER_EMAILS`, can sign in.
+- **Manage page:** Supabase session, enforced in `proxy.ts`. Only existing members, or emails in `HOUSEHOLD_MEMBER_EMAILS`, can sign in.
 - **Wall:** open `/wall?t=WALL_TOKEN` once on the iPad; it stays paired for a year. Rotate `WALL_TOKEN` to revoke.
 - **Stickers:** each URL is signed with `TAP_SECRET`.
 
 Setup, pairing and sticker steps: [`docs/WALL-AND-TAPS.md`](docs/WALL-AND-TAPS.md).
+Sign-in depends on Supabase dashboard settings this repo cannot hold, and gets them
+wrong silently: [`docs/AUTH-SETUP.md`](docs/AUTH-SETUP.md).
 
 ## Develop
 
