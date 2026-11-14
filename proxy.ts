@@ -1,4 +1,7 @@
-// Session wall. Every page and API route requires a Supabase session except:
+// Session wall (Next 16 renamed this convention from middleware to proxy; it
+// runs on the Node.js runtime, which is what the Supabase SSR client wants).
+//
+// Every page and API route requires a Supabase session except:
 //   - /login and /api/auth/*   (how you get a session)
 //   - /wall and /api/wall/*    (wall iPad; verified by the wall_session cookie)
 //   - /api/tap                 (NFC stickers; verified by a signed per-tag token)
@@ -33,7 +36,7 @@ function isPublic(pathname: string, params: URLSearchParams): boolean {
   return false;
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname, searchParams } = req.nextUrl;
   if (isPublic(pathname, searchParams)) return NextResponse.next();
 
