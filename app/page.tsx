@@ -244,6 +244,8 @@ export default async function ManagePage() {
             <summary className={`${ghost} inline-block cursor-pointer list-none`}>Add a car</summary>
             <VehicleForm />
           </details>
+          {/* The fill-up dashboard had no way in except typing its URL. */}
+          <a href="/vehicles-tracking" className={`${ghost} inline-block`}>Fill-ups &amp; MPG</a>
         </Section>
 
         <Section id="costs" title="Costs" hint={`Next 12 months of upkeep and car service, projected at ${annualMiles.toLocaleString("en-US")} miles a year. Costs are estimates until you replace them with real prices.`}>
