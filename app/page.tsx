@@ -1,9 +1,10 @@
 // Manage page: the one place (on your phone) to edit what the wall shows.
 // Behind the Supabase session wall in middleware.ts.
 
+import { buildForecast } from "@/lib/forecast";
 import * as actions from "./actions";
 import { getCurrentHousehold } from "@/lib/server/household";
-import { listBills, listMeals, listRoutine, listTasks, listUpkeep, listVehicles } from "@/lib/server/store";
+import { listBills, listMeals, listRoutine, listTasks, listUpkeep, listVehicleServices, listVehicles } from "@/lib/server/store";
 import { wallToday } from "@/lib/server/wall";
 import { FREQUENCIES, addDays, dueLabel, dueTone, formatTime } from "@/lib/schedule";
 
@@ -17,7 +18,7 @@ const TONE = { overdue: "text-signal-red", today: "text-signal-amber", soon: "te
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const SECTIONS = [
-  ["todos", "To-dos"], ["meals", "Dinners"], ["routine", "Routine"], ["bills", "Bills"], ["upkeep", "Upkeep"], ["cars", "Cars"],
+  ["todos", "To-dos"], ["meals", "Dinners"], ["routine", "Routine"], ["bills", "Bills"], ["upkeep", "Upkeep"], ["cars", "Cars"], ["costs", "Costs"],
 ] as const;
 
 function Section({ id, title, hint, children }: { id: string; title: string; hint?: string; children: React.ReactNode }) {
@@ -64,14 +65,19 @@ export default async function ManagePage() {
   }
 
   const { today, dayStart } = await wallToday(hh);
-  const [tasks, bills, upkeep, meals, routine, vehicles] = await Promise.all([
+  const [tasks, bills, upkeep, meals, routine, vehicles, services] = await Promise.all([
     listTasks(hh, today, dayStart),
     listBills(hh, today),
     listUpkeep(hh, today),
     listMeals(hh, today, addDays(today, 6)),
     listRoutine(hh, today),
     listVehicles(hh, today),
+    listVehicleServices(hh),
   ]);
+  const annualMiles = Number(process.env.ANNUAL_MILES) || 10000;
+  const forecast = buildForecast({ today, annualMiles, vehicles, services, upkeep });
+  const money0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+  const monthName = (m: string) => new Date(`${m}-15T12:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", month: "short" });
   const dinnerOn = new Map(meals.map((m) => [m.date, m.dinner ?? ""]));
   const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "short", month: "numeric", day: "numeric" });
 
@@ -238,6 +244,68 @@ export default async function ManagePage() {
             <summary className={`${ghost} inline-block cursor-pointer list-none`}>Add a car</summary>
             <VehicleForm />
           </details>
+        </Section>
+
+        <Section id="costs" title="Costs" hint={`Next 12 months of upkeep and car service, projected at ${annualMiles.toLocaleString("en-US")} miles a year. Costs are estimates until you replace them with real prices.`}>
+          <div className="rounded-lg border border-edge p-3">
+            <p className="font-display text-3xl">{money0(forecast.total)}</p>
+            <p className="text-sm text-slate-400">Cars {money0(forecast.byGroup.car)} · Home {money0(forecast.byGroup.home)}</p>
+            <ul className="mt-3 grid grid-cols-4 gap-2 text-center text-xs text-slate-400">
+              {forecast.byMonth.map((m) => (
+                <li key={m.month}><span className="block text-slate-500">{monthName(m.month)}</span>{m.total ? money0(m.total) : "–"}</li>
+              ))}
+            </ul>
+          </div>
+          {vehicles.map((v) => {
+            const list = services.filter((s) => s.vehicleId === v.id);
+            if (!list.length) return null;
+            return (
+              <div key={v.id}>
+                <h3 className="mb-1 text-sm font-semibold text-slate-300">{v.year} {v.make} {v.model}</h3>
+                <ul className="divide-y divide-edge">
+                  {list.map((s) => (
+                    <li key={s.id} className="py-2">
+                      <p>{s.item}</p>
+                      <p className="text-xs text-slate-400">
+                        {[s.intervalMiles ? `every ${s.intervalMiles.toLocaleString("en-US")} mi` : null, s.intervalMonths ? `${s.intervalMonths} mo` : null].filter(Boolean).join(" / ")}
+                        {" · "}{s.lastDoneDate || s.lastDoneMiles != null ? `last ${s.lastDoneMiles != null ? `${s.lastDoneMiles.toLocaleString("en-US")} mi` : s.lastDoneDate}` : "no history yet"}
+                      </p>
+                      {s.notes && <p className="text-xs text-slate-500">{s.notes}</p>}
+                      <div className="mt-2 flex items-center gap-2">
+                        <form action={actions.saveServiceCost} className="flex items-center gap-1">
+                          <input type="hidden" name="id" value={s.id} />
+                          <span className="text-slate-400">$</span>
+                          <input name="cost" inputMode="decimal" defaultValue={s.estCost} aria-label={`Cost of ${s.item}`} className={`${input} w-24`} />
+                          <button className={ghost}>Save</button>
+                        </form>
+                        <form action={actions.completeService} className="ml-auto flex items-center gap-1">
+                          <input type="hidden" name="id" value={s.id} />
+                          <input name="miles" inputMode="numeric" defaultValue={v.mileage ?? ""} aria-label="Odometer when done" className={`${input} w-24`} />
+                          <button className={ghost}>Done</button>
+                        </form>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
+          <div>
+            <h3 className="mb-1 text-sm font-semibold text-slate-300">Home upkeep</h3>
+            <ul className="divide-y divide-edge">
+              {upkeep.map((u) => (
+                <li key={u.id} className="flex items-center gap-2 py-2">
+                  <span className="min-w-0 flex-1 truncate">{u.item}</span>
+                  <form action={actions.saveUpkeepCost} className="flex items-center gap-1">
+                    <input type="hidden" name="id" value={u.id} />
+                    <span className="text-slate-400">$</span>
+                    <input name="cost" inputMode="decimal" defaultValue={u.estCost ?? ""} placeholder="0" aria-label={`Cost of ${u.item}`} className={`${input} w-20`} />
+                    <button className={ghost}>Save</button>
+                  </form>
+                </li>
+              ))}
+            </ul>
+          </div>
         </Section>
       </div>
     </main>
