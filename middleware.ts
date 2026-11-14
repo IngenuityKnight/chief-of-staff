@@ -2,6 +2,11 @@
 //   - /login and /api/auth/*   (how you get a session)
 //   - /wall and /api/wall/*    (wall iPad; verified by the wall_session cookie)
 //   - /api/tap                 (NFC stickers; verified by a signed per-tag token)
+//   - the vehicle log form and its POST, when the URL carries a `k` token
+//     (NFC car stickers; verified by a signed per-vehicle token)
+//
+// As with /wall, being listed here only gets the request past the session
+// check — the page and route handler still verify their own credential.
 //
 // Configuration states:
 //   - Supabase entirely unconfigured → local preview with sample data.
@@ -14,16 +19,23 @@ import { NextResponse, type NextRequest } from "next/server";
 const PUBLIC_PREFIXES = ["/api/auth/", "/api/wall/"];
 const PUBLIC_EXACT = ["/login", "/wall", "/api/tap"];
 
-function isPublic(pathname: string): boolean {
-  return (
-    PUBLIC_EXACT.includes(pathname) ||
-    PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))
-  );
+// The vehicle sticker opens the form, which posts to the logs endpoint. Both
+// only bypass the session check while a `k` token is present to verify.
+const VEHICLE_TAP_PAGE = /^\/vehicles\/[0-9a-f-]{36}\/log$/i;
+const VEHICLE_TAP_API = /^\/api\/vehicles\/[0-9a-f-]{36}\/logs$/i;
+
+function isPublic(pathname: string, params: URLSearchParams): boolean {
+  if (PUBLIC_EXACT.includes(pathname)) return true;
+  if (PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return true;
+  if (params.has("k")) {
+    return VEHICLE_TAP_PAGE.test(pathname) || VEHICLE_TAP_API.test(pathname);
+  }
+  return false;
 }
 
 export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
-  if (isPublic(pathname)) return NextResponse.next();
+  const { pathname, searchParams } = req.nextUrl;
+  if (isPublic(pathname, searchParams)) return NextResponse.next();
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL;
   const publicKey =

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 interface Vehicle {
   id: string;
@@ -14,9 +15,27 @@ interface FuelLogFormProps {
   vehicleId?: string;
   onSuccess?: () => void;
   lastReading?: number;
+  /**
+   * Pins the form to one vehicle, shown as plain text instead of a picker. Set
+   * by the NFC sticker page, which already knows the car and has no session to
+   * fetch the vehicle list with.
+   */
+  vehicleName?: string;
+  /** Signed sticker token, forwarded so the POST is accepted without a session. */
+  token?: string;
+  /** Where to go after a successful save. Omitted for sticker taps. */
+  redirectTo?: string;
 }
 
-export function FuelLogForm({ vehicleId, onSuccess, lastReading }: FuelLogFormProps) {
+export function FuelLogForm({
+  vehicleId,
+  onSuccess,
+  lastReading,
+  vehicleName,
+  token,
+  redirectTo,
+}: FuelLogFormProps) {
+  const router = useRouter();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<string>(vehicleId || "");
   const [odometer, setOdometer] = useState("");
@@ -30,10 +49,10 @@ export function FuelLogForm({ vehicleId, onSuccess, lastReading }: FuelLogFormPr
   const [success, setSuccess] = useState(false);
   const [mpgDisplay, setMpgDisplay] = useState<number | null>(null);
 
-  // Fetch vehicles on mount
+  // Fetch vehicles on mount, unless the vehicle is already pinned.
   useEffect(() => {
-    fetchVehicles();
-  }, []);
+    if (!vehicleName) fetchVehicles();
+  }, [vehicleName]);
 
   // Calculate MPG
   useEffect(() => {
@@ -76,7 +95,8 @@ export function FuelLogForm({ vehicleId, onSuccess, lastReading }: FuelLogFormPr
     }
 
     try {
-      const res = await fetch(`/api/vehicles/${selectedVehicle}/logs`, {
+      const query = token ? `?k=${encodeURIComponent(token)}` : "";
+      const res = await fetch(`/api/vehicles/${selectedVehicle}/logs${query}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -105,6 +125,7 @@ export function FuelLogForm({ vehicleId, onSuccess, lastReading }: FuelLogFormPr
 
       setTimeout(() => setSuccess(false), 3000);
       onSuccess?.();
+      if (redirectTo) setTimeout(() => router.push(redirectTo), 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -124,22 +145,26 @@ export function FuelLogForm({ vehicleId, onSuccess, lastReading }: FuelLogFormPr
         </div>
       )}
 
-      {/* Vehicle selector */}
+      {/* Vehicle — a picker normally, fixed text when opened from a sticker */}
       <div>
         <label className="block text-sm font-medium mb-1">Vehicle</label>
-        <select
-          value={selectedVehicle}
-          onChange={(e) => setSelectedVehicle(e.target.value)}
-          className="w-full px-3 py-2 border rounded-md text-sm"
-        >
-          <option value="">Select a vehicle...</option>
-          {vehicles.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.name}
-              {v.year && v.make && ` (${v.year} ${v.make})`}
-            </option>
-          ))}
-        </select>
+        {vehicleName ? (
+          <p className="px-3 py-2 bg-gray-50 border rounded-md text-sm">{vehicleName}</p>
+        ) : (
+          <select
+            value={selectedVehicle}
+            onChange={(e) => setSelectedVehicle(e.target.value)}
+            className="w-full px-3 py-2 border rounded-md text-sm"
+          >
+            <option value="">Select a vehicle...</option>
+            {vehicles.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name}
+                {v.year && v.make && ` (${v.year} ${v.make})`}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Odometer reading */}

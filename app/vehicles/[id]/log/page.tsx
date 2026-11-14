@@ -1,81 +1,60 @@
-"use client";
+// What an NFC car sticker opens. Two ways in:
+//   - a signed sticker URL (/vehicles/<id>/log?k=<token>) — works on any phone,
+//     no session, because possession of the URL is the credential
+//   - an ordinary signed-in browser session
+//
+// Neither one present means 404, not a login redirect: a mistyped or stale
+// sticker shouldn't confirm that the vehicle exists. The vehicle and its last
+// reading are loaded here rather than from the session-gated /api/vehicles, so
+// the form renders filled in on the first paint at the pump.
 
-import { useParams, useRouter } from "next/navigation";
+import { notFound } from "next/navigation";
 import { FuelLogForm } from "@/components/vehicles/fuel-log-form";
-import { useEffect, useState } from "react";
+import { getSupabaseAdmin } from "@/lib/server/supabase";
+import { getCurrentHousehold } from "@/lib/server/household";
+import { wallHouseholdId } from "@/lib/server/wall";
+import { verifyVehicleLogToken } from "@/lib/tap-token";
 
-interface Vehicle {
-  id: string;
-  name: string;
-  make?: string;
-  model?: string;
-  year?: number;
+export const dynamic = "force-dynamic";
+
+interface PageProps {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ k?: string }>;
 }
 
-export default function QuickLogPage() {
-  const params = useParams();
-  const router = useRouter();
-  const vehicleId = params.id as string;
-  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
-  const [lastReading, setLastReading] = useState<number | undefined>();
-  const [loading, setLoading] = useState(true);
+export default async function QuickLogPage({ params, searchParams }: PageProps) {
+  const { id } = await params;
+  const { k } = await searchParams;
 
-  useEffect(() => {
-    const fetchVehicleData = async () => {
-      try {
-        // Get vehicle details
-        const vehicleRes = await fetch(`/api/vehicles`);
-        if (vehicleRes.ok) {
-          const vehicles = await vehicleRes.json();
-          const found = vehicles.find((v: Vehicle) => v.id === vehicleId);
-          if (found) {
-            setVehicle(found);
+  const secret = (process.env.TAP_SECRET ?? "").trim();
+  const viaSticker = Boolean(k && verifyVehicleLogToken(id, k, secret));
 
-            // Get last reading
-            const logsRes = await fetch(`/api/vehicles/${vehicleId}/logs?limit=1`);
-            if (logsRes.ok) {
-              const data = await logsRes.json();
-              if (data.logs && data.logs.length > 0) {
-                setLastReading(data.logs[0].odometer_miles);
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch vehicle data:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // A sticker tap is scoped to the wall's household, the same way /api/tap is.
+  const householdId = viaSticker ? wallHouseholdId() : await getCurrentHousehold();
+  if (!householdId) notFound();
 
-    if (vehicleId) {
-      fetchVehicleData();
-    }
-  }, [vehicleId]);
+  const supabase = getSupabaseAdmin();
+  if (!supabase) notFound();
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-gray-600">Loading...</div>
-      </div>
-    );
-  }
+  const { data: vehicle } = await supabase
+    .from("vehicles")
+    .select("id, make, model, year")
+    .eq("id", id)
+    .eq("household_id", householdId)
+    .maybeSingle();
 
-  if (!vehicle) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">Vehicle not found</p>
-          <button
-            onClick={() => router.back()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
-          >
-            Go Back
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (!vehicle) notFound();
+
+  const { data: lastLog } = await supabase
+    .from("vehicle_logs")
+    .select("odometer_miles")
+    .eq("vehicle_id", id)
+    .eq("household_id", householdId)
+    .order("log_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const name = `${vehicle.make ?? ""} ${vehicle.model ?? ""}`.trim() || "Vehicle";
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
@@ -83,27 +62,31 @@ export default function QuickLogPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-center">Quick Fill-Up Log</h1>
           <p className="text-center text-gray-600 text-sm mt-2">
-            {vehicle.year && vehicle.make ? `${vehicle.year} ${vehicle.make}` : ""} {vehicle.name}
+            {vehicle.year ? `${vehicle.year} ` : ""}
+            {name}
           </p>
         </div>
 
         <FuelLogForm
-          vehicleId={vehicleId}
-          lastReading={lastReading}
-          onSuccess={() => {
-            // Redirect to main tracking page after successful log
-            setTimeout(() => router.push("/vehicles-tracking"), 2000);
-          }}
+          vehicleId={vehicle.id}
+          vehicleName={name}
+          lastReading={lastLog?.odometer_miles ?? undefined}
+          token={viaSticker ? k : undefined}
+          // A sticker tap has no session, so sending it to the dashboard would
+          // only bounce it to login. Signed-in visitors still get the link.
+          redirectTo={viaSticker ? undefined : "/vehicles-tracking"}
         />
 
-        <div className="mt-4 text-center">
-          <button
-            onClick={() => router.push("/vehicles-tracking")}
-            className="text-blue-600 hover:text-blue-800 text-sm"
-          >
-            ← Back to Dashboard
-          </button>
-        </div>
+        {!viaSticker && (
+          <div className="mt-4 text-center">
+            <a
+              href="/vehicles-tracking"
+              className="text-blue-600 hover:text-blue-800 text-sm"
+            >
+              ← Back to Dashboard
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );

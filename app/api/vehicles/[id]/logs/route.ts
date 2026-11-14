@@ -1,5 +1,8 @@
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { getCurrentHousehold } from "@/lib/server/household";
+import { wallHouseholdId } from "@/lib/server/wall";
+import { rateLimit, rateLimitKey } from "@/lib/server/rate-limit";
+import { verifyVehicleLogToken } from "@/lib/tap-token";
 import { NextRequest, NextResponse } from "next/server";
 
 // GET /api/vehicles/[id]/logs - List logs for a vehicle
@@ -54,17 +57,39 @@ export async function GET(
 }
 
 // POST /api/vehicles/[id]/logs - Create a new log
+//
+// Accepts either a signed-in session or a `k` token from an NFC car sticker.
+// The sticker path is unauthenticated by design (possession of the signed URL
+// is the credential), so it is rate limited and scoped to the wall household.
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const householdId = await getCurrentHousehold();
+  const { id: vehicleId } = await params;
+
+  const token = new URL(req.url).searchParams.get("k");
+  const secret = (process.env.TAP_SECRET ?? "").trim();
+  const viaSticker = Boolean(token && verifyVehicleLogToken(vehicleId, token, secret));
+
+  if (viaSticker) {
+    const limit = rateLimit(rateLimitKey("vehicle-log", null, req), {
+      limit: 30,
+      windowMs: 10 * 60_000,
+    });
+    if (!limit.ok) {
+      return NextResponse.json(
+        { error: "Too many requests" },
+        { status: 429, headers: { "Retry-After": String(limit.retryAfterSeconds) } }
+      );
+    }
+  }
+
+  const householdId = viaSticker ? wallHouseholdId() : await getCurrentHousehold();
   if (!householdId) return NextResponse.json({ error: "Not authorized" }, { status: 401 });
 
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: "Database error" }, { status: 500 });
 
-  const { id: vehicleId } = await params;
   const body = await req.json();
   const { odometer_miles, gallons_pumped, cost_dollars, location, fuel_type, notes, log_date } =
     body;
