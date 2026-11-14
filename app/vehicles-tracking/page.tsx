@@ -3,6 +3,15 @@
 import { useState, useEffect } from "react";
 import { FuelLogForm } from "@/components/vehicles/fuel-log-form";
 
+// Hearth tokens, same set the manage page uses. The page previously styled
+// itself with stock light-mode grays, which rendered near-white text on
+// near-white fields against the app's dark shell.
+const input =
+  "w-full rounded-lg border border-edge bg-ink-950 px-3 py-2 text-base text-slate-100 placeholder:text-slate-600 focus:border-signal-blue/50 focus:outline-none";
+const primary = "rounded-lg bg-signal-blue px-4 py-2 text-sm font-semibold text-ink-950";
+const label = "mb-1 block text-xs text-slate-400";
+const panel = "rounded-stone border border-edge bg-ink-900 p-5";
+
 interface Vehicle {
   id: string;
   name: string;
@@ -176,20 +185,21 @@ export default function VehicleTrackingPage() {
   const lastReading = logs.length > 0 ? logs[0].odometer_miles : undefined;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
+    <div className="min-h-screen p-4">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">Vehicle Tracking</h1>
+        <h1 className="mb-6 font-display text-3xl font-semibold">Cars</h1>
 
         {/* Vehicle selector and add button */}
         <div className="mb-6 flex gap-4">
           <div className="flex-1">
-            <label className="block text-sm font-medium mb-2">Select Vehicle</label>
+            <label className={label} htmlFor="vehicle-select">Vehicle</label>
             <select
+              id="vehicle-select"
               value={selectedVehicle}
               onChange={(e) => setSelectedVehicle(e.target.value)}
-              className="w-full px-4 py-2 border rounded-lg text-sm"
+              className={input}
             >
-              <option value="">Choose a vehicle...</option>
+              <option value="">Choose a vehicle…</option>
               {vehicles.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.name} {v.year && v.make ? `(${v.year} ${v.make})` : ""}
@@ -200,7 +210,7 @@ export default function VehicleTrackingPage() {
           <div className="flex items-end">
             <button
               onClick={() => setShowCreateForm(!showCreateForm)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700"
+              className={primary}
             >
               {showCreateForm ? "Cancel" : "+ Add Vehicle"}
             </button>
@@ -209,32 +219,32 @@ export default function VehicleTrackingPage() {
 
         {/* Create vehicle form */}
         {showCreateForm && (
-          <div className="mb-6 bg-white p-6 rounded-lg shadow">
-            <h2 className="text-lg font-semibold mb-4">Add New Vehicle</h2>
+          <div className={`mb-6 ${panel}`}>
+            <h2 className="mb-4 font-display text-xl">Add a vehicle</h2>
             {createError && (
-              <div className="text-sm text-red-600 bg-red-50 p-2 rounded mb-4">{createError}</div>
+              <p className="mb-4 rounded-lg border border-signal-red/25 bg-signal-red/10 px-3 py-2 text-sm text-signal-red">{createError}</p>
             )}
             <form onSubmit={handleCreateVehicle} className="space-y-4 max-w-md">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Make *</label>
+                  <label className={label}>Make *</label>
                   <input
                     type="text"
                     value={createFormData.make}
                     onChange={(e) => setCreateFormData({ ...createFormData, make: e.target.value })}
                     placeholder="e.g., Lexus"
-                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                    className={input}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">Model *</label>
+                  <label className={label}>Model *</label>
                   <input
                     type="text"
                     value={createFormData.model}
                     onChange={(e) => setCreateFormData({ ...createFormData, model: e.target.value })}
                     placeholder="e.g., ES 350"
-                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                    className={input}
                     required
                   />
                 </div>
@@ -242,17 +252,17 @@ export default function VehicleTrackingPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Year *</label>
+                  <label className={label}>Year *</label>
                   <input
                     type="number"
                     value={createFormData.year}
                     onChange={(e) => setCreateFormData({ ...createFormData, year: parseInt(e.target.value) })}
-                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                    className={input}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">License Plate</label>
+                  <label className={label}>License Plate</label>
                   <input
                     type="text"
                     value={createFormData.license_plate}
@@ -260,26 +270,26 @@ export default function VehicleTrackingPage() {
                       setCreateFormData({ ...createFormData, license_plate: e.target.value })
                     }
                     placeholder="e.g., 2GS2844"
-                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                    className={input}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">VIN</label>
+                <label className={label}>VIN</label>
                 <input
                   type="text"
                   value={createFormData.vin}
                   onChange={(e) => setCreateFormData({ ...createFormData, vin: e.target.value })}
                   placeholder="Vehicle Identification Number"
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
+                  className={input}
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={createLoading}
-                className="w-full px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:bg-gray-400"
+                className="w-full rounded-lg bg-signal-blue px-4 py-3 text-base font-semibold text-ink-950 disabled:bg-ink-700 disabled:text-slate-500"
               >
                 {createLoading ? "Creating..." : "Create Vehicle"}
               </button>
@@ -305,7 +315,7 @@ export default function VehicleTrackingPage() {
             <div className="lg:col-span-2 space-y-6">
               {/* Analytics */}
               {analytics && (
-                <div className="bg-white p-6 rounded-lg shadow">
+                <div className={panel}>
                   <div className="flex justify-between items-center mb-4">
                     <h2 className="text-lg font-semibold">Analytics</h2>
                     <select
@@ -321,45 +331,45 @@ export default function VehicleTrackingPage() {
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                     <div>
-                      <div className="text-gray-600 text-sm">MPG</div>
+                      <div className="text-xs uppercase tracking-wider text-slate-400">MPG</div>
                       <div className="text-2xl font-bold">
                         {analytics.mpg_avg ? analytics.mpg_avg.toFixed(1) : "—"}
                       </div>
                       {analytics.trend_mpg && (
-                        <div className={`text-xs ${analytics.trend_mpg > 0 ? "text-green-600" : "text-red-600"}`}>
+                        <div className={`text-xs ${analytics.trend_mpg > 0 ? "text-signal-green" : "text-signal-red"}`}>
                           {analytics.trend_mpg > 0 ? "↑" : "↓"} {Math.abs(analytics.trend_mpg)}
                         </div>
                       )}
                     </div>
 
                     <div>
-                      <div className="text-gray-600 text-sm">Cost/Mile</div>
+                      <div className="text-xs uppercase tracking-wider text-slate-400">Cost/Mile</div>
                       <div className="text-2xl font-bold">
                         {analytics.cost_per_mile ? `$${analytics.cost_per_mile.toFixed(2)}` : "—"}
                       </div>
                     </div>
 
                     <div>
-                      <div className="text-gray-600 text-sm">Cost/Gal</div>
+                      <div className="text-xs uppercase tracking-wider text-slate-400">Cost/Gal</div>
                       <div className="text-2xl font-bold">
                         {analytics.cost_per_gallon ? `$${analytics.cost_per_gallon.toFixed(2)}` : "—"}
                       </div>
                     </div>
 
                     <div>
-                      <div className="text-gray-600 text-sm">Total Miles</div>
+                      <div className="text-xs uppercase tracking-wider text-slate-400">Total Miles</div>
                       <div className="text-2xl font-bold">{analytics.total_miles.toLocaleString()}</div>
                     </div>
 
                     <div>
-                      <div className="text-gray-600 text-sm">Total Cost</div>
+                      <div className="text-xs uppercase tracking-wider text-slate-400">Total Cost</div>
                       <div className="text-2xl font-bold">
                         ${analytics.total_cost.toFixed(2)}
                       </div>
                     </div>
 
                     <div>
-                      <div className="text-gray-600 text-sm">Fill-ups</div>
+                      <div className="text-xs uppercase tracking-wider text-slate-400">Fill-ups</div>
                       <div className="text-2xl font-bold">{analytics.fill_ups}</div>
                     </div>
                   </div>
@@ -367,12 +377,12 @@ export default function VehicleTrackingPage() {
               )}
 
               {/* Recent Logs */}
-              <div className="bg-white p-6 rounded-lg shadow">
+              <div className={panel}>
                 <h2 className="text-lg font-semibold mb-4">Recent Fill-ups</h2>
                 {loading ? (
-                  <div className="text-gray-500 text-sm">Loading...</div>
+                  <div className="text-sm text-slate-400">Loading…</div>
                 ) : logs.length === 0 ? (
-                  <div className="text-gray-500 text-sm">No logs yet. Start by logging your first fill-up!</div>
+                  <div className="text-sm text-slate-400">No fill-ups logged yet. MPG needs two.</div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -388,7 +398,7 @@ export default function VehicleTrackingPage() {
                       </thead>
                       <tbody>
                         {logs.map((log) => (
-                          <tr key={log.id} className="border-b hover:bg-gray-50">
+                          <tr key={log.id} className="border-b border-edge hover:bg-ink-850">
                             <td className="py-2 px-2 text-xs">
                               {new Date(log.log_date).toLocaleDateString()}
                             </td>
@@ -401,7 +411,7 @@ export default function VehicleTrackingPage() {
                             <td className="py-2 px-2">
                               <button
                                 onClick={() => deleteLog(log.id)}
-                                className="text-red-600 hover:text-red-800 text-xs"
+                                className="text-xs text-signal-red"
                               >
                                 Delete
                               </button>

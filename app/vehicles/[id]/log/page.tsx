@@ -57,11 +57,11 @@ export default async function QuickLogPage({ params, searchParams }: PageProps) 
   const name = `${vehicle.make ?? ""} ${vehicle.model ?? ""}`.trim() || "Vehicle";
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-md mx-auto pt-4">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-center">Quick Fill-Up Log</h1>
-          <p className="text-center text-gray-600 text-sm mt-2">
+    <div className="min-h-screen p-4">
+      <div className="mx-auto max-w-md pt-4">
+        <div className="mb-6 text-center">
+          <h1 className="font-display text-2xl font-semibold">Quick fill-up</h1>
+          <p className="mt-1 text-sm text-slate-400">
             {vehicle.year ? `${vehicle.year} ` : ""}
             {name}
           </p>
@@ -79,11 +79,8 @@ export default async function QuickLogPage({ params, searchParams }: PageProps) 
 
         {!viaSticker && (
           <div className="mt-4 text-center">
-            <a
-              href="/vehicles-tracking"
-              className="text-blue-600 hover:text-blue-800 text-sm"
-            >
-              ← Back to Dashboard
+            <a href="/vehicles-tracking" className="text-sm text-signal-blue">
+              ← Back to cars
             </a>
           </div>
         )}

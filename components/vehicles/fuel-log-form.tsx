@@ -3,6 +3,13 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+// Hearth tokens, same as the manage page. text-base on fields is deliberate:
+// anything smaller makes iOS zoom when you tap into it, which is miserable
+// standing at a pump.
+const input =
+  "w-full rounded-lg border border-edge bg-ink-950 px-3 py-2 text-base text-slate-100 placeholder:text-slate-600 focus:border-signal-blue/50 focus:outline-none";
+const label = "mb-1 block text-xs text-slate-400";
+
 interface Vehicle {
   id: string;
   name: string;
@@ -83,13 +90,13 @@ export function FuelLogForm({
     setLoading(true);
 
     if (!selectedVehicle) {
-      setError("Please select a vehicle");
+      setError("Pick a vehicle first.");
       setLoading(false);
       return;
     }
 
     if (!odometer) {
-      setError("Odometer reading is required");
+      setError("The odometer reading is required.");
       setLoading(false);
       return;
     }
@@ -111,7 +118,7 @@ export function FuelLogForm({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.message || data.error || "Failed to log fuel");
+        throw new Error(data.message || data.error || "Couldn't save the fill-up.");
       }
 
       setSuccess(true);
@@ -127,36 +134,46 @@ export function FuelLogForm({
       onSuccess?.();
       if (redirectTo) setTimeout(() => router.push(redirectTo), 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto p-4 border rounded-lg">
-      <h2 className="text-lg font-semibold">Fuel Fill-Up Log</h2>
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-4 rounded-stone border border-edge bg-ink-900 p-4"
+    >
+      <h2 className="font-display text-xl">Fill-up</h2>
 
-      {error && <div className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
+      {error && (
+        <p className="rounded-lg border border-signal-red/25 bg-signal-red/10 px-3 py-2 text-sm text-signal-red">
+          {error}
+        </p>
+      )}
 
       {success && (
-        <div className="text-sm text-green-600 bg-green-50 p-2 rounded">
-          ✓ Fill-up logged successfully
-        </div>
+        <p className="rounded-lg border border-signal-green/25 bg-signal-green/10 px-3 py-2 text-sm text-signal-green">
+          Fill-up logged.
+        </p>
       )}
 
       {/* Vehicle — a picker normally, fixed text when opened from a sticker */}
       <div>
-        <label className="block text-sm font-medium mb-1">Vehicle</label>
+        <span className={label}>Vehicle</span>
         {vehicleName ? (
-          <p className="px-3 py-2 bg-gray-50 border rounded-md text-sm">{vehicleName}</p>
+          <p className="rounded-lg border border-edge bg-ink-950 px-3 py-2 text-base text-slate-100">
+            {vehicleName}
+          </p>
         ) : (
           <select
             value={selectedVehicle}
             onChange={(e) => setSelectedVehicle(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md text-sm"
+            aria-label="Vehicle"
+            className={input}
           >
-            <option value="">Select a vehicle...</option>
+            <option value="">Pick a vehicle…</option>
             {vehicles.map((v) => (
               <option key={v.id} value={v.id}>
                 {v.name}
@@ -167,81 +184,100 @@ export function FuelLogForm({
         )}
       </div>
 
-      {/* Odometer reading */}
       <div>
-        <label className="block text-sm font-medium mb-1">
-          Odometer Reading *
-          {lastReading && <span className="text-xs text-gray-500"> (last: {lastReading})</span>}
+        <label className={label} htmlFor="odometer">
+          Odometer
+          {lastReading ? (
+            <span className="text-slate-500">
+              {" "}
+              · last {lastReading.toLocaleString()}
+            </span>
+          ) : null}
         </label>
         <input
+          id="odometer"
           type="number"
+          inputMode="numeric"
           value={odometer}
           onChange={(e) => setOdometer(e.target.value)}
-          placeholder="142536"
-          className="w-full px-3 py-2 border rounded-md text-sm"
+          placeholder={lastReading ? String(lastReading + 300) : "142536"}
+          className={input}
           required
         />
       </div>
 
-      {/* Gallons pumped */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Gallons Pumped</label>
-        <input
-          type="number"
-          step="0.01"
-          value={gallons}
-          onChange={(e) => setGallons(e.target.value)}
-          placeholder="12.5"
-          className="w-full px-3 py-2 border rounded-md text-sm"
-        />
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={label} htmlFor="gallons">
+            Gallons
+          </label>
+          <input
+            id="gallons"
+            type="number"
+            step="0.01"
+            inputMode="decimal"
+            value={gallons}
+            onChange={(e) => setGallons(e.target.value)}
+            placeholder="12.5"
+            className={input}
+          />
+        </div>
+        <div>
+          <label className={label} htmlFor="cost">
+            Cost
+          </label>
+          <input
+            id="cost"
+            type="number"
+            step="0.01"
+            inputMode="decimal"
+            value={cost}
+            onChange={(e) => setCost(e.target.value)}
+            placeholder="52.18"
+            className={input}
+          />
+        </div>
       </div>
 
-      {/* Cost */}
-      <div>
-        <label className="block text-sm font-medium mb-1">Cost ($)</label>
-        <input
-          type="number"
-          step="0.01"
-          value={cost}
-          onChange={(e) => setCost(e.target.value)}
-          placeholder="52.18"
-          className="w-full px-3 py-2 border rounded-md text-sm"
-        />
-      </div>
-
-      {/* MPG Display */}
       {mpgDisplay && (
-        <div className="bg-blue-50 p-2 rounded text-sm">
-          <span className="text-blue-900">
-            Est. MPG: <strong>{mpgDisplay}</strong>
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-lg border border-signal-blue/20 bg-signal-blue/10 px-3 py-2">
+          <span className="text-sm text-slate-300">
+            Est. MPG{" "}
+            <strong className="font-display text-lg tabular-nums text-signal-blue">
+              {mpgDisplay}
+            </strong>
           </span>
           {cost && gallons && (
-            <span className="text-blue-700 ml-3">
-              Cost/gal: ${(parseFloat(cost) / parseFloat(gallons)).toFixed(2)}
+            <span className="text-sm text-slate-400 tabular-nums">
+              ${(parseFloat(cost) / parseFloat(gallons)).toFixed(2)}/gal
             </span>
           )}
         </div>
       )}
 
-      {/* Location */}
       <div>
-        <label className="block text-sm font-medium mb-1">Location</label>
+        <label className={label} htmlFor="location">
+          Where
+        </label>
         <input
+          id="location"
           type="text"
           value={location}
           onChange={(e) => setLocation(e.target.value)}
-          placeholder="Shell - Oak St"
-          className="w-full px-3 py-2 border rounded-md text-sm"
+          placeholder="Shell — Oak St"
+          className={input}
         />
       </div>
 
-      {/* Fuel type */}
       <div>
-        <label className="block text-sm font-medium mb-1">Fuel Type</label>
+        <label className={label} htmlFor="fuelType">
+          Fuel
+        </label>
         <select
+          id="fuelType"
           value={fuelType}
           onChange={(e) => setFuelType(e.target.value)}
-          className="w-full px-3 py-2 border rounded-md text-sm"
+          className={input}
         >
           <option value="regular">Regular</option>
           <option value="premium">Premium</option>
@@ -250,25 +286,26 @@ export function FuelLogForm({
         </select>
       </div>
 
-      {/* Notes */}
       <div>
-        <label className="block text-sm font-medium mb-1">Notes</label>
+        <label className={label} htmlFor="notes">
+          Notes
+        </label>
         <textarea
+          id="notes"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          placeholder="Long highway trip..."
+          placeholder="Long highway trip…"
           rows={2}
-          className="w-full px-3 py-2 border rounded-md text-sm"
+          className={input}
         />
       </div>
 
-      {/* Submit button */}
       <button
         type="submit"
         disabled={loading}
-        className="w-full px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:bg-gray-400"
+        className="w-full rounded-lg bg-signal-blue px-4 py-3 text-base font-semibold text-ink-950 disabled:bg-ink-700 disabled:text-slate-500"
       >
-        {loading ? "Saving..." : "Save Fill-Up"}
+        {loading ? "Saving…" : "Save fill-up"}
       </button>
     </form>
   );
