@@ -7,7 +7,6 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
     "test": "node --test --experimental-strip-types lib/schedule.test.ts lib/tap-token.test.ts lib/wall-auth.test.ts lib/wall-events.test.ts lib/forecast.test.ts",
     "tap:urls": "node --experimental-strip-types scripts/print-tap-urls.mjs"
   },
@@ -16,14 +15,14 @@
     "@supabase/supabase-js": "^2.57.4",
     "googleapis": "^171.4.0",
     "lucide-react": "^0.424.0",
-    "next": "^15.5.20",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "next": "^16.4.6",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@types/node": "^20.14.10",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.19",
     "playwright": "^1.63.0",
     "postcss": "^8.5.16",
