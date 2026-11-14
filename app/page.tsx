@@ -1,5 +1,5 @@
 // Manage page: the one place (on your phone) to edit what the wall shows.
-// Behind the Supabase session wall in middleware.ts.
+// Behind the Supabase session wall in proxy.ts.
 
 import { buildForecast } from "@/lib/forecast";
 import * as actions from "./actions";

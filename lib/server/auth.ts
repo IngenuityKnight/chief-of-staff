@@ -5,7 +5,7 @@
 //   1. Supabase fully unconfigured        → demo mode, no auth (mock data only)
 //   2. Service key set, public key missing → legacy mode; middleware fails closed
 //      in production because a session wall is impossible without the public key
-//   3. URL + public key set                → sessions enforced by middleware.ts
+//   3. URL + public key set                → sessions enforced by proxy.ts
 
 import { cache } from "react";
 import { cookies } from "next/headers";

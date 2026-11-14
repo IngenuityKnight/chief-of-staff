@@ -1,7 +1,7 @@
 // GET /api/auth/callback — magic-link landing.
 //
 // Verifies the token via a cookie-bound Supabase client so the session is
-// persisted as httpOnly auth cookies (middleware.ts enforces them from then
+// persisted as httpOnly auth cookies (proxy.ts enforces them from then
 // on). Then resolves the user's household membership. Emails listed in
 // HOUSEHOLD_MEMBER_EMAILS join the household on first sign-in; anyone else
 // without a membership is signed straight back out.

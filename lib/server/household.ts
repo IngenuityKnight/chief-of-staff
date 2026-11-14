@@ -56,7 +56,7 @@ export async function getCurrentHousehold(): Promise<string | null> {
   }
 
   // Legacy mode (service key without anon key): sessions are impossible, so
-  // the pre-auth cookie/env resolution applies. middleware.ts fails closed in
+  // the pre-auth cookie/env resolution applies. proxy.ts fails closed in
   // production for this configuration.
   if (cookieValue && UUID_RE.test(cookieValue)) return cookieValue;
   return envFallback() ?? DEFAULT_HOUSEHOLD_ID;
