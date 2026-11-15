@@ -12,6 +12,13 @@ import { dayLabel, groupEventsByDay, parseCalendarConfig, relativeAgo, timeLabel
 import type { WallData, WallDay, WallTodo } from "@/lib/wall-types";
 
 const DAYS_SHOWN = 3;
+
+// Routine that runs most days is the household's rhythm: everyone already
+// knows it, and repeating "Dinner 6:30" under every date turns the schedule
+// into wallpaper. What is worth seeing in advance is the occasional item —
+// bins, a Sunday bath — because those are the ones that get forgotten. Today
+// is excluded entirely: it has its own panel.
+const ROUTINE_LOOKAHEAD_MAX_DAYS_PER_WEEK = 4;
 const TODO_HORIZON_DAYS = 7;
 const TODO_MAX = 9;
 
@@ -95,11 +102,22 @@ export async function getWallData(now = new Date()): Promise<WallData> {
     safe("Taps", notices, [], () => listTaps(hh, today)),
   ]);
 
+  const occasional = routine.filter((r) => r.days.length <= ROUTINE_LOOKAHEAD_MAX_DAYS_PER_WEEK);
   const days: WallDay[] = groupEventsByDay(events, tz, today, DAYS_SHOWN).map((d) => ({
     ymd: d.ymd,
     label: dayLabel(d.ymd, today),
     isToday: d.ymd === today,
     events: d.events.map((e) => ({ id: e.id, who: e.who, title: e.title, timeLabel: timeLabel(e, tz), masked: e.masked })),
+    routine:
+      d.ymd === today
+        ? []
+        : routineFor(occasional, weekdayOf(d.ymd)).map((r) => ({
+            id: r.id,
+            time: r.time,
+            timeLabel: formatTime(r.time),
+            label: r.label,
+            who: r.who,
+          })),
   }));
 
   // One checklist: tasks and upkeep that need a person this week.

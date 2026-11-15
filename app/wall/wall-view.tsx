@@ -137,7 +137,7 @@ export default function WallView({ data }: { data: WallData }) {
             {data.days.map((day) => (
               <div key={day.ymd}>
                 <h3 className={`mb-1 font-display text-lg ${day.isToday ? "text-slate-50" : "text-slate-300"}`}>{day.label}</h3>
-                {day.events.length === 0 ? (
+                {day.events.length === 0 && day.routine.length === 0 ? (
                   <p className="text-sm text-slate-500">Nothing scheduled</p>
                 ) : (
                   <ul className="space-y-1">
@@ -153,6 +153,16 @@ export default function WallView({ data }: { data: WallData }) {
                     {day.events.length > (day.isToday ? 7 : 4) && (
                       <li className="text-sm text-slate-500">+{day.events.length - (day.isToday ? 7 : 4)} more</li>
                     )}
+                    {/* Routine, dimmer than the calendar because it is a
+                        standing arrangement rather than an appointment. Listed
+                        after the events rather than merged by time: an event
+                        only carries a formatted label, not a sortable one. */}
+                    {day.routine.map((r) => (
+                      <li key={r.id} className="flex gap-2 text-[15px] leading-snug text-slate-500">
+                        <span className="w-[4.5rem] shrink-0 tabular-nums">{r.timeLabel}</span>
+                        <span className="min-w-0 truncate">{r.label}</span>
+                      </li>
+                    ))}
                   </ul>
                 )}
               </div>
