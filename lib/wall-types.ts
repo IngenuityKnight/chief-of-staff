@@ -11,11 +11,25 @@ export interface WallEventView {
   masked: boolean;
 }
 
+export interface WallRoutineItem {
+  id: string;
+  time: string; // "HH:MM", compared against the wall clock on the client
+  timeLabel: string;
+  label: string;
+  who?: string;
+}
+
 export interface WallDay {
   ymd: string;
   label: string;
   isToday: boolean;
   events: WallEventView[];
+  /**
+   * Routine falling on this day, for days other than today. Today's routine
+   * has its own panel; this is what is coming, which is the only way to learn
+   * on Saturday that the bins go out on Sunday.
+   */
+  routine: WallRoutineItem[];
 }
 
 export interface WallTodo {
@@ -28,13 +42,6 @@ export interface WallTodo {
   done: boolean;
 }
 
-export interface WallRoutineItem {
-  id: string;
-  time: string; // "HH:MM", compared against the wall clock on the client
-  timeLabel: string;
-  label: string;
-  who?: string;
-}
 
 export interface WallWeather {
   tempF: number;
