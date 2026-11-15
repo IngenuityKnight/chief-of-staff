@@ -104,7 +104,7 @@ export async function GET(req: NextRequest) {
         const needle = tag.completes.toLowerCase();
         const job = (await listUpkeep(householdId, today)).find((u) => u.item.toLowerCase().includes(needle));
         if (job) {
-          await markUpkeepDone(householdId, job.id, today);
+          await markUpkeepDone(householdId, job.id, today, "nfc");
           completed = job.item;
         }
       }

@@ -31,9 +31,9 @@ export async function POST(req: NextRequest) {
   const hh = wallHouseholdId();
   try {
     if (kind === "task") {
-      await setTaskDone(hh, id, body.done !== false);
+      await setTaskDone(hh, id, body.done !== false, "wall");
     } else if (kind === "upkeep") {
-      await markUpkeepDone(hh, id, (await wallToday(hh)).today);
+      await markUpkeepDone(hh, id, (await wallToday(hh)).today, "wall");
     } else {
       return json({ ok: false, error: "Bad request." }, 400);
     }

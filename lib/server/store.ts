@@ -8,6 +8,7 @@
 import { randomUUID } from "node:crypto";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { sampleData } from "@/lib/sample-data";
+import { record, type CompletionSource } from "@/lib/server/completions";
 import { isYmd, nextDue } from "@/lib/schedule";
 import type { Frequency, MealDay, RoutineItem, TapEvent, Task, UpkeepItem, Vehicle, VehicleService } from "@/lib/types";
 
@@ -72,15 +73,37 @@ export async function addTask(householdId: string, title: string, dueDate?: stri
   check(error, "add the task");
 }
 
-export async function setTaskDone(householdId: string, id: string, done: boolean) {
+export async function setTaskDone(
+  householdId: string,
+  id: string,
+  done: boolean,
+  source: CompletionSource = "phone"
+) {
   const sb = db();
   if (!sb) return;
+
+  // Read the title before the update so the log keeps something readable even
+  // if the task is renamed or deleted later.
+  const { data: existing } = await sb
+    .from("tasks").select("title").eq("household_id", householdId).eq("id", id).maybeSingle();
+
   const { error } = await sb
     .from("tasks")
     .update({ status: done ? "done" : "todo", completed_at: done ? new Date().toISOString() : null })
     .eq("household_id", householdId)
     .eq("id", id);
   check(error, "update the task");
+
+  // Only completions are logged. Reopening is a correction, not an event, and
+  // a log that fills with ticks and un-ticks answers nothing.
+  if (done && existing) {
+    await record(householdId, {
+      subjectKind: "task",
+      subjectId: id,
+      label: String(existing.title),
+      source,
+    });
+  }
 }
 
 export async function deleteTask(householdId: string, id: string) {
@@ -130,19 +153,32 @@ export async function addUpkeep(householdId: string, item: string, frequency: Fr
   check(error, "add the upkeep item");
 }
 
-export async function markUpkeepDone(householdId: string, id: string, today: string) {
+export async function markUpkeepDone(
+  householdId: string,
+  id: string,
+  today: string,
+  source: CompletionSource = "phone"
+) {
   const sb = db();
   if (!sb) return;
   const { data, error } = await sb
-    .from("maintenance_items").select("frequency").eq("household_id", householdId).eq("id", id).maybeSingle();
+    .from("maintenance_items").select("item,frequency").eq("household_id", householdId).eq("id", id).maybeSingle();
   check(error, "load the upkeep item");
   if (!data) return;
+
+  const label = String(data.item);
+  // Written before either branch: a one-time job is deleted on completion, so
+  // this is the only moment the fact that it was ever done can be captured.
+  await record(householdId, { subjectKind: "upkeep", subjectId: id, label, source });
+
   const next = nextDue(String(data.frequency) as Frequency, today);
   if (!next) {
     const { error: delErr } = await sb.from("maintenance_items").delete().eq("household_id", householdId).eq("id", id);
     check(delErr, "finish the upkeep item");
     return;
   }
+  // last_done still moves: it is the fast answer to "when was this last done".
+  // The log is the slow answer to "every time it has been".
   const { error: upErr } = await sb
     .from("maintenance_items")
     .update({ last_done: toTs(today), next_due: toTs(next), status: "ok" })
