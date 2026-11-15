@@ -19,6 +19,11 @@ export const EXPORT_TABLES: ReadonlyArray<{ table: string; orderBy: string }> = 
   { table: "vehicles", orderBy: "year" },
   { table: "vehicle_services", orderBy: "item" },
   { table: "maintenance_items", orderBy: "next_due" },
+  // The app no longer has a Bills section — Monarch and EveryDollar own that
+  // ground, and a second ledger nobody trusted had been silently wrong since
+  // July. The table stays, and stays exported, because sixteen rows of what
+  // the household owed and when is history worth keeping even though nothing
+  // reads it any more. Do not remove this line while the table exists.
   { table: "bills", orderBy: "due_date" },
   { table: "routine_items", orderBy: "time_of_day" },
   { table: "tasks", orderBy: "due_date" },

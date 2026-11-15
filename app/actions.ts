@@ -85,37 +85,6 @@ export async function deleteRoutine(fd: FormData) {
   done();
 }
 
-// ─── bills ───────────────────────────────────────────────────────────────────
-
-export async function saveBill(fd: FormData) {
-  const hh = await requireHousehold();
-  const name = text(fd, "name", 80);
-  const amount = Number(text(fd, "amount", 12));
-  if (name && Number.isFinite(amount) && amount >= 0 && amount < 1_000_000) {
-    await store.saveBill(hh, {
-      id: text(fd, "id", 64) || undefined,
-      name,
-      amount: Math.round(amount * 100) / 100,
-      dueDate: date(fd, "due"),
-      frequency: frequency(fd),
-      autopay: fd.get("autopay") === "on",
-    });
-  }
-  done();
-}
-
-export async function payBill(fd: FormData) {
-  const hh = await requireHousehold();
-  await store.markBillPaid(hh, text(fd, "id", 64), (await wallToday(hh)).today);
-  done();
-}
-
-export async function deleteBill(fd: FormData) {
-  const hh = await requireHousehold();
-  await store.deleteBill(hh, text(fd, "id", 64));
-  done();
-}
-
 // ─── upkeep ──────────────────────────────────────────────────────────────────
 
 export async function addUpkeep(fd: FormData) {

@@ -2,7 +2,7 @@
 // Dates are generated relative to "today" so the preview always looks current.
 
 import { addDays } from "./schedule";
-import type { Bill, MealDay, RoutineItem, TapEvent, Task, UpkeepItem, Vehicle } from "./types";
+import type { MealDay, RoutineItem, TapEvent, Task, UpkeepItem, Vehicle } from "./types";
 
 export function sampleData(today: string) {
   const tasks: Task[] = [
@@ -10,12 +10,7 @@ export function sampleData(today: string) {
     { id: "t2", title: "Order HVAC filters (20x25x1)", dueDate: addDays(today, 2), done: false },
     { id: "t3", title: "Sign daycare field-trip form", dueDate: addDays(today, -1), done: false },
     { id: "t4", title: "Take out recycling", done: true, completedAt: `${today}T12:00:00Z` },
-  ];
-  const bills: Bill[] = [
-    { id: "b1", name: "Electric", amount: 0, dueDate: addDays(today, 3), frequency: "monthly", autopay: false, paid: false },
-    { id: "b2", name: "Internet", amount: 0, dueDate: addDays(today, 5), frequency: "monthly", autopay: true, paid: false },
-  ];
-  const upkeep: UpkeepItem[] = [
+  ];  const upkeep: UpkeepItem[] = [
     { id: "u1", item: "Clean dishwasher filter", frequency: "quarterly", nextDue: addDays(today, 1) },
     { id: "u2", item: "HVAC filter", frequency: "quarterly", nextDue: addDays(today, 6) },
     { id: "u3", item: "Gutter cleaning", frequency: "semi-annual", nextDue: addDays(today, 40) },
@@ -39,5 +34,5 @@ export function sampleData(today: string) {
     { slug: "dishwasher-clean", label: "Dishwasher is clean", at: new Date(Date.now() - 25 * 60_000).toISOString() },
     { slug: "medicine-given", label: "Medicine given", at: new Date(Date.now() - 3 * 3_600_000).toISOString() },
   ];
-  return { tasks, bills, upkeep, meals, routine, vehicles, taps };
+  return { tasks, upkeep, meals, routine, vehicles, taps };
 }

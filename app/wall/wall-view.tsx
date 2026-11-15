@@ -81,7 +81,7 @@ export default function WallView({ data }: { data: WallData }) {
 
   function onTap(item: WallTodo) {
     if (item.kind === "info" || pending) return;
-    // Tasks toggle on one tap (and can be undone). Upkeep and bills move to
+    // Tasks toggle on one tap (and can be undone). Upkeep moves to
     // their next cycle, so they ask first.
     if (item.kind === "task") return void act(item, !item.done);
     setConfirming(item.key);
@@ -198,7 +198,7 @@ export default function WallView({ data }: { data: WallData }) {
                     {isConfirming ? (
                       <div className="flex min-h-[52px] items-center gap-2 rounded-xl bg-ink-800 px-3">
                         <span className="min-w-0 flex-1 truncate text-[15px]">
-                          {item.kind === "bill" ? "Paid?" : "Done?"} {item.title.replace(/^Pay /, "")}
+                          Done? {item.title}
                         </span>
                         <button onClick={() => act(item)} className="rounded-lg bg-signal-green px-4 py-2 text-sm font-semibold text-ink-950">
                           Yes
