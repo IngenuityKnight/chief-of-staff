@@ -14,6 +14,7 @@ import { getSupabaseAdmin } from "@/lib/server/supabase";
  * from anything else.
  */
 export const EXPORT_TABLES: ReadonlyArray<{ table: string; orderBy: string }> = [
+  { table: "completions", orderBy: "completed_at" },
   { table: "tap_events", orderBy: "created_at" },
   { table: "vehicle_logs", orderBy: "log_date" },
   { table: "vehicles", orderBy: "year" },

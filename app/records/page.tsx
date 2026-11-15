@@ -6,6 +6,7 @@
 // Supabase session wall in proxy.ts.
 
 import { getCurrentHousehold } from "@/lib/server/household";
+import { listCompletions } from "@/lib/server/completions";
 import { tapHistory, tapStates } from "@/lib/server/store";
 import { RECORD_SLUGS, TAP_TAGS } from "@/lib/tap-tags";
 import type { TapEvent } from "@/lib/types";
@@ -56,9 +57,10 @@ export default async function RecordsPage() {
   }
 
   const toggleSlugs = Object.keys(TAP_TAGS).filter((s) => TAP_TAGS[s].toggle);
-  const [states, histories] = await Promise.all([
+  const [states, histories, done] = await Promise.all([
     tapStates(hh, toggleSlugs),
     Promise.all(RECORD_SLUGS.map((slug) => tapHistory(hh, slug))),
+    listCompletions(hh, 20),
   ]);
 
   return (
@@ -95,6 +97,31 @@ export default async function RecordsPage() {
           </ul>
         </section>
       )}
+
+      <section className={`${card} mb-4`}>
+        <h2 className="mb-1 text-2xs font-semibold uppercase tracking-[0.14em] text-slate-400">Recently done</h2>
+        <p className="mb-3 text-sm text-slate-500">
+          Every job ticked off, kept whether or not the thing it belonged to still exists.
+        </p>
+        {done.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            Nothing logged yet. Completions start landing here the next time something is marked done.
+          </p>
+        ) : (
+          <ul className="divide-y divide-edge">
+            {done.map((c) => (
+              <li key={c.id} className="flex items-baseline justify-between gap-3 py-2">
+                <span className="min-w-0 flex-1 truncate text-slate-100">{c.label}</span>
+                <span className="shrink-0 text-xs text-slate-500">
+                  {c.actor ? `${c.actor} · ` : ""}
+                  {c.source === "nfc" ? "tapped · " : c.source === "wall" ? "wall · " : ""}
+                  {agoLabel(c.completedAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className={card}>
         <h2 className="mb-1 text-2xs font-semibold uppercase tracking-[0.14em] text-slate-400">Service record</h2>
