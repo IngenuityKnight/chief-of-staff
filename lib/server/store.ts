@@ -8,8 +8,8 @@
 import { randomUUID } from "node:crypto";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { sampleData } from "@/lib/sample-data";
-import { isYmd, nextBillDue, nextDue } from "@/lib/schedule";
-import type { Bill, Frequency, MealDay, RoutineItem, TapEvent, Task, UpkeepItem, Vehicle, VehicleService } from "@/lib/types";
+import { isYmd, nextDue } from "@/lib/schedule";
+import type { Frequency, MealDay, RoutineItem, TapEvent, Task, UpkeepItem, Vehicle, VehicleService } from "@/lib/types";
 
 type Row = Record<string, unknown>;
 
@@ -88,85 +88,6 @@ export async function deleteTask(householdId: string, id: string) {
   if (!sb) return;
   const { error } = await sb.from("tasks").delete().eq("household_id", householdId).eq("id", id);
   check(error, "delete the task");
-}
-
-// ─── bills ───────────────────────────────────────────────────────────────────
-
-const toBill = (r: Row): Bill => ({
-  id: String(r.id),
-  name: String(r.name),
-  amount: num(r.amount) ?? 0,
-  dueDate: ymd(r.due_date),
-  frequency: String(r.frequency) as Frequency,
-  autopay: r.autopay === true,
-  paid: r.status === "paid",
-});
-
-export async function listBills(householdId: string, today: string): Promise<Bill[]> {
-  const sb = db();
-  if (!sb) return sampleData(today).bills;
-  const { data, error } = await sb
-    .from("bills")
-    .select("id,name,amount,due_date,frequency,autopay,status")
-    .eq("household_id", householdId)
-    .neq("status", "canceled")
-    .order("due_date", { ascending: true, nullsFirst: false });
-  check(error, "load bills");
-  // A paid one-time bill is finished; recurring bills roll forward instead.
-  return (data ?? []).map(toBill).filter((b) => !(b.paid && b.frequency === "one-time"));
-}
-
-export async function saveBill(
-  householdId: string,
-  bill: { id?: string; name: string; amount: number; dueDate?: string; frequency: Frequency; autopay: boolean }
-) {
-  const sb = db();
-  if (!sb) return;
-  const fields = {
-    name: bill.name,
-    amount: bill.amount,
-    due_date: toTs(bill.dueDate),
-    frequency: bill.frequency,
-    autopay: bill.autopay,
-    status: "due",
-  };
-  const { error } = bill.id
-    ? await sb.from("bills").update(fields).eq("household_id", householdId).eq("id", bill.id)
-    : await sb.from("bills").insert({
-        id: randomUUID(),
-        household_id: householdId,
-        kind: bill.frequency === "one-time" ? "one-time" : "bill",
-        category: "Household",
-        ...fields,
-      });
-  check(error, "save the bill");
-}
-
-export async function markBillPaid(householdId: string, id: string, today: string) {
-  const sb = db();
-  if (!sb) return;
-  const { data, error } = await sb
-    .from("bills").select("due_date,frequency").eq("household_id", householdId).eq("id", id).maybeSingle();
-  check(error, "load the bill");
-  if (!data) return;
-  const next = nextBillDue(String(data.frequency) as Frequency, ymd(data.due_date), today);
-  const { error: upErr } = await sb
-    .from("bills")
-    .update(
-      next
-        ? { due_date: toTs(next), status: "due", last_paid: new Date().toISOString() }
-        : { status: "paid", last_paid: new Date().toISOString() }
-    )
-    .eq("household_id", householdId)
-    .eq("id", id);
-  check(upErr, "mark the bill paid");
-}
-
-export async function deleteBill(householdId: string, id: string) {
-  const sb = db();
-  if (!sb) return;
-  const { error } = await sb.from("bills").delete().eq("household_id", householdId).eq("id", id);
-  check(error, "delete the bill");
 }
 
 // ─── upkeep (home + car maintenance) ─────────────────────────────────────────

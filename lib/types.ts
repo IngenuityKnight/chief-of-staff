@@ -11,16 +11,6 @@ export interface Task {
   completedAt?: string; // ISO
 }
 
-export interface Bill {
-  id: string;
-  name: string;
-  amount: number;
-  dueDate?: string;
-  frequency: Frequency;
-  autopay: boolean;
-  paid: boolean; // only meaningful for one-time bills
-}
-
 export interface UpkeepItem {
   id: string;
   item: string;

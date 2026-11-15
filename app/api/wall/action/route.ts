@@ -1,11 +1,11 @@
 // Check-offs from the wall iPad. Authorised by the wall_session cookie (the
 // same credential that lets the wall be read), and deliberately narrow: the
-// wall can complete or reopen a task, mark upkeep done, and mark a bill paid.
+// wall can complete or reopen a task and mark upkeep done.
 // It cannot create, edit or delete anything.
 
 import { NextResponse, type NextRequest } from "next/server";
 import { rateLimit, rateLimitKey } from "@/lib/server/rate-limit";
-import { markBillPaid, markUpkeepDone, setTaskDone } from "@/lib/server/store";
+import { markUpkeepDone, setTaskDone } from "@/lib/server/store";
 import { wallHouseholdId, wallToday } from "@/lib/server/wall";
 import { WALL_COOKIE, verifyWallSession } from "@/lib/wall-auth";
 
@@ -34,8 +34,6 @@ export async function POST(req: NextRequest) {
       await setTaskDone(hh, id, body.done !== false);
     } else if (kind === "upkeep") {
       await markUpkeepDone(hh, id, (await wallToday(hh)).today);
-    } else if (kind === "bill") {
-      await markBillPaid(hh, id, (await wallToday(hh)).today);
     } else {
       return json({ ok: false, error: "Bad request." }, 400);
     }

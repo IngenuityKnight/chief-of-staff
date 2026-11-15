@@ -4,7 +4,7 @@
 
 import { google } from "googleapis";
 import { getHouseholdForJob } from "@/lib/server/household";
-import { listBills, listMeals, listRoutine, listTaps, listTasks, listUpkeep, listVehicles } from "@/lib/server/store";
+import { listMeals, listRoutine, listTaps, listTasks, listUpkeep, listVehicles } from "@/lib/server/store";
 import { getHouseholdTimezone, todayInTz, zonedTimeToUtc } from "@/lib/server/timezone";
 import { getWeather } from "@/lib/server/weather";
 import { addDays, dueLabel, dueTone, formatTime, routineFor, vehicleAlerts, weekdayOf } from "@/lib/schedule";
@@ -84,11 +84,10 @@ export async function getWallData(now = new Date()): Promise<WallData> {
   const { tz, today, dayStart } = await wallToday(hh, now);
   const horizon = addDays(today, TODO_HORIZON_DAYS);
 
-  const [events, weather, tasks, bills, upkeep, meals, routine, vehicles, taps] = await Promise.all([
+  const [events, weather, tasks, upkeep, meals, routine, vehicles, taps] = await Promise.all([
     loadEvents(tz, today, notices),
     getWeather(tz),
     safe("Tasks", notices, [], () => listTasks(hh, today, dayStart)),
-    safe("Bills", notices, [], () => listBills(hh, today)),
     safe("Upkeep", notices, [], () => listUpkeep(hh, today)),
     safe("Meals", notices, [], () => listMeals(hh, today, addDays(today, 6))),
     safe("Routine", notices, [], () => listRoutine(hh, today)),
@@ -103,7 +102,7 @@ export async function getWallData(now = new Date()): Promise<WallData> {
     events: d.events.map((e) => ({ id: e.id, who: e.who, title: e.title, timeLabel: timeLabel(e, tz), masked: e.masked })),
   }));
 
-  // One checklist: tasks, upkeep and bills that need a person this week.
+  // One checklist: tasks and upkeep that need a person this week.
   const todo: WallTodo[] = [];
   for (const t of tasks) {
     if (!t.done && t.dueDate && t.dueDate > horizon) continue;
@@ -116,13 +115,7 @@ export async function getWallData(now = new Date()): Promise<WallData> {
   for (const u of upkeep) {
     if (u.nextDue > horizon) continue;
     todo.push({ key: `upkeep:${u.id}`, kind: "upkeep", id: u.id, title: u.item, done: false, detail: dueLabel(u.nextDue, today), tone: dueTone(u.nextDue, today) });
-  }
-  for (const b of bills) {
-    // Autopay bills need nobody; amounts stay off a wall that guests can see.
-    if (b.autopay || !b.dueDate || b.dueDate > horizon) continue;
-    todo.push({ key: `bill:${b.id}`, kind: "bill", id: b.id, title: `Pay ${b.name}`, done: false, detail: dueLabel(b.dueDate, today), tone: dueTone(b.dueDate, today) });
-  }
-  for (const a of vehicleAlerts(vehicles, today)) {
+  }  for (const a of vehicleAlerts(vehicles, today)) {
     todo.push({ key: a.id, kind: "info", id: a.id, title: a.label, detail: a.detail, done: false, tone: "soon" });
   }
   todo.sort((a, b) => Number(a.done) - Number(b.done) || TONE_ORDER[a.tone] - TONE_ORDER[b.tone] || a.title.localeCompare(b.title));

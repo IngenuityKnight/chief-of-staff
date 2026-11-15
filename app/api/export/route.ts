@@ -4,7 +4,7 @@
 // remembers. This is the one you reach for when you want the data now.
 //
 //   /api/export                 the whole household as one JSON file
-//   /api/export?table=bills     one table as CSV, for a spreadsheet
+//   /api/export?table=tap_events  one table as CSV, for a spreadsheet
 //
 // Behind the session wall, so only a signed-in member can pull it.
 

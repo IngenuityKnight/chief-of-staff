@@ -39,19 +39,6 @@ export function nextDue(frequency: Frequency, from: string): string | null {
   }
 }
 
-/**
- * Paying a recurring bill moves it to its next cycle, stepping from the old
- * due date so a bill due the 1st stays on the 1st.
- */
-export function nextBillDue(frequency: Frequency, currentDue: string | undefined, today: string): string | null {
-  if (frequency === "one-time") return null;
-  // Always move at least one cycle (a bill paid early is still paid), then
-  // keep going if a stale date is still in the past.
-  let due = nextDue(frequency, currentDue ?? today)!;
-  for (let i = 0; i < 600 && due <= today; i++) due = nextDue(frequency, due)!;
-  return due;
-}
-
 export type DueTone = "overdue" | "today" | "soon" | "later";
 
 export function dueTone(due: string, today: string, soonDays = 7): DueTone {

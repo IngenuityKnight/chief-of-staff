@@ -2,10 +2,10 @@
 // Behind the Supabase session wall in proxy.ts.
 
 import { buildForecast } from "@/lib/forecast";
-import type { Bill, Task, UpkeepItem, Vehicle } from "@/lib/types";
+import type { Task, UpkeepItem, Vehicle } from "@/lib/types";
 import * as actions from "./actions";
 import { getCurrentHousehold } from "@/lib/server/household";
-import { listBills, listMeals, listRoutine, listTasks, listUpkeep, listVehicleServices, listVehicles } from "@/lib/server/store";
+import { listMeals, listRoutine, listTasks, listUpkeep, listVehicleServices, listVehicles } from "@/lib/server/store";
 import { wallToday } from "@/lib/server/wall";
 import { tapStates } from "@/lib/server/store";
 import { TAP_TAGS } from "@/lib/tap-tags";
@@ -25,7 +25,7 @@ const TONE = { overdue: "text-signal-red", today: "text-signal-amber", soon: "te
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const SECTIONS = [
-  ["todos", "To-dos"], ["meals", "Dinners"], ["routine", "Routine"], ["bills", "Bills"], ["upkeep", "Upkeep"], ["cars", "Cars"], ["costs", "Costs"],
+  ["todos", "To-dos"], ["meals", "Dinners"], ["routine", "Routine"], ["upkeep", "Upkeep"], ["cars", "Cars"], ["costs", "Costs"],
 ] as const;
 
 // What the household is actually late on or owes today, gathered from the data
@@ -41,7 +41,6 @@ interface Attention {
 
 function needsYou(
   tasks: Task[],
-  bills: Bill[],
   upkeep: UpkeepItem[],
   vehicles: Vehicle[],
   today: string
@@ -56,23 +55,6 @@ function needsYou(
     if (t.done || !t.dueDate) continue;
     const tone = urgent(t.dueDate);
     if (tone) out.push({ key: `task:${t.id}`, label: t.title, detail: dueLabel(t.dueDate, today), tone, href: "#todos" });
-  }
-
-  for (const b of bills) {
-    // Autopay is deliberately excluded: it is money leaving, not a thing
-    // anyone has to do. It is counted in the week's total instead, the same
-    // way the wall keeps autopay off its list.
-    if (b.paid || b.autopay || !b.dueDate) continue;
-    const tone = urgent(b.dueDate);
-    if (tone) {
-      out.push({
-        key: `bill:${b.id}`,
-        label: b.name,
-        detail: `${dueLabel(b.dueDate, today)} \u00b7 $${b.amount.toFixed(2)}`,
-        tone,
-        href: "#bills",
-      });
-    }
   }
 
   for (const u of upkeep) {
@@ -134,9 +116,8 @@ export default async function ManagePage() {
 
   const { today, dayStart } = await wallToday(hh);
   const toggleSlugs = Object.keys(TAP_TAGS).filter((slug) => TAP_TAGS[slug].toggle);
-  const [tasks, bills, upkeep, meals, routine, vehicles, services, states] = await Promise.all([
+  const [tasks, upkeep, meals, routine, vehicles, services, states] = await Promise.all([
     listTasks(hh, today, dayStart),
-    listBills(hh, today),
     listUpkeep(hh, today),
     listMeals(hh, today, addDays(today, 6)),
     listRoutine(hh, today),
@@ -151,19 +132,13 @@ export default async function ManagePage() {
   const dinnerOn = new Map(meals.map((m) => [m.date, m.dinner ?? ""]));
   const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "short", month: "numeric", day: "numeric" });
 
-  const attention = needsYou(tasks, bills, upkeep, vehicles, today);
+  const attention = needsYou(tasks, upkeep, vehicles, today);
   const tonight = dinnerOn.get(today);
   const routineToday = routineFor(routine, weekdayOf(today)).length;
-  // Autopay is included here on purpose: it is the week's money, whether or
-  // not anyone has to lift a finger for it.
-  const dueThisWeek = bills
-    .filter((b) => !b.paid && b.dueDate && b.dueDate >= today && b.dueDate <= addDays(today, 6))
-    .reduce((sum, b) => sum + b.amount, 0);
   const counts: Record<string, number> = {
     todos: tasks.filter((t) => !t.done).length,
     meals: meals.filter((m) => m.dinner).length,
     routine: routine.length,
-    bills: bills.length,
     upkeep: upkeep.length,
     cars: vehicles.length,
     costs: services.length,
@@ -242,7 +217,6 @@ export default async function ManagePage() {
         <p className="mt-3 border-t border-edge pt-2 text-xs text-slate-500">
           Tonight: {tonight ? <span className="text-signal-amber">{tonight}</span> : "not planned"}
           {routineToday > 0 && ` \u00b7 ${routineToday} routine today`}
-          {dueThisWeek > 0 && ` \u00b7 ${money0(dueThisWeek)} of bills this week`}
         </p>
       </section>
 
@@ -323,39 +297,6 @@ export default async function ManagePage() {
               </li>
             ))}
           </ul>
-        </Section>
-
-        <Section id="bills" title="Bills" hint="Bills you pay by hand show on the wall the week they're due, without amounts. Autopay bills stay off it.">
-          <ul className="divide-y divide-edge">
-            {bills.map((b) => (
-              <li key={b.id} className="py-2">
-                <details>
-                  <summary className="flex cursor-pointer list-none items-center gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate">{b.name}</p>
-                      <p className={`text-xs ${b.dueDate ? TONE[dueTone(b.dueDate, today)] : "text-slate-500"}`}>
-                        {b.dueDate ? dueLabel(b.dueDate, today) : "No due date"} · {b.frequency}{b.autopay ? " · autopay" : ""}
-                      </p>
-                    </div>
-                    <span className="tabular-nums text-slate-300">${b.amount.toFixed(2)}</span>
-                    <span className="text-xs text-slate-500">Edit</span>
-                  </summary>
-                  <BillForm bill={b} />
-                  <div className="mt-2 flex items-center justify-between">
-                    <form action={actions.payBill}>
-                      <input type="hidden" name="id" value={b.id} />
-                      <button className={ghost}>Mark paid</button>
-                    </form>
-                    <Delete action={actions.deleteBill} id={b.id} />
-                  </div>
-                </details>
-              </li>
-            ))}
-          </ul>
-          <details>
-            <summary className={`${ghost} inline-block cursor-pointer list-none`}>Add a bill</summary>
-            <BillForm />
-          </details>
         </Section>
 
         <Section id="upkeep" title="Upkeep" hint="Recurring home jobs. Marking one done schedules the next one automatically.">
@@ -477,24 +418,6 @@ export default async function ManagePage() {
         </Section>
       </div>
     </main>
-  );
-}
-
-function BillForm({ bill }: { bill?: Awaited<ReturnType<typeof listBills>>[number] }) {
-  return (
-    <form action={actions.saveBill} className="mt-3 grid grid-cols-2 gap-2">
-      {bill && <input type="hidden" name="id" value={bill.id} />}
-      <label className="col-span-2"><span className={label}>Name</span><input name="name" required maxLength={80} defaultValue={bill?.name} className={input} /></label>
-      <label><span className={label}>Amount ($)</span><input name="amount" required inputMode="decimal" pattern="\d+(\.\d{1,2})?" defaultValue={bill ? bill.amount.toFixed(2) : ""} className={input} /></label>
-      <label><span className={label}>Next due</span><input name="due" type="date" defaultValue={bill?.dueDate} className={input} /></label>
-      <label><span className={label}>Repeats</span>
-        <select name="frequency" defaultValue={bill?.frequency ?? "monthly"} className={input}>
-          {FREQUENCIES.filter((f) => f !== "seasonal" && f !== "semi-annual").map((f) => <option key={f}>{f}</option>)}
-        </select>
-      </label>
-      <label className="flex items-end gap-2 pb-2"><input type="checkbox" name="autopay" defaultChecked={bill?.autopay} className="h-5 w-5" /><span className="text-sm">Autopay</span></label>
-      <button className={`${primary} col-span-2`}>{bill ? "Save" : "Add bill"}</button>
-    </form>
   );
 }
 

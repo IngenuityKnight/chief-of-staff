@@ -20,7 +20,7 @@ export interface WallDay {
 
 export interface WallTodo {
   key: string;
-  kind: "task" | "upkeep" | "bill" | "info";
+  kind: "task" | "upkeep" | "info";
   id: string;
   title: string;
   detail?: string;
