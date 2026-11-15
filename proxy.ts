@@ -5,6 +5,7 @@
 //   - /login and /api/auth/*   (how you get a session)
 //   - /wall and /api/wall/*    (wall iPad; verified by the wall_session cookie)
 //   - /api/tap                 (NFC stickers; verified by a signed per-tag token)
+//   - /api/cron/*              (scheduled jobs; verified by CRON_SECRET)
 //   - the vehicle log form and its POST, when the URL carries a `k` token
 //     (NFC car stickers; verified by a signed per-vehicle token)
 //
@@ -22,7 +23,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PREFIXES = ["/api/auth/", "/api/wall/"];
+// /api/cron/* carries its own credential (CRON_SECRET, sent by Vercel as a
+// bearer token) because no one is signed in when a schedule fires. As with
+// the others here, passing this check only gets the request to the handler,
+// which refuses to run without that secret.
+const PUBLIC_PREFIXES = ["/api/auth/", "/api/wall/", "/api/cron/"];
 const PUBLIC_EXACT = ["/login", "/wall", "/api/tap"];
 
 // The vehicle sticker opens the form, which posts to the logs endpoint. Both
