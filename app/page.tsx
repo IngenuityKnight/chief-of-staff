@@ -7,6 +7,8 @@ import * as actions from "./actions";
 import { getCurrentHousehold } from "@/lib/server/household";
 import { listBills, listMeals, listRoutine, listTasks, listUpkeep, listVehicleServices, listVehicles } from "@/lib/server/store";
 import { wallToday } from "@/lib/server/wall";
+import { tapStates } from "@/lib/server/store";
+import { TAP_TAGS } from "@/lib/tap-tags";
 import { FREQUENCIES, addDays, dueLabel, dueTone, formatTime, routineFor, vehicleAlerts, weekdayOf } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
@@ -131,7 +133,8 @@ export default async function ManagePage() {
   }
 
   const { today, dayStart } = await wallToday(hh);
-  const [tasks, bills, upkeep, meals, routine, vehicles, services] = await Promise.all([
+  const toggleSlugs = Object.keys(TAP_TAGS).filter((slug) => TAP_TAGS[slug].toggle);
+  const [tasks, bills, upkeep, meals, routine, vehicles, services, states] = await Promise.all([
     listTasks(hh, today, dayStart),
     listBills(hh, today),
     listUpkeep(hh, today),
@@ -139,6 +142,7 @@ export default async function ManagePage() {
     listRoutine(hh, today),
     listVehicles(hh, today),
     listVehicleServices(hh),
+    tapStates(hh, toggleSlugs),
   ]);
   const annualMiles = Number(process.env.ANNUAL_MILES) || 10000;
   const forecast = buildForecast({ today, annualMiles, vehicles, services, upkeep });
@@ -178,6 +182,7 @@ export default async function ManagePage() {
       <nav aria-label="Pages" className="mb-3 flex flex-wrap gap-2">
         <a href="/vehicles-tracking" className={pageLink}>Fill-ups &amp; MPG</a>
         <a href="/wall" className={pageLink}>Wall display</a>
+        <a href="/records" className={pageLink}>Records</a>
       </nav>
 
       <section
@@ -214,6 +219,22 @@ export default async function ManagePage() {
             {attention.length > 5 && (
               <li className="pl-3.5 text-xs text-slate-500">+{attention.length - 5} more below</li>
             )}
+          </ul>
+        )}
+
+        {toggleSlugs.some((slug) => states[slug]) && (
+          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-edge pt-2 text-sm">
+            {toggleSlugs.map((slug) => {
+              const current = states[slug];
+              if (!current) return null;
+              const tag = TAP_TAGS[slug];
+              return (
+                <li key={slug} className="text-slate-400">
+                  {tag.label}{" "}
+                  <span className="text-signal-blue">{tag.toggle?.says[current.value] ?? current.value}</span>
+                </li>
+              );
+            })}
           </ul>
         )}
 
