@@ -2,11 +2,12 @@
 // Behind the Supabase session wall in proxy.ts.
 
 import { buildForecast } from "@/lib/forecast";
+import type { Bill, Task, UpkeepItem, Vehicle } from "@/lib/types";
 import * as actions from "./actions";
 import { getCurrentHousehold } from "@/lib/server/household";
 import { listBills, listMeals, listRoutine, listTasks, listUpkeep, listVehicleServices, listVehicles } from "@/lib/server/store";
 import { wallToday } from "@/lib/server/wall";
-import { FREQUENCIES, addDays, dueLabel, dueTone, formatTime } from "@/lib/schedule";
+import { FREQUENCIES, addDays, dueLabel, dueTone, formatTime, routineFor, vehicleAlerts, weekdayOf } from "@/lib/schedule";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,67 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const SECTIONS = [
   ["todos", "To-dos"], ["meals", "Dinners"], ["routine", "Routine"], ["bills", "Bills"], ["upkeep", "Upkeep"], ["cars", "Cars"], ["costs", "Costs"],
 ] as const;
+
+// What the household is actually late on or owes today, gathered from the data
+// the page already loads. Landing on an empty "To-dos" form told you nothing:
+// the answer to "does anything need me?" was seven sections further down.
+interface Attention {
+  key: string;
+  label: string;
+  detail: string;
+  tone: "overdue" | "today";
+  href: string;
+}
+
+function needsYou(
+  tasks: Task[],
+  bills: Bill[],
+  upkeep: UpkeepItem[],
+  vehicles: Vehicle[],
+  today: string
+): Attention[] {
+  const out: Attention[] = [];
+  const urgent = (due: string) => {
+    const tone = dueTone(due, today);
+    return tone === "overdue" || tone === "today" ? tone : null;
+  };
+
+  for (const t of tasks) {
+    if (t.done || !t.dueDate) continue;
+    const tone = urgent(t.dueDate);
+    if (tone) out.push({ key: `task:${t.id}`, label: t.title, detail: dueLabel(t.dueDate, today), tone, href: "#todos" });
+  }
+
+  for (const b of bills) {
+    // Autopay is deliberately excluded: it is money leaving, not a thing
+    // anyone has to do. It is counted in the week's total instead, the same
+    // way the wall keeps autopay off its list.
+    if (b.paid || b.autopay || !b.dueDate) continue;
+    const tone = urgent(b.dueDate);
+    if (tone) {
+      out.push({
+        key: `bill:${b.id}`,
+        label: b.name,
+        detail: `${dueLabel(b.dueDate, today)} \u00b7 $${b.amount.toFixed(2)}`,
+        tone,
+        href: "#bills",
+      });
+    }
+  }
+
+  for (const u of upkeep) {
+    const tone = urgent(u.nextDue);
+    if (tone) out.push({ key: `upkeep:${u.id}`, label: u.item, detail: dueLabel(u.nextDue, today), tone, href: "#upkeep" });
+  }
+
+  // Mileage-driven, so there is no due date to compare: it appears the moment
+  // it trips and stays until the reading moves past it.
+  for (const a of vehicleAlerts(vehicles, today)) {
+    out.push({ key: a.id, label: a.label, detail: a.detail, tone: "today", href: "#cars" });
+  }
+
+  return out.sort((a, b) => (a.tone === b.tone ? 0 : a.tone === "overdue" ? -1 : 1));
+}
 
 function Section({ id, title, hint, children }: { id: string; title: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -85,6 +147,24 @@ export default async function ManagePage() {
   const dinnerOn = new Map(meals.map((m) => [m.date, m.dinner ?? ""]));
   const weekday = new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "short", month: "numeric", day: "numeric" });
 
+  const attention = needsYou(tasks, bills, upkeep, vehicles, today);
+  const tonight = dinnerOn.get(today);
+  const routineToday = routineFor(routine, weekdayOf(today)).length;
+  // Autopay is included here on purpose: it is the week's money, whether or
+  // not anyone has to lift a finger for it.
+  const dueThisWeek = bills
+    .filter((b) => !b.paid && b.dueDate && b.dueDate >= today && b.dueDate <= addDays(today, 6))
+    .reduce((sum, b) => sum + b.amount, 0);
+  const counts: Record<string, number> = {
+    todos: tasks.filter((t) => !t.done).length,
+    meals: meals.filter((m) => m.dinner).length,
+    routine: routine.length,
+    bills: bills.length,
+    upkeep: upkeep.length,
+    cars: vehicles.length,
+    costs: services.length,
+  };
+
   return (
     <main id="main" className="mx-auto max-w-xl px-4 pb-24">
       <header className="flex items-center justify-between py-4">
@@ -100,9 +180,56 @@ export default async function ManagePage() {
         <a href="/wall" className={pageLink}>Wall display</a>
       </nav>
 
+      <section
+        aria-labelledby="needs-you"
+        className="mb-4 rounded-stone border border-edge bg-ink-900 p-4"
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 id="needs-you" className="text-2xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+            Needs you
+          </h2>
+          <span className="shrink-0 text-xs text-slate-500">
+            {weekday.format(new Date(`${today}T12:00:00Z`))}
+          </span>
+        </div>
+
+        {attention.length === 0 ? (
+          <p className="mt-2 font-display text-xl text-slate-300">Nothing due today.</p>
+        ) : (
+          <ul className="mt-2 space-y-1.5">
+            {attention.slice(0, 5).map((a) => (
+              <li key={a.key}>
+                <a href={a.href} className="flex items-baseline gap-2 text-[15px]">
+                  <span
+                    aria-hidden="true"
+                    className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
+                      a.tone === "overdue" ? "bg-signal-red" : "bg-signal-amber"
+                    }`}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-slate-100">{a.label}</span>
+                  <span className={`shrink-0 text-xs ${TONE[a.tone]}`}>{a.detail}</span>
+                </a>
+              </li>
+            ))}
+            {attention.length > 5 && (
+              <li className="pl-3.5 text-xs text-slate-500">+{attention.length - 5} more below</li>
+            )}
+          </ul>
+        )}
+
+        <p className="mt-3 border-t border-edge pt-2 text-xs text-slate-500">
+          Tonight: {tonight ? <span className="text-signal-amber">{tonight}</span> : "not planned"}
+          {routineToday > 0 && ` \u00b7 ${routineToday} routine today`}
+          {dueThisWeek > 0 && ` \u00b7 ${money0(dueThisWeek)} of bills this week`}
+        </p>
+      </section>
+
       <nav aria-label="Sections" className="sticky top-0 z-20 -mx-4 mb-4 flex gap-2 overflow-x-auto border-b border-edge bg-ink-950/95 px-4 py-2 backdrop-blur">
         {SECTIONS.map(([id, name]) => (
-          <a key={id} href={`#${id}`} className="shrink-0 rounded-full border border-edge px-3 py-1.5 text-sm text-slate-300">{name}</a>
+          <a key={id} href={`#${id}`} className="shrink-0 rounded-full border border-edge px-3 py-1.5 text-sm text-slate-300">
+            {name}
+            {counts[id] > 0 && <span className="ml-1.5 text-slate-500 tabular-nums">{counts[id]}</span>}
+          </a>
         ))}
       </nav>
 
