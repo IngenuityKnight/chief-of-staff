@@ -377,6 +377,55 @@ export async function listTaps(householdId: string, today: string, limit = 5): P
   return (data ?? []).map((r: Row) => ({ slug: String(r.slug), label: String(r.label), at: String(r.created_at) }));
 }
 
+/**
+ * The newest value for each of `slugs`, which for a toggle tag is its current
+ * state. Reads the same append-only rows as the history below, so asking
+ * "is the dishwasher clean" costs nothing extra and cannot drift from the log.
+ */
+export async function tapStates(
+  householdId: string,
+  slugs: readonly string[]
+): Promise<Record<string, { value: string; at: string }>> {
+  const sb = db();
+  if (!sb || slugs.length === 0) return {};
+  const { data, error } = await sb
+    .from("tap_events")
+    .select("slug,value,created_at")
+    .eq("household_id", householdId)
+    .in("slug", slugs as string[])
+    .not("value", "is", null)
+    .order("created_at", { ascending: false });
+  check(error, "load tap states");
+
+  const out: Record<string, { value: string; at: string }> = {};
+  // Rows arrive newest first, so the first one seen for a slug is its state.
+  for (const r of (data ?? []) as Row[]) {
+    const slug = String(r.slug);
+    if (out[slug]) continue;
+    out[slug] = { value: String(r.value), at: String(r.created_at) };
+  }
+  return out;
+}
+
+/**
+ * Every tap for one slug, newest first. This is the maintenance record: the
+ * reason tap_events is only ever inserted into is so that this can be asked
+ * a year from now.
+ */
+export async function tapHistory(householdId: string, slug: string, limit = 50): Promise<TapEvent[]> {
+  const sb = db();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("tap_events")
+    .select("slug,label,created_at")
+    .eq("household_id", householdId)
+    .eq("slug", slug)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  check(error, "load tap history");
+  return (data ?? []).map((r: Row) => ({ slug: String(r.slug), label: String(r.label), at: String(r.created_at) }));
+}
+
 // ─── car services + cost estimates ───────────────────────────────────────────
 
 const toService = (r: Row): VehicleService => ({

@@ -6,13 +6,18 @@
 // GET has a side effect on purpose (NFC tags can only open URLs). Mitigations:
 // signed token, rate limit, and a 2-minute dedupe so link previews or a
 // double-tap don't log twice.
+//
+// Two kinds of tag. A marker records a moment — the filter was changed, the
+// detectors were tested. A toggle records a state: each tap stores the state
+// it moved to, so "is the dishwasher clean" is answered by the newest row
+// rather than by a separate field that would overwrite its own history.
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { rateLimit, rateLimitKey } from "@/lib/server/rate-limit";
 import { listUpkeep, markUpkeepDone } from "@/lib/server/store";
 import { wallHouseholdId, wallToday } from "@/lib/server/wall";
-import { TAP_TAGS, isTapSlug } from "@/lib/tap-tags";
+import { TAP_TAGS, isTapSlug, nextToggleState } from "@/lib/tap-tags";
 import { verifyTapToken } from "@/lib/tap-token";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +38,7 @@ h1{font-size:28px;margin:0 0 8px}p{color:#A89C87;margin:0}
 }
 
 function escapeHtml(s: string) {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[c]!);
 }
 
 export async function GET(req: NextRequest) {
@@ -53,20 +58,40 @@ export async function GET(req: NextRequest) {
   if (!supabase) return page("Not saved", "The household database isn't configured.", 503);
 
   const householdId = wallHouseholdId();
-  const since = new Date(Date.now() - DEDUPE_MS).toISOString();
   let completed: string | null = null;
+  let state: string | null = null;
+  let alreadyJustNow = false;
 
   try {
+    // The newest row serves both purposes: it carries the current state of a
+    // toggle, and its age is what the dedupe window is measured against.
     const { data: recent, error: readErr } = await supabase
       .from("tap_events")
-      .select("id")
+      .select("value,created_at")
       .eq("household_id", householdId)
       .eq("slug", slug)
-      .gte("created_at", since)
+      .order("created_at", { ascending: false })
       .limit(1);
     if (readErr) throw readErr;
 
-    if (!recent?.length) {
+    const last = recent?.[0] as { value: string | null; created_at: string } | undefined;
+    // Parsed rather than string-compared: Postgres renders +00:00 where
+    // toISOString writes Z, so the two sort differently as text.
+    alreadyJustNow = last ? Date.now() - new Date(last.created_at).getTime() < DEDUPE_MS : false;
+
+    if (tag.toggle) {
+      if (alreadyJustNow) {
+        // A second tap inside the window is the same tap. Report where the
+        // tag already is instead of flipping it back and losing the change.
+        state = last?.value ?? tag.toggle.states[0];
+      } else {
+        state = nextToggleState(tag.toggle, last?.value ?? null);
+        const { error } = await supabase
+          .from("tap_events")
+          .insert({ household_id: householdId, slug, label: tag.label, value: state });
+        if (error) throw error;
+      }
+    } else if (!alreadyJustNow) {
       const { error } = await supabase
         .from("tap_events")
         .insert({ household_id: householdId, slug, label: tag.label });
@@ -86,6 +111,14 @@ export async function GET(req: NextRequest) {
     }
   } catch {
     return page("Not saved", "Couldn't reach the household database. Try again shortly.", 503);
+  }
+
+  if (tag.toggle && state) {
+    const says = tag.toggle.says[state] ?? state;
+    return page(
+      escapeHtml(tag.label),
+      escapeHtml(alreadyJustNow ? `${says} · already logged just now` : says)
+    );
   }
 
   return page("Logged ✓", escapeHtml(completed ? `${tag.label}. "${completed}" is rescheduled.` : tag.label));
