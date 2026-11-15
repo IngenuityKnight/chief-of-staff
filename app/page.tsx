@@ -183,6 +183,7 @@ export default async function ManagePage() {
         <a href="/vehicles-tracking" className={pageLink}>Fill-ups &amp; MPG</a>
         <a href="/wall" className={pageLink}>Wall display</a>
         <a href="/records" className={pageLink}>Records</a>
+        <a href="/keys" className={pageLink}>Keys</a>
       </nav>
 
       <section

@@ -19,6 +19,7 @@ export default function LoginPage() {
     setNext(params.get("next"));
     const reason = params.get("auth");
     if (reason === "not_member") setError("That email isn't a member of this household.");
+    else if (reason === "key") setError("That key didn't work. It may have been revoked.");
     else if (reason) setError("That sign-in link didn't work. Send a new one.");
   }, []);
 
