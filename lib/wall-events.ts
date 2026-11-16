@@ -189,6 +189,17 @@ export function timeLabel(ev: Pick<WallEvent, "allDay" | "start">, tz: string): 
   }).format(new Date(ev.start));
 }
 
+/** "HH:MM" in the household's timezone; undefined for all-day events. */
+export function sortableTime(ev: Pick<WallEvent, "allDay" | "start">, tz: string): string | undefined {
+  if (ev.allDay) return undefined;
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: tz,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(ev.start));
+}
+
 export function relativeAgo(thenIso: string, now: Date): string {
   const mins = Math.floor((now.getTime() - new Date(thenIso).getTime()) / 60_000);
   if (mins < 1) return "just now";

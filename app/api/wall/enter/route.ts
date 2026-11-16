@@ -1,6 +1,11 @@
-// One-time pairing for the wall iPad: open /wall?t=WALL_TOKEN once and this
-// sets a year-long httpOnly cookie, then redirects to a clean /wall URL so the
-// token doesn't stay in the address bar or history.
+// One-time pairing for a household tablet: open /wall?t=WALL_TOKEN (or
+// /today?t=…) once and this sets a year-long httpOnly cookie, then redirects
+// to a clean URL so the token doesn't stay in the address bar or history.
+//
+// The destination is an allow-list of the two kiosk views rather than a
+// general same-origin check. This endpoint hands out a year-long credential,
+// so the set of places it can drop you afterwards should be short enough to
+// read.
 
 import { NextResponse, type NextRequest } from "next/server";
 import { rateLimit, rateLimitKey } from "@/lib/server/rate-limit";
@@ -30,7 +35,11 @@ export async function GET(req: NextRequest) {
   const value = wallSessionCookieValue();
   if (!verifyWallToken(token) || !value) return new NextResponse("Not found", { status: 404 });
 
-  const res = NextResponse.redirect(new URL("/wall", req.url), 303);
+  const PAIRABLE = ["/wall", "/today"];
+  const requested = req.nextUrl.searchParams.get("next");
+  const destination = requested && PAIRABLE.includes(requested) ? requested : "/wall";
+
+  const res = NextResponse.redirect(new URL(destination, req.url), 303);
   res.cookies.set(WALL_COOKIE, value, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
