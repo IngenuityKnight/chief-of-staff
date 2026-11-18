@@ -93,6 +93,10 @@ export async function POST(
   const body = await req.json();
   const { odometer_miles, gallons_pumped, cost_dollars, location, fuel_type, notes, log_date } =
     body;
+  // Absent means full: the overwhelming majority of stops are, and an older
+  // client that does not send the field should not have its logs marked
+  // partial and quietly dropped from the MPG history.
+  const isFullFill = body.is_full_fill !== false;
 
   // Validate required field
   if (!odometer_miles || odometer_miles <= 0) {
@@ -114,7 +118,7 @@ export async function POST(
   // Check if odometer is higher than last reading
   const { data: lastLog } = await supabase
     .from("vehicle_logs")
-    .select("odometer_miles")
+    .select("odometer_miles,is_full_fill")
     .eq("vehicle_id", vehicleId)
     .order("log_date", { ascending: false })
     .limit(1)
@@ -139,6 +143,7 @@ export async function POST(
       odometer_miles,
       gallons_pumped: gallons_pumped || null,
       cost_dollars: cost_dollars || null,
+      is_full_fill: isFullFill,
       location: location || null,
       fuel_type: fuel_type || null,
       notes: notes || null,
@@ -151,9 +156,14 @@ export async function POST(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Calculate MPG if we have gallons
+  // MPG is miles-since-last-fill over gallons-pumped, which only holds when
+  // both ends of that interval were at the top of the tank. If either fill was
+  // partial the gallons pumped is not the fuel burned, and the figure would be
+  // confidently wrong — better to return nothing than a number nobody can tell
+  // is bad.
   let mpg = null;
-  if (gallons_pumped && lastLog && lastLog.odometer_miles > 0) {
+  const bothFull = isFullFill && lastLog?.is_full_fill !== false;
+  if (gallons_pumped && lastLog && lastLog.odometer_miles > 0 && bothFull) {
     const miles = odometer_miles - lastLog.odometer_miles;
     mpg = miles / gallons_pumped;
   }

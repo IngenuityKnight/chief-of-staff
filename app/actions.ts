@@ -123,6 +123,7 @@ export async function saveVehicle(fd: FormData) {
       lastOilChangeMiles: int(fd, "lastOil"),
       oilChangeIntervalMiles: int(fd, "interval", 1000, 30000) ?? 5000,
       registrationExpires: date(fd, "registration"),
+      tankGallons: int(fd, "tank", 1, 60),
     });
   }
   done();

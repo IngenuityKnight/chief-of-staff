@@ -280,7 +280,7 @@ export async function listVehicles(householdId: string, today: string): Promise<
   if (!sb) return sampleData(today).vehicles;
   const { data, error } = await sb
     .from("vehicles")
-    .select("id,year,make,model,mileage,last_oil_change_miles,oil_change_interval_miles,registration_expires")
+    .select("id,year,make,model,mileage,last_oil_change_miles,oil_change_interval_miles,registration_expires,tank_gallons")
     .eq("household_id", householdId)
     .order("year", { ascending: false });
   check(error, "load vehicles");
@@ -292,6 +292,7 @@ export async function listVehicles(householdId: string, today: string): Promise<
     mileage: num(r.mileage),
     lastOilChangeMiles: num(r.last_oil_change_miles),
     oilChangeIntervalMiles: num(r.oil_change_interval_miles) ?? 5000,
+    tankGallons: num(r.tank_gallons),
     registrationExpires: ymd(r.registration_expires),
   }));
 }
@@ -306,6 +307,7 @@ export async function saveVehicle(householdId: string, v: Omit<Vehicle, "id"> & 
     mileage: v.mileage ?? null,
     last_oil_change_miles: v.lastOilChangeMiles ?? null,
     oil_change_interval_miles: v.oilChangeIntervalMiles,
+    tank_gallons: v.tankGallons ?? null,
     registration_expires: v.registrationExpires ?? null,
   };
   const { error } = v.id
