@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { WallData, WallTodo } from "@/lib/wall-types";
+import KioskExit from "@/components/kiosk-exit";
 
 const REFRESH_MS = 5 * 60_000;
 const CONFIRM_MS = 4_000;
@@ -149,10 +150,11 @@ export default function TodayView({ data }: { data: WallData }) {
   return (
     <main className="mx-auto min-h-screen max-w-2xl px-5 pb-16 pt-8">
       <header className="mb-5">
-        <div className="flex items-baseline justify-between gap-4">
+        {/* Same gesture as the wall, same place: long-press the date. */}
+        <KioskExit from="/today" className="flex items-baseline justify-between gap-4">
           <h1 className="font-display text-4xl font-semibold leading-none">{data.todayLabel}</h1>
           <span className="shrink-0 tabular-nums text-xl text-slate-400">{clock}</span>
-        </div>
+        </KioskExit>
         {w && (
           <p className="mt-2 text-lg text-slate-300">
             {Math.round(w.tempF)}° {w.label.toLowerCase()} · high {Math.round(w.highF)}°, low{" "}
