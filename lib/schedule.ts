@@ -3,7 +3,7 @@
 
 import type { Frequency, RoutineItem, Vehicle } from "./types";
 
-export const FREQUENCIES: Frequency[] = ["one-time", "weekly", "monthly", "quarterly", "semi-annual", "annual", "seasonal"];
+export const FREQUENCIES: Frequency[] = ["one-time", "weekly", "fortnightly", "monthly", "quarterly", "semi-annual", "annual", "seasonal"];
 
 export function isYmd(value: unknown): value is string {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -31,6 +31,8 @@ export function nextDue(frequency: Frequency, from: string): string | null {
   switch (frequency) {
     case "one-time": return null;
     case "weekly": return addDays(from, 7);
+    // 14 days rather than half a month, so a Tuesday rota stays on Tuesdays.
+    case "fortnightly": return addDays(from, 14);
     case "monthly": return addMonths(from, 1);
     case "quarterly":
     case "seasonal": return addMonths(from, 3);

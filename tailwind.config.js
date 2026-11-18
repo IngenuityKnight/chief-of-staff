@@ -11,41 +11,44 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Core surfaces — charred oak, dark but warm. The room at night.
+        // Values live in app/globals.css as CSS variables so the same token
+        // can mean "charred oak" at night and "warm paper" by day. Names stay
+        // literal to the role, not to the colour: ink-950 is always the
+        // furthest-back surface, whichever theme is on.
         ink: {
-          950: "#14100B",
-          900: "#191410",
-          850: "#1E1813",
-          800: "#241D16",
-          700: "#2D241B",
-          600: "#3A2E22",
-          500: "#4A3B2C",
+          950: "rgb(var(--ink-950) / <alpha-value>)",
+          900: "rgb(var(--ink-900) / <alpha-value>)",
+          850: "rgb(var(--ink-850) / <alpha-value>)",
+          800: "rgb(var(--ink-800) / <alpha-value>)",
+          700: "rgb(var(--ink-700) / <alpha-value>)",
+          600: "rgb(var(--ink-600) / <alpha-value>)",
+          500: "rgb(var(--ink-500) / <alpha-value>)",
         },
-        edge: "#2E261C",
-        // State + agent accents — firelight temperatures, never alarm colors
+        edge: "rgb(var(--edge) / <alpha-value>)",
         signal: {
-          green: "#97B873",  // sage — the house is well
-          amber: "#E8A857",  // ember — needs tending
-          red: "#E07856",    // clay — urgent, still warm
-          blue: "#7FA5D6",   // dusk — the Chief (the one deliberate cool note)
-          purple: "#B59AC6", // heather — Money
-          cyan: "#7FBDB0",   // eucalyptus — Schedule
-          pink: "#D98E9F",   // rose clay — Roster
+          green: "rgb(var(--signal-green) / <alpha-value>)",
+          amber: "rgb(var(--signal-amber) / <alpha-value>)",
+          red: "rgb(var(--signal-red) / <alpha-value>)",
+          blue: "rgb(var(--signal-blue) / <alpha-value>)",
+          purple: "rgb(var(--signal-purple) / <alpha-value>)",
+          cyan: "rgb(var(--signal-cyan) / <alpha-value>)",
+          pink: "rgb(var(--signal-pink) / <alpha-value>)",
         },
-        // Warm the entire text ramp: existing pages use text-slate-* heavily,
-        // so overriding slate converts cool grays to parchment/umber app-wide.
+        // The text ramp. 50 is always the most prominent text and 950 the
+        // faintest, so the scale inverts between themes rather than the
+        // call sites having to.
         slate: {
-          50: "#F7F3EB",
-          100: "#EFE9DF",
-          200: "#E2DACB",
-          300: "#CFC5B2",
-          400: "#A89C87",
-          500: "#857A67",
-          600: "#5F5647",
-          700: "#463F34",
-          800: "#322C24",
-          900: "#211D17",
-          950: "#14110C",
+          50: "rgb(var(--slate-50) / <alpha-value>)",
+          100: "rgb(var(--slate-100) / <alpha-value>)",
+          200: "rgb(var(--slate-200) / <alpha-value>)",
+          300: "rgb(var(--slate-300) / <alpha-value>)",
+          400: "rgb(var(--slate-400) / <alpha-value>)",
+          500: "rgb(var(--slate-500) / <alpha-value>)",
+          600: "rgb(var(--slate-600) / <alpha-value>)",
+          700: "rgb(var(--slate-700) / <alpha-value>)",
+          800: "rgb(var(--slate-800) / <alpha-value>)",
+          900: "rgb(var(--slate-900) / <alpha-value>)",
+          950: "rgb(var(--slate-950) / <alpha-value>)",
         },
       },
       fontFamily: {

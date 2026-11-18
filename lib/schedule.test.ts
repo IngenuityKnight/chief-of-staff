@@ -5,6 +5,13 @@ import {
   nextRoutineIndex, routineFor, vehicleAlerts, weatherLabel, weekdayOf,
 } from "./schedule.ts";
 
+test("fortnightly lands on the same weekday, two weeks on", () => {
+  assert.equal(nextDue("fortnightly", "2026-11-17"), "2026-12-01");
+  // Across a month boundary it is still exactly 14 days, not half a month.
+  assert.equal(nextDue("fortnightly", "2026-11-30"), "2026-12-14");
+  assert.equal(weekdayOf("2026-11-17"), weekdayOf(nextDue("fortnightly", "2026-11-17")!));
+});
+
 test("date validation", () => {
   assert.ok(isYmd("2026-11-12"));
   assert.equal(isYmd("2026-02-30"), false);

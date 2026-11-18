@@ -1,7 +1,12 @@
 // Domain types for the household wall. Dates are YYYY-MM-DD strings in the
 // household's timezone; the store converts to/from database timestamps.
 
-export type Frequency = "one-time" | "weekly" | "monthly" | "quarterly" | "semi-annual" | "annual" | "seasonal";
+// "fortnightly" rather than "biweekly": biweekly means both every two weeks
+// and twice a week depending on who is reading, and a cleaning rota is not
+// the place to find out which.
+export type Frequency =
+  | "one-time" | "weekly" | "fortnightly" | "monthly"
+  | "quarterly" | "semi-annual" | "annual" | "seasonal";
 
 export interface Task {
   id: string;
