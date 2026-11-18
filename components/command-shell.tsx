@@ -26,6 +26,15 @@ const stroke = {
 
 const DESTS: Dest[] = [
   {
+    href: "/",
+    label: "House",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-6 w-6" {...stroke}>
+        <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1Z" />
+      </svg>
+    ),
+  },
+  {
     href: "/dash",
     label: "Today",
     icon: (
@@ -76,15 +85,6 @@ const DESTS: Dest[] = [
       </svg>
     ),
   },
-  {
-    href: "/",
-    label: "House",
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-6 w-6" {...stroke}>
-        <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1Z" />
-      </svg>
-    ),
-  },
 ];
 
 function isActive(pathname: string, href: string): boolean {
@@ -125,7 +125,24 @@ export default function CommandShell({ children }: { children: React.ReactNode }
           );
         })}
 
-        <div className="mt-auto">
+        {/* Help is reference, not a destination — it belongs with the
+            settings-ish controls rather than taking a seventh slot that would
+            crush the phone tab bar. */}
+        <div className="mt-auto flex flex-col items-center gap-2">
+          <Link
+            href="/help"
+            aria-label="Why this app works the way it does"
+            title="Why this works the way it does"
+            className={`grid h-11 w-11 place-items-center rounded-xl transition ${
+              isActive(pathname, "/help") ? "bg-ink-800 text-signal-amber" : "text-slate-600 hover:text-slate-300"
+            }`}
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" {...stroke}>
+              <circle cx="12" cy="12" r="9" />
+              <path d="M9.6 9.4a2.5 2.5 0 1 1 3.2 2.9c-.5.2-.8.7-.8 1.2v.6" />
+              <path d="M12 17.2h.01" strokeWidth="2.4" />
+            </svg>
+          </Link>
           <ThemeToggle />
         </div>
       </nav>
@@ -180,7 +197,18 @@ export function Page({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {action}
-          <span className="md:hidden">
+          <span className="flex items-center gap-2 md:hidden">
+            <a
+              href="/help"
+              aria-label="Why this app works the way it does"
+              className="grid h-11 w-11 place-items-center rounded-xl border border-edge text-slate-400"
+            >
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M9.6 9.4a2.5 2.5 0 1 1 3.2 2.9c-.5.2-.8.7-.8 1.2v.6" />
+                <path d="M12 17.2h.01" strokeWidth="2.4" />
+              </svg>
+            </a>
             <ThemeToggle />
           </span>
         </div>
