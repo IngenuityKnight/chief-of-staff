@@ -306,7 +306,11 @@ export default function TodayView({ data }: { data: WallData }) {
         )}
 
         <footer className="flex items-center justify-between pt-2 text-sm text-slate-600">
-          <a href="/wall" className="underline-offset-4 hover:underline">Wall view</a>
+          <span className="flex gap-4">
+            <a href="/" className="underline-offset-4 hover:underline">Household</a>
+            <a href="/dash" className="underline-offset-4 hover:underline">Command centre</a>
+            <a href="/wall" className="underline-offset-4 hover:underline">Wall view</a>
+          </span>
           {data.notices.length > 0 && <span>{data.notices.join(" · ")}</span>}
         </footer>
       </div>

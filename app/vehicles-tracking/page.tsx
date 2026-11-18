@@ -187,7 +187,17 @@ export default function VehicleTrackingPage() {
   return (
     <div className="min-h-screen p-4">
       <div className="max-w-6xl mx-auto">
-        <h1 className="mb-6 font-display text-3xl font-semibold">Cars</h1>
+        {/* The only ways off this page were the browser's back button and the
+            address bar. Matches the header on /records and /keys. */}
+        <header className="mb-6 flex items-center justify-between gap-4">
+          <h1 className="font-display text-3xl font-semibold">Cars</h1>
+          <a
+            href="/"
+            className="shrink-0 rounded-lg border border-edge px-3 py-2 text-sm text-slate-300"
+          >
+            Home
+          </a>
+        </header>
 
         {/* Vehicle selector and add button */}
         <div className="mb-6 flex gap-4">
