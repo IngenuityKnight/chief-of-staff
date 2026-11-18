@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, Instrument_Sans, Spline_Sans_Mono } from "next/font/google";
+import { THEME_SCRIPT } from "@/components/theme";
 
 // Self-hosted via next/font. Variable names match tailwind.config.js.
 const displayFont = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-space" });
@@ -17,7 +18,17 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable}`}>
+    <html
+      lang="en"
+      // Dark until the inline script below corrects it, which happens before
+      // the first paint.
+      data-theme="dark"
+      className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="font-sans antialiased">{children}</body>
     </html>
   );

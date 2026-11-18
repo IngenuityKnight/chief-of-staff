@@ -15,6 +15,15 @@ import { getSupabaseAdmin } from "@/lib/server/supabase";
  */
 export const EXPORT_TABLES: ReadonlyArray<{ table: string; orderBy: string }> = [
   { table: "completions", orderBy: "completed_at" },
+  // Command centre. Goals and the journal are the least reconstructable
+  // things in here — nothing else in the household records what someone
+  // was trying to do, or what they thought about it afterwards.
+  { table: "goals", orderBy: "created_at" },
+  { table: "milestones", orderBy: "created_at" },
+  { table: "priorities", orderBy: "on_date" },
+  { table: "week_reviews", orderBy: "week_start" },
+  { table: "readings", orderBy: "created_at" },
+  { table: "journal_entries", orderBy: "on_date" },
   { table: "tap_events", orderBy: "created_at" },
   { table: "vehicle_logs", orderBy: "log_date" },
   { table: "vehicles", orderBy: "year" },
