@@ -134,7 +134,7 @@ export default async function ManagePage() {
 
   const attention = needsYou(tasks, upkeep, vehicles, today);
   const tonight = dinnerOn.get(today);
-  const routineToday = routineFor(routine, weekdayOf(today)).length;
+  const routineToday = routineFor(routine, today).length;
   const counts: Record<string, number> = {
     todos: tasks.filter((t) => !t.done).length,
     meals: meals.filter((m) => m.dinner).length,

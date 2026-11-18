@@ -72,8 +72,32 @@ export function formatTime(hhmm: string): string {
 }
 
 /** Today's routine in time order. */
-export function routineFor(items: RoutineItem[], weekday: number): RoutineItem[] {
-  return items.filter((i) => i.days.includes(weekday)).sort((a, b) => a.time.localeCompare(b.time));
+/**
+ * Whether a repeating item falls on `date`, given its interval and anchor.
+ * Assumes the weekday already matches — the caller filters on that first, so
+ * the gap is always a whole number of weeks.
+ */
+function occursOn(item: RoutineItem, date: string): boolean {
+  const every = item.intervalWeeks ?? 1;
+  if (every <= 1) return true;
+  // An interval with nothing to count from cannot say which week is on, so it
+  // degrades to weekly rather than vanishing from the schedule.
+  if (!item.anchorDate) return true;
+
+  const days = Math.round(
+    (Date.parse(`${date}T12:00:00Z`) - Date.parse(`${item.anchorDate}T12:00:00Z`)) / 86_400_000
+  );
+  // Before it started, it does not happen.
+  if (days < 0) return false;
+  return Math.floor(days / 7) % every === 0;
+}
+
+/** Routine falling on `date` (YYYY-MM-DD), earliest first. */
+export function routineFor(items: RoutineItem[], date: string): RoutineItem[] {
+  const weekday = weekdayOf(date);
+  return items
+    .filter((i) => i.days.includes(weekday) && occursOn(i, date))
+    .sort((a, b) => a.time.localeCompare(b.time));
 }
 
 /** Index of the first routine item at or after `now` ("HH:MM"); -1 when the day is done. */

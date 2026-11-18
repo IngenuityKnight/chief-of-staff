@@ -11,7 +11,10 @@ import { addDays, dueLabel, dueTone, formatTime, routineFor, vehicleAlerts, week
 import { dayLabel, groupEventsByDay, parseCalendarConfig, relativeAgo, sortableTime, timeLabel, toWallEvent, type WallEvent } from "@/lib/wall-events";
 import type { WallData, WallDay, WallTodo } from "@/lib/wall-types";
 
-const DAYS_SHOWN = 3;
+// A week. The schedule panel scrolls now, so it is no longer limited to what
+// fits without moving — and "what is on this week" is the question people
+// actually walk up to a wall display to ask.
+const DAYS_SHOWN = 7;
 
 // Routine that runs most days is the household's rhythm: everyone already
 // knows it, and repeating "Dinner 6:30" under every date turns the schedule
@@ -118,7 +121,7 @@ export async function getWallData(now = new Date()): Promise<WallData> {
     routine:
       d.ymd === today
         ? []
-        : routineFor(occasional, weekdayOf(d.ymd)).map((r) => ({
+        : routineFor(occasional, d.ymd).map((r) => ({
             id: r.id,
             time: r.time,
             timeLabel: formatTime(r.time),
@@ -159,7 +162,7 @@ export async function getWallData(now = new Date()): Promise<WallData> {
       const ymd = addDays(today, i + 1);
       return { ymd, label: weekdayFmt.format(new Date(`${ymd}T12:00:00Z`)), dinner: mealByDate.get(ymd)?.dinner };
     }),
-    routine: routineFor(routine, weekdayOf(today)).map((r) => ({ id: r.id, time: r.time, timeLabel: formatTime(r.time), label: r.label, who: r.who })),
+    routine: routineFor(routine, today).map((r) => ({ id: r.id, time: r.time, timeLabel: formatTime(r.time), label: r.label, who: r.who })),
     todo: todo.slice(0, TODO_MAX),
     todoHidden: Math.max(0, todo.length - TODO_MAX),
     taps: taps.map((t) => ({ key: `${t.slug}:${t.at}`, label: t.label, agoLabel: relativeAgo(t.at, now) })),

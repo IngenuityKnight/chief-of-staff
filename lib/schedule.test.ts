@@ -12,6 +12,28 @@ test("fortnightly lands on the same weekday, two weeks on", () => {
   assert.equal(weekdayOf("2026-11-17"), weekdayOf(nextDue("fortnightly", "2026-11-17")!));
 });
 
+test("fortnightly routine falls on alternate weeks only", () => {
+  const sonia = [{
+    id: "s", label: "Cleaner", time: "09:00", days: [2],
+    intervalWeeks: 2, anchorDate: "2026-11-17",
+  }];
+  // The anchor Tuesday, then every other Tuesday after it.
+  assert.deepEqual(routineFor(sonia, "2026-11-17").map((i) => i.id), ["s"]);
+  assert.deepEqual(routineFor(sonia, "2026-11-24"), []);
+  assert.deepEqual(routineFor(sonia, "2026-12-01").map((i) => i.id), ["s"]);
+  assert.deepEqual(routineFor(sonia, "2026-12-08"), []);
+  // Before it starts, it does not happen at all.
+  assert.deepEqual(routineFor(sonia, "2026-11-10"), []);
+  // Wrong weekday is still wrong, whatever the week.
+  assert.deepEqual(routineFor(sonia, "2026-12-02"), []);
+});
+
+test("an interval with no anchor degrades to weekly rather than vanishing", () => {
+  const orphan = [{ id: "o", label: "x", time: "09:00", days: [2], intervalWeeks: 2 }];
+  assert.deepEqual(routineFor(orphan, "2026-11-17").map((i) => i.id), ["o"]);
+  assert.deepEqual(routineFor(orphan, "2026-11-24").map((i) => i.id), ["o"]);
+});
+
 test("date validation", () => {
   assert.ok(isYmd("2026-11-12"));
   assert.equal(isYmd("2026-02-30"), false);
@@ -62,9 +84,10 @@ test("routine: filters by weekday, sorts, finds what's next", () => {
     { id: "p", label: "Pickup", time: "17:00", days: [1, 2, 3, 4, 5] },
     { id: "a", label: "Breakfast", time: "07:00", days: [0, 1, 2, 3, 4, 5, 6] },
   ];
-  assert.deepEqual(routineFor(items, 4).map((i) => i.id), ["a", "p", "b"]);
-  assert.deepEqual(routineFor(items, 6).map((i) => i.id), ["a", "b"]);
-  const thursday = routineFor(items, 4);
+  // 2026-11-19 is a Thursday, 2026-11-21 a Saturday.
+  assert.deepEqual(routineFor(items, "2026-11-19").map((i) => i.id), ["a", "p", "b"]);
+  assert.deepEqual(routineFor(items, "2026-11-21").map((i) => i.id), ["a", "b"]);
+  const thursday = routineFor(items, "2026-11-19");
   assert.equal(nextRoutineIndex(thursday, "06:00"), 0);
   assert.equal(nextRoutineIndex(thursday, "17:00"), 1);
   assert.equal(nextRoutineIndex(thursday, "20:00"), -1);
