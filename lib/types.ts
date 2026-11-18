@@ -37,6 +37,11 @@ export interface RoutineItem {
   time: string; // "HH:MM" 24h
   days: number[]; // 0 = Sunday
   who?: string;
+  /** Weeks between occurrences. 1 (the default) is every week. */
+  intervalWeeks?: number;
+  /** A date the item definitely falls on; which week is an "on" week is
+   *  measured from here. Meaningless, and ignored, when intervalWeeks is 1. */
+  anchorDate?: string;
 }
 
 export interface Vehicle {

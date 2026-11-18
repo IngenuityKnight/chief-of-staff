@@ -76,9 +76,20 @@ const DESTS: Dest[] = [
       </svg>
     ),
   },
+  {
+    href: "/",
+    label: "House",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-6 w-6" {...stroke}>
+        <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1Z" />
+      </svg>
+    ),
+  },
 ];
 
 function isActive(pathname: string, href: string): boolean {
+  // "/" is a prefix of everything, so it only ever matches exactly.
+  if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -114,18 +125,8 @@ export default function CommandShell({ children }: { children: React.ReactNode }
           );
         })}
 
-        <div className="mt-auto flex flex-col items-center gap-2">
+        <div className="mt-auto">
           <ThemeToggle />
-          <Link
-            href="/"
-            className="grid h-11 w-11 place-items-center rounded-xl text-slate-600 transition hover:text-slate-300"
-            aria-label="Household"
-            title="Household"
-          >
-            <svg viewBox="0 0 24 24" className="h-5 w-5" {...stroke}>
-              <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1Z" />
-            </svg>
-          </Link>
         </div>
       </nav>
 

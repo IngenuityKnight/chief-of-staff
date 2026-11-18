@@ -3,7 +3,9 @@
 
 import { buildForecast } from "@/lib/forecast";
 import type { Task, UpkeepItem, Vehicle } from "@/lib/types";
-import * as actions from "./actions";
+// Absolute: this file moved under (command), where "./actions" is the
+// command-centre's actions rather than the household's.
+import * as actions from "@/app/actions";
 import { getCurrentHousehold } from "@/lib/server/household";
 import { listMeals, listRoutine, listTasks, listUpkeep, listVehicleServices, listVehicles } from "@/lib/server/store";
 import { wallToday } from "@/lib/server/wall";
@@ -134,7 +136,7 @@ export default async function ManagePage() {
 
   const attention = needsYou(tasks, upkeep, vehicles, today);
   const tonight = dinnerOn.get(today);
-  const routineToday = routineFor(routine, weekdayOf(today)).length;
+  const routineToday = routineFor(routine, today).length;
   const counts: Record<string, number> = {
     todos: tasks.filter((t) => !t.done).length,
     meals: meals.filter((m) => m.dinner).length,
@@ -151,14 +153,15 @@ export default async function ManagePage() {
         <form action="/api/auth/logout" method="post"><button className={ghost}>Sign out</button></form>
       </header>
 
-      {/* The only way to the other pages used to be typing their URLs, or
-          scrolling to Cars. The sticky row below is section anchors, so these
-          sit above it rather than mixing in with links that do not navigate. */}
+      {/* The rail carries the five command-centre pages and this one. These
+          are the household's own corners, which do not earn a rail slot but
+          are otherwise only reachable by typing a URL. */}
       <nav aria-label="Pages" className="mb-3 flex flex-wrap gap-2">
         <a href="/vehicles-tracking" className={pageLink}>Fill-ups &amp; MPG</a>
-        <a href="/wall" className={pageLink}>Wall display</a>
         <a href="/records" className={pageLink}>Records</a>
         <a href="/keys" className={pageLink}>Keys</a>
+        <a href="/today" className={pageLink}>Bedside</a>
+        <a href="/wall" className={pageLink}>Wall display</a>
       </nav>
 
       <section

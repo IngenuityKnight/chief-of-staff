@@ -238,12 +238,14 @@ export async function listRoutine(householdId: string, today: string): Promise<R
   if (!sb) return sampleData(today).routine;
   const { data, error } = await sb
     .from("routine_items")
-    .select("id,label,time_of_day,days,who")
+    .select("id,label,time_of_day,days,who,interval_weeks,anchor_date")
     .eq("household_id", householdId)
     .order("time_of_day", { ascending: true });
   check(error, "load the routine");
   return (data ?? []).map((r: Row) => ({
     id: String(r.id),
+    intervalWeeks: r.interval_weeks == null ? 1 : Number(r.interval_weeks),
+    anchorDate: ymd(r.anchor_date),
     label: String(r.label),
     time: String(r.time_of_day),
     days: Array.isArray(r.days) ? r.days.map(Number) : [],

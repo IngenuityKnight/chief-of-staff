@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { WallData, WallTodo } from "@/lib/wall-types";
 
 const REFRESH_MS = 5 * 60_000;
 const CONFIRM_MS = 6_000;
+// How long the schedule stays where someone left it before returning to today.
+// Long enough to read a week; short enough that the wall is showing today again
+// by the time the next person walks past.
+const RETURN_MS = 45_000;
 const WHO_COLORS = ["text-signal-cyan", "text-signal-pink", "text-signal-purple", "text-signal-green"];
 const TONE_TEXT: Record<WallTodo["tone"], string> = {
   overdue: "text-signal-red",
@@ -30,11 +34,26 @@ function useClock(timeZone: string) {
   return { time, hhmm: `${hh}:${mm}`, night: Number(hh) >= 22 || Number(hh) < 6 };
 }
 
-function Panel({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) {
+function Panel({
+  title,
+  action,
+  children,
+  className = "",
+}: {
+  title: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <section className={`flex min-h-0 flex-col overflow-hidden rounded-stone border border-edge bg-ink-900 p-4 ${className}`}>
-      <h2 className="mb-2 shrink-0 text-2xs font-semibold uppercase text-slate-400">{title}</h2>
-      <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+      <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
+        <h2 className="text-2xs font-semibold uppercase text-slate-400">{title}</h2>
+        {action}
+      </div>
+      {/* flex, so a child asking for flex-1 actually gets the leftover height
+          — which is what lets the schedule scroll inside a fixed panel. */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
     </section>
   );
 }
@@ -58,6 +77,50 @@ export default function WallView({ data }: { data: WallData }) {
   }, [router]);
 
   useEffect(() => () => { if (confirmTimer.current) clearTimeout(confirmTimer.current); }, []);
+
+  // The schedule scrolls through the week. On a device nobody owns, that needs
+  // a way back: a wall left scrolled to Friday is worse than one that never
+  // scrolled, because the next person to walk past reads the wrong day as
+  // today. So any interaction starts a timer that returns it.
+  const scroller = useRef<HTMLDivElement | null>(null);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [scrolled, setScrolled] = useState(false);
+
+  const scrollToDay = useCallback((index: number, smooth = true) => {
+    const el = scroller.current;
+    const target = el?.children[index] as HTMLElement | undefined;
+    if (!el || !target) return;
+    el.scrollTo({ top: target.offsetTop - el.offsetTop, behavior: smooth ? "smooth" : "auto" });
+  }, []);
+
+  const nudgeIdle = useCallback(() => {
+    if (idleTimer.current) clearTimeout(idleTimer.current);
+    idleTimer.current = setTimeout(() => {
+      scrollToDay(0);
+      setScrolled(false);
+    }, RETURN_MS);
+  }, [scrollToDay]);
+
+  useEffect(() => () => { if (idleTimer.current) clearTimeout(idleTimer.current); }, []);
+
+  function onScheduleScroll() {
+    const el = scroller.current;
+    if (!el) return;
+    // A few pixels of slop so a rounding error does not count as scrolling.
+    setScrolled(el.scrollTop > 8);
+    nudgeIdle();
+  }
+
+  function step(delta: number) {
+    const el = scroller.current;
+    if (!el) return;
+    // Which day is nearest the top right now, then move from there.
+    const tops = Array.from(el.children).map((c) => (c as HTMLElement).offsetTop - el.offsetTop);
+    const current = tops.findIndex((t, i) => el.scrollTop < (tops[i + 1] ?? Infinity) - 8);
+    const next = Math.max(0, Math.min(data.days.length - 1, (current < 0 ? 0 : current) + delta));
+    scrollToDay(next);
+    nudgeIdle();
+  }
 
   async function act(item: WallTodo, done = true) {
     setConfirming(null);
@@ -132,16 +195,59 @@ export default function WallView({ data }: { data: WallData }) {
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-3 grid-rows-[minmax(0,3fr)_minmax(0,2fr)] gap-4">
-        <Panel title="Schedule" className="row-span-2">
-          <div className="space-y-3">
+        <Panel
+          title="Schedule"
+          className="row-span-2"
+          action={
+            <div className="flex items-center gap-1">
+              {scrolled && (
+                <button
+                  onClick={() => { scrollToDay(0); setScrolled(false); }}
+                  className="rounded-lg border border-edge px-2 py-1 text-2xs uppercase tracking-wider text-signal-amber"
+                >
+                  Today
+                </button>
+              )}
+              {/* Buttons as well as scrolling: a wall gets tapped by people
+                  who are not expecting a scrollable surface, and a gesture
+                  with no visible affordance is a gesture nobody finds. */}
+              <button
+                onClick={() => step(-1)}
+                aria-label="Earlier"
+                className="grid h-9 w-9 place-items-center rounded-lg border border-edge text-slate-400"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <path d="m6 15 6-6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <button
+                onClick={() => step(1)}
+                aria-label="Later"
+                className="grid h-9 w-9 place-items-center rounded-lg border border-edge text-slate-400"
+              >
+                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <path d="m6 9 6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          }
+        >
+          <div
+            ref={scroller}
+            onScroll={onScheduleScroll}
+            onTouchStart={nudgeIdle}
+            // snap-start on each day means a flick lands on a date boundary
+            // rather than halfway through Wednesday.
+            className="min-h-0 flex-1 snap-y snap-mandatory space-y-3 overflow-y-auto overscroll-contain pr-1"
+          >
             {data.days.map((day) => (
-              <div key={day.ymd}>
+              <div key={day.ymd} className="snap-start scroll-mt-1">
                 <h3 className={`mb-1 font-display text-lg ${day.isToday ? "text-slate-50" : "text-slate-300"}`}>{day.label}</h3>
                 {day.events.length === 0 && day.routine.length === 0 ? (
                   <p className="text-sm text-slate-500">Nothing scheduled</p>
                 ) : (
                   <ul className="space-y-1">
-                    {day.events.slice(0, day.isToday ? 7 : 4).map((e) => (
+                    {day.events.slice(0, day.isToday ? 8 : 6).map((e) => (
                       <li key={e.id} className="flex gap-2 text-[15px] leading-snug">
                         <span className="w-[4.5rem] shrink-0 tabular-nums text-slate-400">{e.timeLabel}</span>
                         <span className="min-w-0">
@@ -150,8 +256,8 @@ export default function WallView({ data }: { data: WallData }) {
                         </span>
                       </li>
                     ))}
-                    {day.events.length > (day.isToday ? 7 : 4) && (
-                      <li className="text-sm text-slate-500">+{day.events.length - (day.isToday ? 7 : 4)} more</li>
+                    {day.events.length > (day.isToday ? 8 : 6) && (
+                      <li className="text-sm text-slate-500">+{day.events.length - (day.isToday ? 8 : 6)} more</li>
                     )}
                     {/* Routine, dimmer than the calendar because it is a
                         standing arrangement rather than an appointment. Listed

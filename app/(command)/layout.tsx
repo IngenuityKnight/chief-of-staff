@@ -17,7 +17,7 @@ export default async function CommandLayout({ children }: { children: React.Reac
 
   // proxy.ts already turns anonymous requests away; this catches the narrower
   // case of a valid session whose user is not in the household.
-  if (!household || !user) redirect("/login?next=%2Fdash");
+  if (!household || !user) redirect("/login");
 
   return <CommandShell>{children}</CommandShell>;
 }
