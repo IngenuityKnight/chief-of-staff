@@ -48,6 +48,9 @@ export function FuelLogForm({
   const [odometer, setOdometer] = useState("");
   const [gallons, setGallons] = useState("");
   const [cost, setCost] = useState("");
+  // Checked by default: filling to the click is the normal case and the
+  // flag exists for the exception, so the common path needs no taps.
+  const [fullFill, setFullFill] = useState(true);
   const [location, setLocation] = useState("");
   const [fuelType, setFuelType] = useState("regular");
   const [notes, setNotes] = useState("");
@@ -110,6 +113,7 @@ export function FuelLogForm({
           odometer_miles: parseInt(odometer),
           gallons_pumped: gallons ? parseFloat(gallons) : null,
           cost_dollars: cost ? parseFloat(cost) : null,
+          is_full_fill: fullFill,
           location: location || null,
           fuel_type: fuelType || null,
           notes: notes || null,
@@ -239,7 +243,34 @@ export function FuelLogForm({
         </div>
       </div>
 
-      {mpgDisplay && (
+      {/* MPG is miles-since-last-fill over gallons-pumped, which only holds
+          when both ends were at the top of the tank. A partial fill pumps less
+          than was burned, so the car reads as more efficient than it is and the
+          next interval reads short — silently. One checkbox is the difference
+          between a history that can be reasoned about and one that drifts. */}
+      <label className="flex items-start gap-3 rounded-lg border border-edge px-3 py-3">
+        <input
+          type="checkbox"
+          checked={fullFill}
+          onChange={(e) => setFullFill(e.target.checked)}
+          className="mt-0.5 h-5 w-5 shrink-0 accent-signal-blue"
+        />
+        <span className="min-w-0">
+          <span className="block text-base text-slate-100">Filled it up</span>
+          <span className="block text-xs text-slate-500">
+            Leave on if the pump clicked off. Turn off only for a partial fill — it
+            keeps the MPG honest.
+          </span>
+        </span>
+      </label>
+
+      {mpgDisplay && !fullFill && (
+        <p className="text-xs text-slate-500">
+          MPG is left out of the history for partial fills.
+        </p>
+      )}
+
+      {mpgDisplay && fullFill && (
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-lg border border-signal-blue/20 bg-signal-blue/10 px-3 py-2">
           <span className="text-sm text-slate-300">
             Est. MPG{" "}

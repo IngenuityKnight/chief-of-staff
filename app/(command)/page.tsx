@@ -435,6 +435,9 @@ function VehicleForm({ vehicle: v }: { vehicle?: Awaited<ReturnType<typeof listV
       <label><span className={label}>Mileage at last oil change</span><input name="lastOil" inputMode="numeric" pattern="\d*" defaultValue={v?.lastOilChangeMiles} className={input} /></label>
       <label><span className={label}>Oil change every (mi)</span><input name="interval" inputMode="numeric" pattern="\d*" defaultValue={v?.oilChangeIntervalMiles ?? 5000} className={input} /></label>
       <label><span className={label}>Registration expires</span><input name="registration" type="date" defaultValue={v?.registrationExpires} className={input} /></label>
+      {/* From the manual, entered once. Says how far down the tank is being
+          run, which gallons pumped alone cannot. */}
+      <label><span className={label}>Tank (gal)</span><input name="tank" inputMode="decimal" pattern="[0-9.]*" placeholder="14.5" defaultValue={v?.tankGallons} className={input} /></label>
       <button className={`${primary} col-span-2`}>{v ? "Save" : "Add car"}</button>
     </form>
   );

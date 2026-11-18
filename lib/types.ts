@@ -53,6 +53,9 @@ export interface Vehicle {
   lastOilChangeMiles?: number;
   oilChangeIntervalMiles: number;
   registrationExpires?: string;
+  /** Usable tank size, from the manual. Answers how far down the car is
+   *  being run, which gallons-pumped alone cannot. */
+  tankGallons?: number;
 }
 
 export interface TapEvent {

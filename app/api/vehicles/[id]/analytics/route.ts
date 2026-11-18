@@ -76,7 +76,12 @@ export async function GET(
     const curr = logs[i];
     const milesSinceLastFill = curr.odometer_miles - prev.odometer_miles;
 
-    if (curr.gallons_pumped && milesSinceLastFill > 0) {
+    // Both ends of the interval have to have finished at the top of the tank.
+    // A partial fill pumps less than was burned, so including it would make
+    // the car read as more efficient than it is — and an average is where that
+    // error hides best, because no single number looks wrong.
+    const bothFull = curr.is_full_fill !== false && prev.is_full_fill !== false;
+    if (curr.gallons_pumped && milesSinceLastFill > 0 && bothFull) {
       const mpg = milesSinceLastFill / curr.gallons_pumped;
       mpgReadings.push(mpg);
     }
@@ -123,7 +128,7 @@ export async function GET(
       for (let i = 1; i < prevLogs.length; i++) {
         const prev = prevLogs[i - 1];
         const curr = prevLogs[i];
-        if (curr.gallons_pumped) {
+        if (curr.gallons_pumped && curr.is_full_fill !== false && prev.is_full_fill !== false) {
           const miles = curr.odometer_miles - prev.odometer_miles;
           prevMpg.push(miles / curr.gallons_pumped);
         }
