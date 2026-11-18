@@ -16,6 +16,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { rateLimit, rateLimitKey } from "@/lib/server/rate-limit";
 import { listUpkeep, markUpkeepDone } from "@/lib/server/store";
+import { record as recordCompletion } from "@/lib/server/completions";
+import { getActorName } from "@/lib/server/auth";
 import { wallHouseholdId, wallToday } from "@/lib/server/wall";
 import { TAP_TAGS, isTapSlug, nextToggleState } from "@/lib/tap-tags";
 import { verifyTapToken } from "@/lib/tap-token";
@@ -60,6 +62,7 @@ export async function GET(req: NextRequest) {
   const householdId = wallHouseholdId();
   let completed: string | null = null;
   let state: string | null = null;
+  let actor: string | null = null;
   let alreadyJustNow = false;
 
   try {
@@ -97,6 +100,22 @@ export async function GET(req: NextRequest) {
         .insert({ household_id: householdId, slug, label: tag.label });
       if (error) throw error;
 
+      // A care tap is about who did it, so it writes a completion as well as
+      // the tap. The chip is anonymous but the phone that read it usually is
+      // not: if whoever tapped happens to be signed in on this device, that
+      // is the attribution, for free and with no extra tap. If not, the event
+      // is still recorded — an unattributed nappy beats a missing one.
+      if (tag.care) {
+        actor = await getActorName();
+        await recordCompletion(householdId, {
+          subjectKind: "care",
+          subjectId: slug,
+          label: tag.label,
+          source: "nfc",
+          actor,
+        });
+      }
+
       // Some stickers also tick off the matching upkeep job, which then
       // reschedules itself (tap the furnace sticker when you swap the filter).
       if (tag.completes) {
@@ -119,6 +138,11 @@ export async function GET(req: NextRequest) {
       escapeHtml(tag.label),
       escapeHtml(alreadyJustNow ? `${says} · already logged just now` : says)
     );
+  }
+
+  if (tag.care) {
+    // Naming them back is the confirmation that the attribution landed.
+    return page("Logged ✓", escapeHtml(actor ? `${tag.label} — ${actor}` : tag.label));
   }
 
   return page("Logged ✓", escapeHtml(completed ? `${tag.label}. "${completed}" is rescheduled.` : tag.label));

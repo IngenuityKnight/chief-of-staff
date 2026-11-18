@@ -15,7 +15,9 @@
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { getWallData } from "@/lib/server/wall";
+import { getWallData, wallToday } from "@/lib/server/wall";
+import { careSince } from "@/lib/server/completions";
+import { wallHouseholdId } from "@/lib/server/wall";
 import { WALL_COOKIE, isWallConfigured, verifyWallSession } from "@/lib/wall-auth";
 import TodayView from "./today-view";
 
@@ -50,5 +52,10 @@ export default async function TodayPage({
   if (!verifyWallSession(jar.get(WALL_COOKIE)?.value)) notFound();
 
   const data = await getWallData();
-  return <TodayView data={data} />;
+  // Care is the household's, not a signed-in person's, so it comes from the
+  // same household the wall reads.
+  const hh = wallHouseholdId();
+  const { dayStart } = await wallToday(hh);
+  const care = await careSince(hh, dayStart).catch(() => []);
+  return <TodayView data={data} care={care} />;
 }

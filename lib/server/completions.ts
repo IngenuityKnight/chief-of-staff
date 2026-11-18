@@ -16,7 +16,7 @@ import { getSupabaseAdmin } from "@/lib/server/supabase";
 /** Where the completion came from, which is worth knowing a year later. */
 export type CompletionSource = "phone" | "wall" | "nfc";
 
-export type SubjectKind = "upkeep" | "task" | "chore";
+export type SubjectKind = "upkeep" | "task" | "chore" | "care";
 
 export interface Completion {
   id: string;
@@ -102,6 +102,24 @@ export async function completionsFor(
     .limit(limit);
   if (error) {
     console.error(`[completions] could not list for ${subjectKind}: ${error.message}`);
+    return [];
+  }
+  return (data ?? []).map(toCompletion);
+}
+
+/** Care events since `sinceIso` — the day's nappies, feeds and the rest. */
+export async function careSince(householdId: string, sinceIso: string): Promise<Completion[]> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("completions")
+    .select("id,subject_kind,subject_id,label,completed_at,actor,source,value")
+    .eq("household_id", householdId)
+    .eq("subject_kind", "care")
+    .gte("completed_at", sinceIso)
+    .order("completed_at", { ascending: true });
+  if (error) {
+    console.error(`[completions] could not list care: ${error.message}`);
     return [];
   }
   return (data ?? []).map(toCompletion);

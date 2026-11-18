@@ -9,6 +9,7 @@ import { getCurrentHousehold } from "@/lib/server/household";
 import { getWallData, wallToday } from "@/lib/server/wall";
 import { addDays } from "@/lib/schedule";
 import { getJournal, listGoals, listPriorities, priorityHistory } from "@/lib/server/command";
+import { careSince } from "@/lib/server/completions";
 import { Card, Page } from "@/components/command-shell";
 import { DayDots, Ring } from "@/components/charts";
 import { savePriority, togglePriority } from "../actions";
@@ -24,10 +25,10 @@ export default async function DashPage() {
   const [household, user] = await Promise.all([getCurrentHousehold(), getSessionUser()]);
   if (!household || !user) return null;
 
-  const { today } = await wallToday(household);
+  const { today, dayStart } = await wallToday(household);
   const weekAgo = addDays(today, -6);
 
-  const [priorities, history, goals, journal, wall] = await Promise.all([
+  const [priorities, history, goals, journal, wall, care] = await Promise.all([
     listPriorities(household, user.id, today),
     priorityHistory(household, user.id, weekAgo, today),
     listGoals(household, user.id),
@@ -35,6 +36,7 @@ export default async function DashPage() {
     // The household's day, reused rather than re-queried. One assembler, two
     // audiences — the same decision /wall and /today already make.
     getWallData().catch(() => null),
+    careSince(household, dayStart),
   ]);
 
   const byRank = new Map(priorities.map((p) => [p.rank, p]));
@@ -181,6 +183,24 @@ export default async function DashPage() {
           <p className="mt-3 text-xs text-slate-600">
             Tick these off on <a href="/today" className="underline underline-offset-4">the house view</a>.
           </p>
+        </Card>
+      )}
+
+      {care.length > 0 && (
+        <Card title={`Charles today · ${care.length}`}>
+          <ul className="space-y-1">
+            {care.map((c) => (
+              <li key={c.id} className="flex items-baseline gap-3 text-[15px]">
+                <span className="w-[4.75rem] shrink-0 tabular-nums text-sm text-slate-500">
+                  {new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(
+                    new Date(c.completedAt)
+                  )}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-slate-200">{c.label}</span>
+                <span className="shrink-0 text-sm text-signal-cyan">{c.actor ?? "\u2014"}</span>
+              </li>
+            ))}
+          </ul>
         </Card>
       )}
 
