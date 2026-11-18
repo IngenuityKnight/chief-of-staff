@@ -24,6 +24,9 @@ export const EXPORT_TABLES: ReadonlyArray<{ table: string; orderBy: string }> = 
   { table: "week_reviews", orderBy: "week_start" },
   { table: "readings", orderBy: "created_at" },
   { table: "journal_entries", orderBy: "on_date" },
+  // A copy of Monarch's recurring schedule. Exported so the backup shows
+  // what the dashboard was claiming at the time, not just what it claims now.
+  { table: "recurring_snapshot", orderBy: "next_date" },
   { table: "tap_events", orderBy: "created_at" },
   { table: "vehicle_logs", orderBy: "log_date" },
   { table: "vehicles", orderBy: "year" },

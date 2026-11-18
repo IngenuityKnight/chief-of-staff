@@ -9,6 +9,7 @@ import { getCurrentHousehold } from "@/lib/server/household";
 import { getWallData, wallToday } from "@/lib/server/wall";
 import { addDays } from "@/lib/schedule";
 import { getJournal, listGoals, listPriorities, priorityHistory } from "@/lib/server/command";
+import { recurringBetween, SNAPSHOT_STALE_DAYS } from "@/lib/server/money";
 import { Card, Page } from "@/components/command-shell";
 import { DayDots, Ring } from "@/components/charts";
 import { savePriority, togglePriority } from "../actions";
@@ -20,6 +21,10 @@ const input =
 
 const RANK_LABEL = ["", "First", "Second", "Third"];
 
+const dayOf = (ymd: string) =>
+  new Intl.DateTimeFormat("en-US", { timeZone: "UTC", weekday: "short", day: "numeric" })
+    .format(new Date(`${ymd}T12:00:00Z`));
+
 export default async function DashPage() {
   const [household, user] = await Promise.all([getCurrentHousehold(), getSessionUser()]);
   if (!household || !user) return null;
@@ -27,7 +32,7 @@ export default async function DashPage() {
   const { today } = await wallToday(household);
   const weekAgo = addDays(today, -6);
 
-  const [priorities, history, goals, journal, wall] = await Promise.all([
+  const [priorities, history, goals, journal, wall, money] = await Promise.all([
     listPriorities(household, user.id, today),
     priorityHistory(household, user.id, weekAgo, today),
     listGoals(household, user.id),
@@ -35,6 +40,7 @@ export default async function DashPage() {
     // The household's day, reused rather than re-queried. One assembler, two
     // audiences — the same decision /wall and /today already make.
     getWallData().catch(() => null),
+    recurringBetween(household, today, addDays(today, 6)),
   ]);
 
   const byRank = new Map(priorities.map((p) => [p.rank, p]));
@@ -165,6 +171,50 @@ export default async function DashPage() {
           <span className="pb-6 text-2xs text-slate-600">last 7 days</span>
         </div>
       </Card>
+
+      {money.items.length > 0 && (
+        <Card
+          title="Money this week"
+          action={
+            money.ageDays !== undefined && (
+              <span
+                className={`text-2xs ${
+                  money.ageDays > SNAPSHOT_STALE_DAYS ? "text-signal-amber" : "text-slate-600"
+                }`}
+              >
+                {money.ageDays > SNAPSHOT_STALE_DAYS
+                  ? `read ${money.ageDays} days ago — ask Claude to refresh`
+                  : money.ageDays === 0
+                    ? "read today"
+                    : `read ${money.ageDays}d ago`}
+              </span>
+            )
+          }
+        >
+          <ul className="space-y-1.5">
+            {money.items.map((m) => (
+              <li key={m.id} className="flex items-baseline justify-between gap-3">
+                <span className="min-w-0 flex-1 truncate text-slate-200">{m.name}</span>
+                <span className="shrink-0 text-sm text-slate-500">
+                  {m.nextDate ? dayOf(m.nextDate) : ""}
+                </span>
+                <span
+                  className={`w-20 shrink-0 text-right tabular-nums ${
+                    m.kind === "income" ? "text-signal-green" : "text-slate-300"
+                  }`}
+                >
+                  {m.kind === "income" ? "+" : "\u2212"}${m.amount.toFixed(2)}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {/* Read-only by design: Monarch owns the money. Most of these are
+              autopay and need nobody, so there is nothing here to tick. */}
+          <p className="mt-3 border-t border-edge pt-2 text-xs text-slate-600">
+            From Monarch. Nothing to do here — pay and change things there.
+          </p>
+        </Card>
+      )}
 
       {needs.length > 0 && (
         <Card title={`House needs you · ${needs.length}`}>
