@@ -8,7 +8,7 @@ import { listMeals, listRoutine, listTaps, listTasks, listUpkeep, listVehicles }
 import { getHouseholdTimezone, todayInTz, zonedTimeToUtc } from "@/lib/server/timezone";
 import { getWeather } from "@/lib/server/weather";
 import { addDays, dueLabel, dueTone, formatTime, routineFor, vehicleAlerts, weekdayOf } from "@/lib/schedule";
-import { dayLabel, groupEventsByDay, parseCalendarConfig, relativeAgo, timeLabel, toWallEvent, type WallEvent } from "@/lib/wall-events";
+import { dayLabel, groupEventsByDay, parseCalendarConfig, relativeAgo, sortableTime, timeLabel, toWallEvent, type WallEvent } from "@/lib/wall-events";
 import type { WallData, WallDay, WallTodo } from "@/lib/wall-types";
 
 const DAYS_SHOWN = 3;
@@ -107,7 +107,14 @@ export async function getWallData(now = new Date()): Promise<WallData> {
     ymd: d.ymd,
     label: dayLabel(d.ymd, today),
     isToday: d.ymd === today,
-    events: d.events.map((e) => ({ id: e.id, who: e.who, title: e.title, timeLabel: timeLabel(e, tz), masked: e.masked })),
+    events: d.events.map((e) => ({
+      id: e.id,
+      who: e.who,
+      title: e.title,
+      timeLabel: timeLabel(e, tz),
+      time: sortableTime(e, tz),
+      masked: e.masked,
+    })),
     routine:
       d.ymd === today
         ? []

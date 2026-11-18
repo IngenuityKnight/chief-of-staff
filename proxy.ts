@@ -3,7 +3,7 @@
 //
 // Every page and API route requires a Supabase session except:
 //   - /login and /api/auth/*   (how you get a session)
-//   - /wall and /api/wall/*    (wall iPad; verified by the wall_session cookie)
+//   - /wall, /today and /api/wall/*  (household tablets; wall_session cookie)
 //   - /api/tap                 (NFC stickers; verified by a signed per-tag token)
 //   - /api/key                 (sign-in chips; the token is looked up in access_keys)
 //   - /api/cron/*              (scheduled jobs; verified by CRON_SECRET)
@@ -29,7 +29,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // the others here, passing this check only gets the request to the handler,
 // which refuses to run without that secret.
 const PUBLIC_PREFIXES = ["/api/auth/", "/api/wall/", "/api/cron/"];
-const PUBLIC_EXACT = ["/login", "/wall", "/api/tap", "/api/key"];
+const PUBLIC_EXACT = ["/login", "/wall", "/today", "/api/tap", "/api/key"];
 
 // The vehicle sticker opens the form, which posts to the logs endpoint. Both
 // only bypass the session check while a `k` token is present to verify.

@@ -8,6 +8,12 @@ export interface WallEventView {
   who: string;
   title: string;
   timeLabel: string;
+  /**
+   * "HH:MM" in the household's timezone, absent for all-day events. The
+   * formatted label cannot be sorted or compared, and the bedside view needs
+   * to interleave these with routine items on one timeline.
+   */
+  time?: string;
   masked: boolean;
 }
 
