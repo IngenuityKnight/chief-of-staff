@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { WallData, WallTodo } from "@/lib/wall-types";
+import KioskExit from "@/components/kiosk-exit";
 
 const REFRESH_MS = 5 * 60_000;
 const CONFIRM_MS = 6_000;
@@ -166,10 +167,12 @@ export default function WallView({ data }: { data: WallData }) {
       }`}
     >
       <header className="mb-4 grid shrink-0 grid-cols-3 items-end gap-4">
-        <div>
+        {/* Long-press the clock to get off the wall. Nothing marks it,
+            deliberately — see components/kiosk-exit.tsx. */}
+        <KioskExit from="/wall">
           <p className="font-display text-5xl font-semibold tabular-nums leading-none">{time || " "}</p>
           <p className="mt-1 text-base text-slate-300">{data.todayLabel}</p>
-        </div>
+        </KioskExit>
         <div className="text-center">
           {w && (
             <>
