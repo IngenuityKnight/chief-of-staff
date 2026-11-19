@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "@/lib/server/supabase";
 import { getCurrentHousehold } from "@/lib/server/household";
+import { syncVehicleMileage } from "@/lib/server/store";
 import { wallHouseholdId } from "@/lib/server/wall";
 import { rateLimit, rateLimitKey } from "@/lib/server/rate-limit";
 import { verifyVehicleLogToken } from "@/lib/tap-token";
@@ -168,13 +169,10 @@ export async function POST(
     mpg = miles / gallons_pumped;
   }
 
-  // Keep vehicles.mileage in step with the newest reading so the existing
-  // /vehicles page and maintenance cron don't drift from the log history.
-  await supabase
-    .from("vehicles")
-    .update({ mileage: odometer_miles })
-    .eq("id", vehicleId)
-    .eq("household_id", householdId);
+  // Derived from the logs rather than set to what was just typed: the two
+  // agree for a normal fill-up, and only the derived version stays right when
+  // an entry is back-dated, edited or removed.
+  await syncVehicleMileage(householdId, vehicleId);
 
   return NextResponse.json({ ...data, mpg_calculated: mpg }, { status: 201 });
 }

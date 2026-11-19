@@ -19,6 +19,13 @@ export interface TapToggle {
 export interface TapTag {
   label: string;
   place: string;
+  /**
+   * Records something a person did for someone, rather than a maintenance
+   * moment. Care taps write a completion with the person who tapped, because
+   * "who" is most of the point — the rest of the app does not care who
+   * changed the furnace filter, and this does.
+   */
+  care?: boolean;
   /** If set, a tap also marks the upkeep job whose name contains this text as done. */
   completes?: string;
   /**
@@ -43,6 +50,10 @@ export const TAP_TAGS: Record<string, TapTag> = {
       says: { clean: "Clean — ready to empty", dirty: "Dirty — load it up" },
     },
   },
+  // Care. Stuck where the work happens, so logging costs one tap with the
+  // hand that is already holding a phone.
+  "diaper": { label: "Diaper changed", place: "Changing table", care: true },
+  "charlie-fed": { label: "Charlie fed", place: "Kitchen", care: true },
   "pantry-low": { label: "Pantry running low", place: "Pantry" },
   "medicine-given": { label: "Medicine given", place: "Medicine cabinet" },
   "smoke-detectors": { label: "Smoke/CO detectors tested", place: "Hallway", completes: "Smoke" },
@@ -63,3 +74,6 @@ export function nextToggleState(toggle: TapToggle, current: string | null): stri
  * answer "when did we last do this, and how often do we really".
  */
 export const RECORD_SLUGS = ["water-heater", "hvac-filter", "smoke-detectors"] as const;
+
+/** Tags whose taps are care events — shown together as the day's care. */
+export const CARE_SLUGS = Object.keys(TAP_TAGS).filter((s) => TAP_TAGS[s].care);

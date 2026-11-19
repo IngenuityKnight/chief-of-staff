@@ -313,6 +313,15 @@ export default function VehicleTrackingPage() {
             <div className="lg:col-span-1">
               <FuelLogForm
                 vehicleId={selectedVehicle}
+                // Passing the name collapses the form's own picker to fixed
+                // text. The selector above this already chose the car, and two
+                // controls for one decision is how a fill-up ends up on the
+                // wrong vehicle.
+                vehicleName={
+                  currentVehicle
+                    ? `${currentVehicle.year ?? ""} ${currentVehicle.make ?? ""} ${currentVehicle.model ?? ""}`.trim()
+                    : undefined
+                }
                 lastReading={lastReading}
                 onSuccess={() => {
                   fetchLogs();

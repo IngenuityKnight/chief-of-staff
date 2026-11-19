@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { WallData, WallTodo } from "@/lib/wall-types";
 import KioskExit from "@/components/kiosk-exit";
+import type { Completion } from "@/lib/server/completions";
 
 const REFRESH_MS = 5 * 60_000;
 const CONFIRM_MS = 4_000;
@@ -44,7 +45,7 @@ function Card({ title, children }: { title?: string; children: React.ReactNode }
   );
 }
 
-export default function TodayView({ data }: { data: WallData }) {
+export default function TodayView({ data, care = [] }: { data: WallData; care?: Completion[] }) {
   const router = useRouter();
   const [now, setNow] = useState<Date | null>(null);
   const [confirming, setConfirming] = useState<string | null>(null);
@@ -261,6 +262,29 @@ export default function TodayView({ data }: { data: WallData }) {
             </ul>
           )}
         </Card>
+
+        {care.length > 0 && (
+          <Card title={`Charles today · ${care.length}`}>
+            <ul className="space-y-1">
+              {care.map((c) => (
+                <li key={c.id} className="flex items-baseline gap-3 text-[15px]">
+                  <span className="w-[4.75rem] shrink-0 tabular-nums text-sm text-slate-500">
+                    {new Intl.DateTimeFormat("en-US", {
+                      timeZone: data.timeZone,
+                      hour: "numeric",
+                      minute: "2-digit",
+                    }).format(new Date(c.completedAt))}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-slate-200">{c.label}</span>
+                  {/* Who, where it is useful and before anyone has to ask.
+                      Today only — a running tally is a scoreboard, and that is
+                      a different decision from this one. */}
+                  <span className="shrink-0 text-sm text-signal-cyan">{c.actor ?? "—"}</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Card title="Dinner tonight">

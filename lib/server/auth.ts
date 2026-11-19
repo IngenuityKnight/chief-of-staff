@@ -80,3 +80,28 @@ export const getMemberships = cache(async (): Promise<Membership[]> => {
     return [];
   }
 });
+
+/**
+ * A short display name for the signed-in person, or null when nobody is.
+ *
+ * Derived from the email because there is nowhere else to get it yet: the
+ * household_members table exists but is empty, and asking two tired parents
+ * to fill in a profile before they can log a nappy is the wrong trade. When
+ * that table is populated this should read from it instead.
+ *
+ * Never throws. Callers are public routes where a missing session is the
+ * normal case, not an error.
+ */
+export async function getActorName(): Promise<string | null> {
+  try {
+    const user = await getSessionUser();
+    const email = user?.email;
+    if (!email) return null;
+    const local = email.split("@")[0] ?? "";
+    const first = local.split(/[._+-]/)[0] ?? "";
+    if (!first) return null;
+    return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+  } catch {
+    return null;
+  }
+}
