@@ -323,6 +323,44 @@ export async function deleteVehicle(householdId: string, id: string) {
   check(error, "delete the vehicle");
 }
 
+/**
+ * Re-derive a vehicle's odometer from its own logs.
+ *
+ * Every path that adds, edits or removes a fill-up has to call this. Setting
+ * the mileage to "whatever was just entered" is only correct when that entry
+ * is the newest one — deleting a log used to leave the odometer where the
+ * deleted row had put it, which is how a 205,587-mile reading outlived the
+ * log that created it and ended up on the wrong car.
+ *
+ * Takes the maximum rather than the latest by date, because an odometer only
+ * goes up and a back-dated entry should not lower it.
+ */
+export async function syncVehicleMileage(householdId: string, vehicleId: string) {
+  const sb = db();
+  if (!sb) return;
+  const { data, error } = await sb
+    .from("vehicle_logs")
+    .select("odometer_miles")
+    .eq("household_id", householdId)
+    .eq("vehicle_id", vehicleId)
+    .order("odometer_miles", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error(`[store] could not re-derive mileage: ${error.message}`);
+    return;
+  }
+  // No logs left: leave whatever is there. It may have been typed in by hand
+  // on the manage page, and clearing it would lose a real reading.
+  if (!data) return;
+  const { error: upErr } = await sb
+    .from("vehicles")
+    .update({ mileage: Number(data.odometer_miles) })
+    .eq("household_id", householdId)
+    .eq("id", vehicleId);
+  check(upErr, "update the vehicle mileage");
+}
+
 // ─── taps ────────────────────────────────────────────────────────────────────
 
 export async function listTaps(householdId: string, today: string, limit = 5): Promise<TapEvent[]> {
