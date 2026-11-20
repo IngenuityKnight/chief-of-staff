@@ -51,7 +51,7 @@ export default function LoginPage() {
           <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-signal-blue to-signal-purple shadow-lg shadow-signal-blue/20">
             <Sparkles className="h-6 w-6 text-ink-950" strokeWidth={2.5} />
           </div>
-          <h1 className="mt-4 font-display text-2xl font-semibold text-white">Burden House</h1>
+          <h1 className="mt-4 font-display text-2xl font-semibold text-slate-50">Burden House</h1>
           <p className="mt-1 text-sm text-slate-400">
             Sign in with your email — we&rsquo;ll send you a magic link.
           </p>

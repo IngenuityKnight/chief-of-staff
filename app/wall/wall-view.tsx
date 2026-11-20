@@ -162,8 +162,8 @@ export default function WallView({ data }: { data: WallData }) {
 
   return (
     <div
-      className={`flex h-[100dvh] select-none flex-col overflow-hidden bg-ink-950 p-5 font-sans text-slate-100 transition-opacity duration-1000 ${
-        night ? "opacity-40" : "opacity-100"
+      className={`flex h-[100dvh] select-none flex-col overflow-hidden bg-ink-950 p-5 font-sans text-slate-100 transition-[filter] duration-1000 ${
+        night ? "brightness-[0.4]" : "brightness-100"
       }`}
     >
       <header className="mb-4 grid shrink-0 grid-cols-3 items-end gap-4">
