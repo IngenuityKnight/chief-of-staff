@@ -85,10 +85,10 @@
   --slate-50: 14 19 40;
   --slate-100: 20 26 51;
   --slate-200: 34 41 70;
-  --slate-300: 52 60 92;
-  --slate-400: 82 91 125;
-  --slate-500: 108 117 150;
-  --slate-600: 140 148 178;
+  --slate-300: 46 54 84;
+  --slate-400: 62 70 102;
+  --slate-500: 84 93 126;
+  --slate-600: 116 124 156;
   --slate-700: 172 179 204;
   --slate-800: 200 206 226;
   --slate-900: 222 226 240;
@@ -98,9 +98,9 @@
   --hearth-tending: #9E6A00;
   --hearth-urgent: #C4402E;
 
-  --grain-alpha: 0.02;
-  --glow-warm: 0.06;
-  --glow-cool: 0.06;
+  --grain-alpha: 0.015;
+  --glow-warm: 0.03;
+  --glow-cool: 0.03;
 }
 
 html,
