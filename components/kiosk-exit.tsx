@@ -18,6 +18,7 @@
 // keyboard.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTheme } from "@/components/theme";
 
 const HOLD_MS = 650;
 const AUTO_CLOSE_MS = 12_000;
@@ -48,6 +49,7 @@ export default function KioskExit({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [theme, toggleTheme] = useTheme();
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const origin = useRef<{ x: number; y: number } | null>(null);
@@ -147,9 +149,19 @@ export default function KioskExit({
                 </li>
               ))}
             </ul>
+            {/* Light and dark live here rather than on the face of the
+                view: same reasoning as the exits. The choice is remembered
+                per device, so the nightstand and the hallway can differ. */}
+            <button
+              onClick={toggleTheme}
+              className="mt-3 flex min-h-12 w-full items-center justify-between rounded-xl border border-edge px-3 text-slate-100 transition hover:bg-ink-800"
+            >
+              <span>{theme === "light" ? "Switch to dark" : "Switch to light"}</span>
+              <span className="text-sm text-slate-500">{theme === "light" ? "Light" : "Dark"} now</span>
+            </button>
             <button
               onClick={() => setOpen(false)}
-              className="mt-3 min-h-12 w-full rounded-xl border border-edge text-slate-400"
+              className="mt-2 min-h-12 w-full rounded-xl border border-edge text-slate-400"
             >
               Stay here
             </button>

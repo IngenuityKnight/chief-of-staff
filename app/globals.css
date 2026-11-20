@@ -12,84 +12,95 @@
    variables, so ink-950 always means "furthest-back surface" and slate-50
    always means "most prominent text" — the ramp inverts here rather than at
    two hundred-odd call sites. Dark is the default because the first thing
-   this app was is a screen you look at before dawn. */
+   this app was is a screen you look at before dawn.
+
+   Palette: Midnight. A navy ground with gold and coral accents — richer than
+   neutral charcoal, and the blue base keeps panels distinct from the page
+   where the old warm browns ran together. */
 :root {
-  --ink-950: 20 16 11;
-  --ink-900: 25 20 16;
-  --ink-850: 30 24 19;
-  --ink-800: 36 29 22;
-  --ink-700: 45 36 27;
-  --ink-600: 58 46 34;
-  --ink-500: 74 59 44;
-  --edge: 46 38 28;
+  --ink-950: 11 16 32;
+  --ink-900: 17 24 48;
+  --ink-850: 21 29 56;
+  --ink-800: 26 35 66;
+  --ink-700: 34 44 80;
+  --ink-600: 46 58 100;
+  --ink-500: 62 76 124;
+  --edge: 34 44 74;
 
-  --signal-green: 151 184 115;
-  --signal-amber: 232 168 87;
-  --signal-red: 224 120 86;
-  --signal-blue: 127 165 214;
-  --signal-purple: 181 154 198;
-  --signal-cyan: 127 189 176;
-  --signal-pink: 217 142 159;
+  --signal-green: 110 211 160;
+  --signal-amber: 245 192 101;
+  --signal-red: 255 138 122;
+  --signal-blue: 138 180 255;
+  --signal-purple: 184 160 240;
+  --signal-cyan: 108 210 214;
+  --signal-pink: 240 150 190;
 
-  --slate-50: 247 243 235;
-  --slate-100: 239 233 223;
-  --slate-200: 226 218 203;
-  --slate-300: 207 197 178;
-  --slate-400: 168 156 135;
-  --slate-500: 133 122 103;
-  --slate-600: 95 86 71;
-  --slate-700: 70 63 52;
-  --slate-800: 50 44 36;
-  --slate-900: 33 29 23;
-  --slate-950: 20 17 12;
+  --slate-50: 243 245 252;
+  --slate-100: 231 234 245;
+  --slate-200: 211 216 234;
+  --slate-300: 183 190 214;
+  --slate-400: 141 150 184;
+  --slate-500: 110 119 154;
+  --slate-600: 82 90 122;
+  --slate-700: 60 67 96;
+  --slate-800: 42 48 74;
+  --slate-900: 28 33 54;
+  --slate-950: 16 20 36;
 
   /* House state — set on <html> by the shell, consumed by the Hearth line */
-  --hearth-steady: #97B873;
-  --hearth-tending: #E8A857;
-  --hearth-urgent: #E07856;
+  --hearth-steady: #6ED3A0;
+  --hearth-tending: #F5C065;
+  --hearth-urgent: #FF8A7A;
 
-  --grain-alpha: 0.045;
-  --glow-warm: 0.06;
-  --glow-cool: 0.04;
+  --grain-alpha: 0.04;
+  /* Background glows: gold from below, blue from above */
+  --glow-warm-rgb: 245 192 101;
+  --glow-cool-rgb: 138 180 255;
+  --glow-warm: 0.05;
+  --glow-cool: 0.07;
 }
 
-/* Daylight: warm paper rather than white, so the two themes feel like the
-   same room at different hours instead of two different products. The accents
-   are darkened — the dark-mode values are tuned to glow against near-black
-   and fail contrast on a light ground. */
+/* Daylight: a cool off-white with the same navy as ink, so the two themes
+   read as one product at different hours. The accents are darkened — the
+   dark-mode values are tuned to glow against navy and fail contrast on a
+   light ground. */
 [data-theme="light"] {
-  --ink-950: 247 244 237;
-  --ink-900: 255 253 249;
-  --ink-850: 250 247 240;
-  --ink-800: 243 239 230;
-  --ink-700: 234 228 216;
-  --ink-600: 219 211 196;
-  --ink-500: 198 188 170;
-  --edge: 225 217 202;
+  --ink-950: 243 245 251;
+  --ink-900: 255 255 255;
+  --ink-850: 248 249 253;
+  --ink-800: 236 239 248;
+  --ink-700: 225 229 242;
+  --ink-600: 206 212 232;
+  --ink-500: 180 188 214;
+  --edge: 216 221 238;
 
-  --signal-green: 90 125 62;
-  --signal-amber: 169 109 26;
-  --signal-red: 173 69 42;
-  --signal-blue: 57 94 150;
-  --signal-purple: 112 83 131;
-  --signal-cyan: 44 118 105;
-  --signal-pink: 161 71 91;
+  --signal-green: 29 133 88;
+  --signal-amber: 158 106 0;
+  --signal-red: 196 64 46;
+  --signal-blue: 45 91 208;
+  --signal-purple: 106 76 180;
+  --signal-cyan: 14 116 124;
+  --signal-pink: 176 58 110;
 
-  --slate-50: 28 23 17;
-  --slate-100: 40 34 26;
-  --slate-200: 56 48 38;
-  --slate-300: 77 68 55;
-  --slate-400: 108 97 80;
-  --slate-500: 134 122 103;
-  --slate-600: 160 148 128;
-  --slate-700: 190 179 160;
-  --slate-800: 214 205 189;
-  --slate-900: 232 225 212;
-  --slate-950: 243 238 229;
+  --slate-50: 14 19 40;
+  --slate-100: 20 26 51;
+  --slate-200: 34 41 70;
+  --slate-300: 52 60 92;
+  --slate-400: 82 91 125;
+  --slate-500: 108 117 150;
+  --slate-600: 140 148 178;
+  --slate-700: 172 179 204;
+  --slate-800: 200 206 226;
+  --slate-900: 222 226 240;
+  --slate-950: 236 239 247;
 
-  --grain-alpha: 0.025;
-  --glow-warm: 0.05;
-  --glow-cool: 0.035;
+  --hearth-steady: #1D8558;
+  --hearth-tending: #9E6A00;
+  --hearth-urgent: #C4402E;
+
+  --grain-alpha: 0.02;
+  --glow-warm: 0.06;
+  --glow-cool: 0.06;
 }
 
 html,
@@ -99,12 +110,12 @@ body {
   min-height: 100%;
 }
 
-/* Firelight from below, dusk from above. Both themes get it; the light one
+/* Lamplight from below, night sky from above. Both themes get it; the light one
    just whispers it. */
 body {
   background-image:
-    radial-gradient(1100px 520px at 50% 115%, rgba(232, 168, 87, var(--glow-warm)), transparent 60%),
-    radial-gradient(900px 480px at 85% -10%, rgba(127, 165, 214, var(--glow-cool)), transparent 55%);
+    radial-gradient(1100px 520px at 50% 115%, rgb(var(--glow-warm-rgb) / var(--glow-warm)), transparent 60%),
+    radial-gradient(900px 480px at 85% -10%, rgb(var(--glow-cool-rgb) / var(--glow-cool)), transparent 55%);
   background-attachment: fixed;
 }
 
@@ -171,14 +182,13 @@ body {
     height: 10px;
   }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #2e261c; border-radius: 8px; }
-  ::-webkit-scrollbar-thumb:hover { background: #4a3b2c; }
+  ::-webkit-scrollbar-thumb { background: rgb(var(--ink-600)); border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgb(var(--ink-500)); }
 }
 
-/* Warm selection */
 ::selection {
-  background: rgba(232, 168, 87, 0.3);
-  color: #fff7ec;
+  background: rgb(var(--signal-blue) / 0.3);
+  color: rgb(var(--slate-50));
 }
 
 /* Respect reduced motion: the house holds still */
