@@ -40,3 +40,6 @@ next-env.d.ts
 # Supabase CLI local state
 supabase/.temp/
 .env*
+
+# Local design previews (not part of the app)
+.previews/
