@@ -30,8 +30,8 @@ function page(title: string, body: string, status = 200) {
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
 <title>${title}</title><style>
-body{margin:0;min-height:100vh;display:grid;place-items:center;background:#14100B;color:#EFE9DF;font:18px/1.4 system-ui,sans-serif;text-align:center}
-h1{font-size:28px;margin:0 0 8px}p{color:#A89C87;margin:0}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0B1020;color:#E7EAF5;font:18px/1.4 system-ui,sans-serif;text-align:center}
+h1{font-size:28px;margin:0 0 8px}p{color:#8D96B8;margin:0}
 </style></head><body><main><h1>${title}</h1><p>${body}</p></main></body></html>`;
   return new NextResponse(html, {
     status,
