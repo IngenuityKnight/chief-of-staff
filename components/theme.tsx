@@ -80,3 +80,48 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
     </button>
   );
 }
+
+// ── Night dimming ─────────────────────────────────────────────
+// The wall dims itself overnight. Some rooms want that, some do not (a
+// hallway with the lights on at 11pm), so it can be switched off — per
+// device, for the same reason as the theme.
+
+export const DIM_KEY = "cos_night_dim";
+const DIM_EVENT = "cos-night-dim";
+
+function readDim(): boolean {
+  try {
+    return localStorage.getItem(DIM_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+/** [enabled, toggle]. On by default; stays in sync across components. */
+export function useNightDim(): [boolean, () => void] {
+  const [enabled, setEnabled] = useState(true);
+
+  useEffect(() => {
+    setEnabled(readDim());
+    const sync = () => setEnabled(readDim());
+    window.addEventListener(DIM_EVENT, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(DIM_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+
+  const toggle = useCallback(() => {
+    const next = !readDim();
+    try {
+      localStorage.setItem(DIM_KEY, next ? "on" : "off");
+    } catch {
+      // Not remembered, but still applies until the page reloads.
+    }
+    setEnabled(next);
+    window.dispatchEvent(new Event(DIM_EVENT));
+  }, []);
+
+  return [enabled, toggle];
+}

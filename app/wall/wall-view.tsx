@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { WallData, WallTodo } from "@/lib/wall-types";
 import KioskExit from "@/components/kiosk-exit";
+import { useNightDim } from "@/components/theme";
 
 const REFRESH_MS = 5 * 60_000;
 const CONFIRM_MS = 6_000;
@@ -62,6 +63,7 @@ function Panel({
 export default function WallView({ data }: { data: WallData }) {
   const router = useRouter();
   const { time, hhmm, night } = useClock(data.timeZone);
+  const [dimEnabled] = useNightDim();
   const [confirming, setConfirming] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -163,7 +165,7 @@ export default function WallView({ data }: { data: WallData }) {
   return (
     <div
       className={`flex h-[100dvh] select-none flex-col overflow-hidden bg-ink-950 p-5 font-sans text-slate-100 transition-[filter] duration-1000 ${
-        night ? "brightness-[0.4]" : "brightness-100"
+        night && dimEnabled ? "brightness-[0.4]" : "brightness-100"
       }`}
     >
       <header className="mb-4 grid shrink-0 grid-cols-3 items-end gap-4">

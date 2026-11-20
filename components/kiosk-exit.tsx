@@ -18,7 +18,7 @@
 // keyboard.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useTheme } from "@/components/theme";
+import { useNightDim, useTheme } from "@/components/theme";
 
 const HOLD_MS = 650;
 const AUTO_CLOSE_MS = 12_000;
@@ -50,6 +50,7 @@ export default function KioskExit({
 }) {
   const [open, setOpen] = useState(false);
   const [theme, toggleTheme] = useTheme();
+  const [dimEnabled, toggleDim] = useNightDim();
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const origin = useRef<{ x: number; y: number } | null>(null);
@@ -159,6 +160,16 @@ export default function KioskExit({
               <span>{theme === "light" ? "Switch to dark" : "Switch to light"}</span>
               <span className="text-sm text-slate-500">{theme === "light" ? "Light" : "Dark"} now</span>
             </button>
+            {/* Only the wall dims overnight, so only the wall offers this. */}
+            {from === "/wall" && (
+              <button
+                onClick={toggleDim}
+                className="mt-2 flex min-h-12 w-full items-center justify-between rounded-xl border border-edge px-3 text-slate-100 transition hover:bg-ink-800"
+              >
+                <span>{dimEnabled ? "Turn off night dimming" : "Turn on night dimming"}</span>
+                <span className="text-sm text-slate-500">10pm–6am · {dimEnabled ? "On" : "Off"}</span>
+              </button>
+            )}
             <button
               onClick={() => setOpen(false)}
               className="mt-2 min-h-12 w-full rounded-xl border border-edge text-slate-400"
