@@ -17,7 +17,8 @@ import { recurringBetween } from "@/lib/server/money";
 import { careSince } from "@/lib/server/completions";
 import { fredConfigured, getIndicators, ownMortgageRate, refinanceRead, type Indicator } from "@/lib/server/fred";
 import { proposePlan, todaysEventSpans } from "@/lib/server/brief";
-import { AREAS, DEFAULT_PLAN_SETTINGS as PLAN, findConflicts, formatSpan } from "@/lib/timebox";
+import { AREAS, DEFAULT_PLAN_SETTINGS as PLAN, findConflicts, fixedFor, formatSpan, toMin } from "@/lib/timebox";
+import { weekdayOf } from "@/lib/schedule";
 import { Card, Page } from "@/components/command-shell";
 import { acceptPlan, clearPlan, markTimebox } from "../actions";
 
@@ -145,7 +146,14 @@ export default async function BriefPage() {
   if (priorities.length < 3) decisions.push({ text: `Set ${3 - priorities.length} more priorit${3 - priorities.length === 1 ? "y" : "ies"} for today.`, href: "/dash" });
   for (const p of untagged) decisions.push({ text: `Tag “${p.title}” as Home, Work or Self so it can be boxed.`, href: "/dash" });
 
-  const fixedLabel = PLAN.fixed.map((f) => `${f.label} ${formatSpan(f.start, f.end)}`).join(", ");
+  const weekday = weekdayOf(today);
+  const isWorkday = PLAN.workDays.includes(weekday);
+  const fixedLabel = fixedFor(weekday)
+    .map((f) => `${f.label.toLowerCase()} ${formatSpan(f.start, f.end)}`)
+    .join(", ");
+  // Phone goes away at 8:30, so a box after it is for something offline.
+  const PHONE_CUTOFF = toMin("20:30");
+  const phoneOff = (start: string) => toMin(start) >= PHONE_CUTOFF;
 
   return (
     <Page
@@ -190,14 +198,17 @@ export default async function BriefPage() {
 
       <Card
         title="Time boxes"
-        action={<span className="text-2xs text-slate-500">outside 9–5</span>}
+        action={<span className="text-2xs text-slate-500">{isWorkday ? "evenings" : "weekend"}</span>}
       >
         {boxes.length > 0 ? (
           <>
             <ul className="divide-y divide-edge">
               {boxes.map((b) => (
                 <li key={b.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5">
-                  <span className="w-28 shrink-0 tabular-nums text-sm text-slate-400">{formatSpan(b.start, b.end)}</span>
+                  <span className="w-28 shrink-0 tabular-nums text-sm text-slate-400">
+                    {formatSpan(b.start, b.end)}
+                    {phoneOff(b.start) && <span className="block text-2xs text-slate-600">phone off</span>}
+                  </span>
                   <span
                     className={`min-w-0 flex-1 text-slate-100 ${b.status === "done" ? "text-slate-500 line-through" : ""}`}
                   >
@@ -239,7 +250,10 @@ export default async function BriefPage() {
             <ul className="divide-y divide-edge">
               {plan.boxes.map((b) => (
                 <li key={`${b.start}-${b.title}`} className="flex items-center gap-3 py-2.5">
-                  <span className="w-28 shrink-0 tabular-nums text-sm text-slate-400">{formatSpan(b.start, b.end)}</span>
+                  <span className="w-28 shrink-0 tabular-nums text-sm text-slate-400">
+                    {formatSpan(b.start, b.end)}
+                    {phoneOff(b.start) && <span className="block text-2xs text-slate-600">phone off</span>}
+                  </span>
                   <span className="min-w-0 flex-1 text-slate-100">{b.title}</span>
                 </li>
               ))}
@@ -268,7 +282,9 @@ export default async function BriefPage() {
           </p>
         )}
         <p className="mt-3 text-xs text-slate-600">
-          Kept free: weekdays 9–5, {fixedLabel}, and anything on the calendar.
+          Kept free: {isWorkday ? "work 9–5, " : ""}
+          {fixedLabel}, wind-down from 9:30, and anything on the calendar. Check boxes off before the 8:30 phone
+          cutoff.
         </p>
       </Card>
 
