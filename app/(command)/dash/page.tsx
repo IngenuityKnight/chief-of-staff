@@ -12,6 +12,7 @@ import { getJournal, listGoals, listPriorities, priorityHistory } from "@/lib/se
 import { recurringBetween, SNAPSHOT_STALE_DAYS } from "@/lib/server/money";
 import { careSince } from "@/lib/server/completions";
 import { Card, Page } from "@/components/command-shell";
+import { AREAS } from "@/lib/timebox";
 import { DayDots, Ring } from "@/components/charts";
 import { savePriority, togglePriority } from "../actions";
 
@@ -114,11 +115,18 @@ export default async function DashPage() {
                       <span className={`block text-lg leading-snug ${p.doneAt ? "text-slate-600 line-through" : "text-slate-100"}`}>
                         {p.title}
                       </span>
-                      {p.goalId && (
-                        <span className="text-xs text-slate-500">
-                          {goals.find((g) => g.id === p.goalId)?.title ?? "goal"}
-                        </span>
-                      )}
+                      <span className="flex flex-wrap items-center gap-2">
+                        {p.area && (
+                          <span className={p.area === "home" ? "pill-amber" : p.area === "self" ? "pill-cyan" : "pill-blue"}>
+                            {AREAS.find((a) => a.value === p.area)?.label}
+                          </span>
+                        )}
+                        {p.goalId && (
+                          <span className="text-xs text-slate-500">
+                            {goals.find((g) => g.id === p.goalId)?.title ?? "goal"}
+                          </span>
+                        )}
+                      </span>
                     </span>
                     {/* Clearing is the same action with an empty title, so
                         there is one code path for set, change and remove. */}
@@ -137,7 +145,7 @@ export default async function DashPage() {
                     </form>
                   </div>
                 ) : (
-                  <form action={savePriority} className="flex items-center gap-3">
+                  <form action={savePriority} className="flex flex-wrap items-center gap-3">
                     <input type="hidden" name="date" value={today} />
                     <input type="hidden" name="rank" value={rank} />
                     <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border-2 border-dashed border-edge text-sm text-slate-600">
@@ -148,8 +156,15 @@ export default async function DashPage() {
                       maxLength={140}
                       placeholder={`${RANK_LABEL[rank]} thing that matters today`}
                       aria-label={`${RANK_LABEL[rank]} priority`}
-                      className={input}
+                      className={`${input} min-w-0 flex-1 basis-56`}
                     />
+                    {/* Home and Self priorities get time boxes on the brief;
+                        Work stays on the work calendar. */}
+                    <select name="area" aria-label="Area" className={`${input.replace("w-full ", "")} w-auto shrink-0`} defaultValue="home">
+                      {AREAS.map((a) => (
+                        <option key={a.value} value={a.value}>{a.label}</option>
+                      ))}
+                    </select>
                     {goals.length > 0 && (
                       <select name="goalId" aria-label="Link to a goal" className={`${input} hidden w-40 sm:block`} defaultValue="">
                         <option value="">No goal</option>

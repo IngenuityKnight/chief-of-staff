@@ -6,6 +6,10 @@
 // shape — the service role bypasses RLS, so the scoping here is the boundary.
 
 import { getSupabaseAdmin } from "@/lib/server/supabase";
+import { AREAS, type Area } from "@/lib/timebox";
+
+export const isArea = (v: unknown): v is Area =>
+  typeof v === "string" && AREAS.some((a) => a.value === v);
 
 type Row = Record<string, unknown>;
 
@@ -147,6 +151,7 @@ export interface Priority {
   title: string;
   goalId?: string;
   doneAt?: string;
+  area?: Area;
 }
 
 const toPriority = (r: Row): Priority => ({
@@ -155,6 +160,7 @@ const toPriority = (r: Row): Priority => ({
   title: str(r.title),
   goalId: opt(r.goal_id),
   doneAt: opt(r.done_at),
+  area: isArea(r.area) ? r.area : undefined,
 });
 
 export async function listPriorities(householdId: string, userId: string, date: string): Promise<Priority[]> {
@@ -162,7 +168,7 @@ export async function listPriorities(householdId: string, userId: string, date: 
   if (!sb) return [];
   const { data, error } = await sb
     .from("priorities")
-    .select("id,rank,title,goal_id,done_at")
+    .select("id,rank,title,goal_id,done_at,area")
     .eq("household_id", householdId)
     .eq("user_id", userId)
     .eq("on_date", date)
@@ -177,7 +183,8 @@ export async function setPriority(
   date: string,
   rank: number,
   title: string,
-  goalId?: string
+  goalId?: string,
+  area?: Area
 ) {
   const sb = db();
   if (!sb) return;
@@ -201,6 +208,7 @@ export async function setPriority(
       rank,
       title: title.trim().slice(0, 140),
       goal_id: goalId || null,
+      area: area ?? null,
     },
     { onConflict: "user_id,on_date,rank" }
   );
@@ -468,4 +476,88 @@ export async function recentJournal(
     body: str(r.body),
     updatedAt: opt(r.updated_at),
   }));
+}
+
+// ─── time boxes ──────────────────────────────────────────────────────────────
+
+export type TimeboxStatus = "planned" | "done" | "partial" | "slipped";
+const STATUSES: TimeboxStatus[] = ["planned", "done", "partial", "slipped"];
+export const isTimeboxStatus = (v: unknown): v is TimeboxStatus =>
+  typeof v === "string" && (STATUSES as string[]).includes(v);
+
+export interface Timebox {
+  id: string;
+  start: string;
+  end: string;
+  title: string;
+  priorityId?: string;
+  status: TimeboxStatus;
+}
+
+export async function listTimeboxes(householdId: string, userId: string, date: string): Promise<Timebox[]> {
+  const sb = db();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from("timeboxes")
+    .select("id,start_time,end_time,title,priority_id,status")
+    .eq("household_id", householdId)
+    .eq("user_id", userId)
+    .eq("on_date", date)
+    .order("start_time", { ascending: true });
+  check(error, "load today's time boxes");
+  return ((data ?? []) as Row[]).map((r) => ({
+    id: str(r.id),
+    start: str(r.start_time),
+    end: str(r.end_time),
+    title: str(r.title),
+    priorityId: opt(r.priority_id),
+    status: isTimeboxStatus(r.status) ? r.status : "planned",
+  }));
+}
+
+/**
+ * Replace the day's still-planned boxes with a new plan. Boxes already marked
+ * done, partial or slipped are history and are left alone.
+ */
+export async function replacePlannedTimeboxes(
+  householdId: string,
+  userId: string,
+  date: string,
+  boxes: { start: string; end: string; title: string; priorityId?: string }[]
+) {
+  const sb = db();
+  if (!sb) return;
+  const { error: delErr } = await sb
+    .from("timeboxes")
+    .delete()
+    .eq("household_id", householdId)
+    .eq("user_id", userId)
+    .eq("on_date", date)
+    .eq("status", "planned");
+  check(delErr, "clear the old plan");
+  if (!boxes.length) return;
+  const { error } = await sb.from("timeboxes").insert(
+    boxes.map((b) => ({
+      household_id: householdId,
+      user_id: userId,
+      on_date: date,
+      start_time: b.start,
+      end_time: b.end,
+      title: b.title.slice(0, 140),
+      priority_id: b.priorityId ?? null,
+    }))
+  );
+  check(error, "save the plan");
+}
+
+export async function setTimeboxStatus(householdId: string, userId: string, id: string, status: TimeboxStatus) {
+  const sb = db();
+  if (!sb) return;
+  const { error } = await sb
+    .from("timeboxes")
+    .update({ status })
+    .eq("household_id", householdId)
+    .eq("user_id", userId)
+    .eq("id", id);
+  check(error, "update the time box");
 }

@@ -8,7 +8,7 @@ import { listMeals, listRoutine, listTaps, listTasks, listUpkeep, listVehicles }
 import { getHouseholdTimezone, todayInTz, zonedTimeToUtc } from "@/lib/server/timezone";
 import { getWeather } from "@/lib/server/weather";
 import { addDays, dueLabel, dueTone, formatTime, routineFor, vehicleAlerts, weekdayOf } from "@/lib/schedule";
-import { dayLabel, groupEventsByDay, parseCalendarConfig, relativeAgo, sortableTime, timeLabel, toWallEvent, type WallEvent } from "@/lib/wall-events";
+import { dayLabel, groupEventsByDay, parseCalendarConfig, relativeAgo, sortableTime, timeLabel, toWallEvent, ymdInTz, type WallEvent } from "@/lib/wall-events";
 import type { WallData, WallDay, WallTodo } from "@/lib/wall-types";
 
 // A week. The schedule panel scrolls now, so it is no longer limited to what
@@ -116,6 +116,13 @@ export async function getWallData(now = new Date()): Promise<WallData> {
       title: e.title,
       timeLabel: timeLabel(e, tz),
       time: sortableTime(e, tz),
+      // An event that runs past midnight ends "tomorrow"; clamp it to the
+      // end of today so the day's free-time arithmetic stays within the day.
+      endTime: e.allDay
+        ? undefined
+        : ymdInTz(e.end, tz) > d.ymd
+          ? "23:59"
+          : sortableTime({ allDay: false, start: e.end }, tz),
       masked: e.masked,
     })),
     routine:

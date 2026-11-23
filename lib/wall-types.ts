@@ -14,6 +14,8 @@ export interface WallEventView {
    * to interleave these with routine items on one timeline.
    */
   time?: string;
+  /** "HH:MM" end in the household's timezone, absent for all-day events. */
+  endTime?: string;
   masked: boolean;
 }
 

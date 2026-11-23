@@ -8,7 +8,8 @@ import { revalidatePath } from "next/cache";
 import { getSessionUser } from "@/lib/server/auth";
 import { getCurrentHousehold } from "@/lib/server/household";
 import * as cmd from "@/lib/server/command";
-import { wallToday } from "@/lib/server/wall";
+import { getWallData, wallToday } from "@/lib/server/wall";
+import { proposePlan } from "@/lib/server/brief";
 
 async function who() {
   const [household, user] = await Promise.all([getCurrentHousehold(), getSessionUser()]);
@@ -32,13 +33,62 @@ export async function savePriority(fd: FormData) {
   const date = text(fd, "date", 10) || (await localToday());
   const rank = Number(fd.get("rank"));
   if (![1, 2, 3].includes(rank)) return;
-  await cmd.setPriority(household, userId, date, rank, text(fd, "title", 140), text(fd, "goalId", 64) || undefined);
+  const area = text(fd, "area", 10);
+  await cmd.setPriority(
+    household,
+    userId,
+    date,
+    rank,
+    text(fd, "title", 140),
+    text(fd, "goalId", 64) || undefined,
+    cmd.isArea(area) ? area : undefined
+  );
   revalidatePath("/dash");
+  revalidatePath("/brief");
 }
 
 export async function togglePriority(fd: FormData) {
   const { household, userId } = await who();
   await cmd.togglePriority(household, userId, text(fd, "id", 64), fd.get("done") === "1");
+  revalidatePath("/dash");
+  revalidatePath("/brief");
+}
+
+// ─── time boxes ──────────────────────────────────────────────────────────────
+
+/**
+ * Accept the plan the brief is showing. The plan is recomputed here rather
+ * than posted from the page, so what is saved is what the server would
+ * propose now — not whatever a form claims.
+ */
+export async function acceptPlan() {
+  const { household, userId } = await who();
+  const { tz, today } = await wallToday(household);
+  const [priorities, existing, wall] = await Promise.all([
+    cmd.listPriorities(household, userId, today),
+    cmd.listTimeboxes(household, userId, today),
+    getWallData().catch(() => null),
+  ]);
+  const plan = proposePlan(today, tz, wall, priorities, existing);
+  await cmd.replacePlannedTimeboxes(household, userId, today, plan.boxes);
+  revalidatePath("/brief");
+  revalidatePath("/dash");
+}
+
+export async function clearPlan() {
+  const { household, userId } = await who();
+  const { today } = await wallToday(household);
+  await cmd.replacePlannedTimeboxes(household, userId, today, []);
+  revalidatePath("/brief");
+  revalidatePath("/dash");
+}
+
+export async function markTimebox(fd: FormData) {
+  const { household, userId } = await who();
+  const status = text(fd, "status", 10);
+  if (!cmd.isTimeboxStatus(status)) return;
+  await cmd.setTimeboxStatus(household, userId, text(fd, "id", 64), status);
+  revalidatePath("/brief");
   revalidatePath("/dash");
 }
 
