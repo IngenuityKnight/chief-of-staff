@@ -15,7 +15,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { getSupabaseAdmin, getSupabaseUrl } from "@/lib/server/supabase";
 import { getSupabasePublicKey, isAuthConfigured } from "@/lib/server/auth";
-import { HOUSEHOLD_COOKIE } from "@/lib/server/household";
+import { HOUSEHOLD_COOKIE, HOUSEHOLD_COOKIE_MAX_AGE } from "@/lib/server/household";
 import { consumeKey } from "@/lib/server/keys";
 import { rateLimit, rateLimitKey } from "@/lib/server/rate-limit";
 import { safeNextPath } from "@/lib/safe-next";
@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 24 * 30,
+    maxAge: HOUSEHOLD_COOKIE_MAX_AGE,
   });
 
   return response;

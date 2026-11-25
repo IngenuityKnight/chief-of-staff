@@ -5,6 +5,9 @@ import {
   verifyTapToken,
   vehicleLogToken,
   verifyVehicleLogToken,
+  undoToken,
+  readUndoToken,
+  UNDO_WINDOW_MS,
 } from "./tap-token.ts";
 
 const SECRET = "x".repeat(32);
@@ -52,4 +55,34 @@ test("tap and vehicle tokens do not cross over", () => {
   assert.notEqual(tapToken(VEHICLE, SECRET), vehicleLogToken(VEHICLE, SECRET));
   assert.equal(verifyVehicleLogToken(VEHICLE, tapToken(VEHICLE, SECRET), SECRET), false);
   assert.equal(verifyTapToken(VEHICLE, vehicleLogToken(VEHICLE, SECRET), SECRET), false);
+});
+
+const UNDO = { l: "Diaper changed", t: "tap-1", c: ["c-1"] };
+
+test("undo token round-trips inside the window", () => {
+  const now = 1_000_000;
+  const tok = undoToken(UNDO, SECRET, now);
+  const p = readUndoToken(tok, SECRET, now + UNDO_WINDOW_MS);
+  assert.ok(p);
+  assert.equal(p.t, "tap-1");
+  assert.deepEqual(p.c, ["c-1"]);
+});
+
+test("undo token expires", () => {
+  const now = 1_000_000;
+  const tok = undoToken(UNDO, SECRET, now);
+  assert.equal(readUndoToken(tok, SECRET, now + 5 * 60_000), null);
+});
+
+test("undo token can't be edited or forged", () => {
+  const now = 1_000_000;
+  const tok = undoToken(UNDO, SECRET, now);
+  const [, sig] = tok.split(".");
+  // Swap in a payload pointing at someone else's row, keep the signature.
+  const forged = Buffer.from(JSON.stringify({ ...UNDO, t: "other-row", x: now + 60_000 })).toString("base64url");
+  assert.equal(readUndoToken(`${forged}.${sig}`, SECRET, now), null);
+  assert.equal(readUndoToken(tok, "y".repeat(32), now), null);
+  assert.equal(readUndoToken("garbage", SECRET, now), null);
+  // A tap token is not an undo token, even with the same secret.
+  assert.equal(readUndoToken(`${tapToken("diaper", SECRET)}.${tapToken("diaper", SECRET)}`, SECRET, now), null);
 });

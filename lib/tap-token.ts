@@ -44,3 +44,50 @@ export function verifyVehicleLogToken(
 ): boolean {
   return verify(`vehicle-log:v1:${vehicleId}`, token, secret);
 }
+
+// ─── undo ───────────────────────────────────────────────────────────────────
+//
+// A tap's confirmation page carries one of these so the tap can be taken back
+// for a short while. It names exactly what the tap wrote, plus what an upkeep
+// job looked like before the tap rescheduled it, so undo restores the prior
+// state rather than guessing at it. Signed so the undo endpoint, which is as
+// public as the tap itself, can only reverse what a tap actually did.
+
+/** How long the Undo button is shown. */
+export const UNDO_WINDOW_MS = 30_000;
+/** Server-side allowance on top, for a slow thumb or a slow network. */
+const UNDO_GRACE_MS = 15_000;
+
+export interface UndoPayload {
+  /** Tag label, to say what was undone. */
+  l: string;
+  /** tap_events row the tap inserted. */
+  t: string;
+  /** completions rows it wrote. */
+  c: string[];
+  /** The upkeep job as it was before the tap rescheduled it. */
+  u?: { id: string; last_done: string | null; next_due: string | null; status: string | null };
+  /** Expiry, epoch ms. */
+  x: number;
+}
+
+export function undoToken(payload: Omit<UndoPayload, "x">, secret: string, now = Date.now()): string {
+  const body = Buffer.from(JSON.stringify({ ...payload, x: now + UNDO_WINDOW_MS + UNDO_GRACE_MS })).toString("base64url");
+  return `${body}.${sign(`tap-undo:v1:${body}`, secret)}`;
+}
+
+/** The payload if the token is genuine and in time, otherwise null. */
+export function readUndoToken(token: string, secret: string, now = Date.now()): UndoPayload | null {
+  const dot = token.lastIndexOf(".");
+  if (dot <= 0) return null;
+  const body = token.slice(0, dot);
+  if (!verify(`tap-undo:v1:${body}`, token.slice(dot + 1), secret)) return null;
+  try {
+    const p = JSON.parse(Buffer.from(body, "base64url").toString("utf8")) as UndoPayload;
+    if (typeof p.x !== "number" || now > p.x) return null;
+    if (typeof p.t !== "string" || !Array.isArray(p.c)) return null;
+    return p;
+  } catch {
+    return null;
+  }
+}

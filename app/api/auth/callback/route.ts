@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { getSupabaseAdmin, getSupabaseUrl } from "@/lib/server/supabase";
 import { getSupabasePublicKey, isAuthConfigured } from "@/lib/server/auth";
-import { HOUSEHOLD_COOKIE, getHouseholdForJob } from "@/lib/server/household";
+import { HOUSEHOLD_COOKIE, HOUSEHOLD_COOKIE_MAX_AGE, getHouseholdForJob } from "@/lib/server/household";
 import { NEXT_COOKIE, safeNextPath } from "@/lib/safe-next";
 
 // HOUSEHOLD_MEMBER_EMAILS: comma-separated emails allowed to join the household.
@@ -101,7 +101,7 @@ export async function GET(req: NextRequest) {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
-      maxAge: 60 * 60 * 24 * 30,
+      maxAge: HOUSEHOLD_COOKIE_MAX_AGE,
     });
   }
   return response;
