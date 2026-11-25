@@ -21,7 +21,7 @@ export default function Error({
     <div className="mx-auto grid max-w-md place-items-center py-24 text-center">
       <div>
         <AlertTriangle className="mx-auto h-8 w-8 text-signal-amber" aria-hidden="true" />
-        <h1 className="mt-4 font-display text-xl font-semibold text-white">
+        <h1 className="mt-4 font-display text-xl font-semibold text-slate-50">
           The house lost its footing
         </h1>
         <p className="mt-2 text-sm text-slate-400">
