@@ -10,6 +10,7 @@ import { getCurrentHousehold } from "@/lib/server/household";
 import { listMeals, listRoutine, listTasks, listUpkeep, listVehicleServices, listVehicles } from "@/lib/server/store";
 import { wallToday } from "@/lib/server/wall";
 import { tapStates } from "@/lib/server/store";
+import { getHealth } from "@/lib/server/health";
 import { TAP_TAGS } from "@/lib/tap-tags";
 import { FREQUENCIES, addDays, dueLabel, dueTone, formatTime, routineFor, vehicleAlerts, weekdayOf } from "@/lib/schedule";
 
@@ -118,7 +119,7 @@ export default async function ManagePage() {
 
   const { today, dayStart } = await wallToday(hh);
   const toggleSlugs = Object.keys(TAP_TAGS).filter((slug) => TAP_TAGS[slug].toggle);
-  const [tasks, upkeep, meals, routine, vehicles, services, states] = await Promise.all([
+  const [tasks, upkeep, meals, routine, vehicles, services, states, health] = await Promise.all([
     listTasks(hh, today, dayStart),
     listUpkeep(hh, today),
     listMeals(hh, today, addDays(today, 6)),
@@ -126,6 +127,7 @@ export default async function ManagePage() {
     listVehicles(hh, today),
     listVehicleServices(hh),
     tapStates(hh, toggleSlugs),
+    getHealth(hh),
   ]);
   const annualMiles = Number(process.env.ANNUAL_MILES) || 10000;
   const forecast = buildForecast({ today, annualMiles, vehicles, services, upkeep });
@@ -222,6 +224,51 @@ export default async function ManagePage() {
           {routineToday > 0 && ` \u00b7 ${routineToday} routine today`}
         </p>
       </section>
+
+      {/* The unattended parts of the app: backup, stickers, the Monarch read,
+          and any save that failed quietly. One line while all is well, so it
+          never competes with "Needs you"; it opens itself when something
+          isn't, because a warning nobody expands is a warning nobody sees. */}
+      {health.length > 0 && (() => {
+        const warn = health.filter((h) => h.tone === "warn");
+        return (
+          <details
+            open={warn.length > 0}
+            className={`mb-4 rounded-stone border bg-ink-900 px-4 py-3 ${
+              warn.length > 0 ? "border-signal-amber/40" : "border-edge"
+            }`}
+          >
+            <summary className="flex cursor-pointer list-none items-center gap-2 text-sm">
+              <span
+                aria-hidden="true"
+                className={`h-2 w-2 shrink-0 rounded-full ${warn.length > 0 ? "bg-signal-amber" : "bg-signal-green"}`}
+              />
+              <span className="flex-1 text-slate-300">
+                {warn.length === 0
+                  ? "Everything running"
+                  : `${warn.length} ${warn.length === 1 ? "thing needs" : "things need"} a look`}
+              </span>
+              <span className="text-xs text-slate-500">Status</span>
+            </summary>
+            <ul className="mt-2 space-y-1.5 border-t border-edge pt-2">
+              {health.map((h) => (
+                <li key={h.key} className="flex items-baseline gap-2 text-sm">
+                  <span
+                    aria-hidden="true"
+                    className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
+                      h.tone === "ok" ? "bg-signal-green" : h.tone === "warn" ? "bg-signal-amber" : "bg-slate-600"
+                    }`}
+                  />
+                  <span className="w-[4.5rem] shrink-0 text-slate-400">{h.label}</span>
+                  <span className={`min-w-0 flex-1 ${h.tone === "warn" ? "text-signal-amber" : "text-slate-300"}`}>
+                    {h.detail}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        );
+      })()}
 
       <nav aria-label="Sections" className="sticky top-0 z-20 -mx-4 mb-4 flex gap-2 overflow-x-auto border-b border-edge bg-ink-950/95 px-4 py-2 backdrop-blur">
         {SECTIONS.map(([id, name]) => (

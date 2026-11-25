@@ -13,6 +13,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { exportHousehold } from "@/lib/server/export";
 import { getHouseholdForJob } from "@/lib/server/household";
+import { note } from "@/lib/server/health";
 import { timingSafeEqual } from "node:crypto";
 
 export const dynamic = "force-dynamic";
@@ -34,23 +35,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Not authorized." }, { status: 401 });
   }
 
+  // Every exit past this point is noted, so the House page can say whether
+  // the backup worked. An unauthorized call isn't a backup run and isn't noted.
+  const householdId = getHouseholdForJob(process.env.WALL_HOUSEHOLD_ID);
+
   const apiKey = (process.env.RESEND_API_KEY ?? "").trim();
   const to = (process.env.BACKUP_EMAIL_TO ?? "").trim();
   const from = (process.env.BACKUP_EMAIL_FROM ?? "").trim();
   if (!apiKey || !to || !from) {
+    await note(householdId, "backup", false, "email not configured");
     return NextResponse.json(
       { ok: false, error: "Backup email is not configured: set RESEND_API_KEY, BACKUP_EMAIL_TO and BACKUP_EMAIL_FROM." },
       { status: 503 }
     );
   }
 
-  const householdId = getHouseholdForJob(process.env.WALL_HOUSEHOLD_ID);
-
   let files;
   try {
     files = await exportHousehold(householdId);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error.";
+    await note(householdId, "backup", false, `export failed: ${message}`);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 
@@ -84,8 +89,10 @@ export async function GET(req: NextRequest) {
     // only looks like it is running.
     const detail = await res.text().catch(() => "");
     console.error(`[cron/backup] Resend ${res.status}: ${detail.slice(0, 300)}`);
+    await note(householdId, "backup", false, `email provider returned ${res.status}`);
     return NextResponse.json({ ok: false, error: `Email provider returned ${res.status}.` }, { status: 502 });
   }
 
+  await note(householdId, "backup", true, `${total} rows, ${files.length} files`);
   return NextResponse.json({ ok: true, files: files.length, rows: total });
 }

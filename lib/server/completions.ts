@@ -3,15 +3,18 @@
 // The state tables overwrite themselves: marking an upkeep job done replaces
 // last_done and reschedules, so the previous completion is gone the moment
 // the next one happens. This is the append-only half — state answers "what is
-// true now", this answers "what happened", and nothing in here is ever
-// updated or deleted.
+// true now", this answers "what happened". Nothing in here is ever updated.
+// A row is deleted only when a person removes it as a mistake (the undo on a
+// tap, or Records), because a wrong entry in a history is worse than a gap.
 //
 // Writing is best-effort by design. Losing a history row is a smaller harm
 // than refusing to let someone tick a job off the wall because the log write
-// failed, so record() swallows its errors after logging them. The state
-// change is the user's intent; the log is bookkeeping.
+// failed, so record() swallows its errors. It does report them to the health
+// log, so the failure shows on the House page instead of only in a console
+// nobody reads.
 
 import { getSupabaseAdmin } from "@/lib/server/supabase";
+import { note } from "@/lib/server/health";
 
 /** Where the completion came from, which is worth knowing a year later. */
 export type CompletionSource = "phone" | "wall" | "nfc";
@@ -51,10 +54,10 @@ export async function record(
     actor?: string | null;
     value?: string | null;
   }
-): Promise<void> {
+): Promise<string | null> {
   const sb = getSupabaseAdmin();
-  if (!sb) return;
-  const { error } = await sb.from("completions").insert({
+  if (!sb) return null;
+  const { data, error } = await sb.from("completions").insert({
     household_id: householdId,
     subject_kind: entry.subjectKind,
     subject_id: entry.subjectId,
@@ -62,8 +65,13 @@ export async function record(
     source: entry.source ?? "phone",
     actor: entry.actor ?? null,
     value: entry.value ?? null,
-  });
-  if (error) console.error(`[completions] could not record ${entry.subjectKind}: ${error.message}`);
+  }).select("id").single();
+  if (error) {
+    console.error(`[completions] could not record ${entry.subjectKind}: ${error.message}`);
+    await note(householdId, "completion-write", false, `${entry.label}: ${error.message}`);
+    return null;
+  }
+  return String((data as { id: string }).id);
 }
 
 /** What the household has got done lately, newest first. */

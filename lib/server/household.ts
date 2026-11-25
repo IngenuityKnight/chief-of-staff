@@ -21,6 +21,13 @@ export const DEFAULT_HOUSEHOLD_ID = "00000000-0000-0000-0000-000000000001";
 
 export const HOUSEHOLD_COOKIE = "cos_household_id";
 
+/**
+ * A year, to match how long a device stays signed in. Supabase's own session
+ * cookie lasts 400 days and renews on every visit; a shorter clock here would
+ * be the first thing on the bedside iPad to run out.
+ */
+export const HOUSEHOLD_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
+
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 
 function envFallback(): string | null {
