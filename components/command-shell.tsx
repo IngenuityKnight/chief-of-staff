@@ -35,6 +35,16 @@ const DESTS: Dest[] = [
     ),
   },
   {
+    href: "/chores",
+    label: "Chores",
+    icon: (
+      <svg viewBox="0 0 24 24" className="h-6 w-6" {...stroke}>
+        <rect x="4" y="4" width="16" height="16" rx="3" />
+        <path d="m8.5 12.5 2.5 2.5 4.5-5" />
+      </svg>
+    ),
+  },
+  {
     href: "/brief",
     label: "Brief",
     icon: (

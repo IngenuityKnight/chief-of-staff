@@ -43,3 +43,6 @@ supabase/.temp/
 
 # Local design previews (not part of the app)
 .previews/
+
+# local chores preview store (no Supabase configured)
+.data/

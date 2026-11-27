@@ -8,6 +8,7 @@ A family wall organizer. A hallway iPad shows the day at a glance, and one page 
 |---|---|---|
 | `/wall` | The paired iPad | Clock, weather, both calendars, today's routine, dinners, and a checklist of to-dos, upkeep and bills due this week. Tap to check things off. |
 | `/` | Signed-in household members | Manage to-dos, dinners, routine, bills, upkeep and cars. |
+| `/chores` | Signed-in household members | Recurring chores: Today (overdue, due, next few days, paused), Schedule, All (search and filter), History. Each chore has one next due date, counted from the scheduled date or from when it was done. |
 | `/api/tap` | NFC stickers | Logs a tap ("Dishwasher is clean") that shows on the wall. |
 | `/login` | Household members | Magic-link sign-in. |
 
