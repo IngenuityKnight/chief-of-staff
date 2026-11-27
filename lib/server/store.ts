@@ -158,24 +158,25 @@ export async function markUpkeepDone(
   id: string,
   today: string,
   source: CompletionSource = "phone"
-) {
+): Promise<string | null> {
   const sb = db();
-  if (!sb) return;
+  if (!sb) return null;
   const { data, error } = await sb
     .from("maintenance_items").select("item,frequency").eq("household_id", householdId).eq("id", id).maybeSingle();
   check(error, "load the upkeep item");
-  if (!data) return;
+  if (!data) return null;
 
   const label = String(data.item);
   // Written before either branch: a one-time job is deleted on completion, so
   // this is the only moment the fact that it was ever done can be captured.
-  await record(householdId, { subjectKind: "upkeep", subjectId: id, label, source });
+  // The id goes back to the caller so a tap can be undone.
+  const completionId = await record(householdId, { subjectKind: "upkeep", subjectId: id, label, source });
 
   const next = nextDue(String(data.frequency) as Frequency, today);
   if (!next) {
     const { error: delErr } = await sb.from("maintenance_items").delete().eq("household_id", householdId).eq("id", id);
     check(delErr, "finish the upkeep item");
-    return;
+    return completionId;
   }
   // last_done still moves: it is the fast answer to "when was this last done".
   // The log is the slow answer to "every time it has been".
@@ -185,6 +186,7 @@ export async function markUpkeepDone(
     .eq("household_id", householdId)
     .eq("id", id);
   check(upErr, "mark the upkeep item done");
+  return completionId;
 }
 
 export async function deleteUpkeep(householdId: string, id: string) {
@@ -416,13 +418,15 @@ export async function tapHistory(householdId: string, slug: string, limit = 50):
   if (!sb) return [];
   const { data, error } = await sb
     .from("tap_events")
-    .select("slug,label,created_at")
+    .select("id,slug,label,created_at")
     .eq("household_id", householdId)
     .eq("slug", slug)
     .order("created_at", { ascending: false })
     .limit(limit);
   check(error, "load tap history");
-  return (data ?? []).map((r: Row) => ({ slug: String(r.slug), label: String(r.label), at: String(r.created_at) }));
+  return (data ?? []).map((r: Row) => ({
+    id: String(r.id), slug: String(r.slug), label: String(r.label), at: String(r.created_at),
+  }));
 }
 
 // ─── car services + cost estimates ───────────────────────────────────────────

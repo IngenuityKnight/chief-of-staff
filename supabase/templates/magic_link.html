@@ -1,0 +1,5 @@
+<!-- Local copy of the production Magic Link template (docs/AUTH-SETUP.md §2).
+     The app verifies with token_hash, so the link must carry it as a query
+     parameter; Supabase's default template cannot work with this app. -->
+<h2>Sign in to Burden House (local)</h2>
+<p><a href="{{ .SiteURL }}/api/auth/callback?token_hash={{ .TokenHash }}&type=email">Sign in</a></p>

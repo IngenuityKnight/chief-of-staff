@@ -59,6 +59,8 @@ export interface Vehicle {
 }
 
 export interface TapEvent {
+  /** Absent only on sample data; real rows always have one. */
+  id?: string;
   slug: string;
   label: string;
   at: string; // ISO

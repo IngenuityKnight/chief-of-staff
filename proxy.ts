@@ -29,7 +29,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // the others here, passing this check only gets the request to the handler,
 // which refuses to run without that secret.
 const PUBLIC_PREFIXES = ["/api/auth/", "/api/wall/", "/api/cron/"];
-const PUBLIC_EXACT = ["/login", "/wall", "/today", "/api/tap", "/api/key"];
+const PUBLIC_EXACT = ["/login", "/wall", "/today", "/api/tap", "/api/tap/undo", "/api/key"];
 
 // The vehicle sticker opens the form, which posts to the logs endpoint. Both
 // only bypass the session check while a `k` token is present to verify.

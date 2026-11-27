@@ -10,6 +10,7 @@ import { listCompletions } from "@/lib/server/completions";
 import { tapHistory, tapStates } from "@/lib/server/store";
 import { RECORD_SLUGS, TAP_TAGS } from "@/lib/tap-tags";
 import type { TapEvent } from "@/lib/types";
+import { deleteCompletion, deleteTap } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +45,28 @@ function cadence(events: TapEvent[]): string | null {
   if (avg < 45) return `about every ${avg} days`;
   const months = Math.round(avg / 30);
   return months < 18 ? `about every ${months} months` : `about every ${(avg / 365).toFixed(1)} years`;
+}
+
+// Two steps without JavaScript, the same pattern as House: open, then confirm.
+function Remove({ action, id, what }: { action: (fd: FormData) => Promise<void>; id: string; what: string }) {
+  return (
+    <details className="relative shrink-0">
+      <summary
+        aria-label={`Remove ${what}`}
+        className="grid h-8 w-8 cursor-pointer list-none place-items-center rounded-lg text-slate-600 hover:text-signal-red"
+      >
+        <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" />
+        </svg>
+      </summary>
+      <form action={action} className="absolute right-0 z-10 mt-1">
+        <input type="hidden" name="id" value={id} />
+        <button className="whitespace-nowrap rounded-lg bg-signal-red px-3 py-2 text-sm font-semibold text-ink-950">
+          Remove — it didn&rsquo;t happen
+        </button>
+      </form>
+    </details>
+  );
 }
 
 export default async function RecordsPage() {
@@ -110,13 +133,14 @@ export default async function RecordsPage() {
         ) : (
           <ul className="divide-y divide-edge">
             {done.map((c) => (
-              <li key={c.id} className="flex items-baseline justify-between gap-3 py-2">
+              <li key={c.id} className="flex items-center justify-between gap-3 py-1.5">
                 <span className="min-w-0 flex-1 truncate text-slate-100">{c.label}</span>
                 <span className="shrink-0 text-xs text-slate-500">
                   {c.actor ? `${c.actor} · ` : ""}
                   {c.source === "nfc" ? "tapped · " : c.source === "wall" ? "wall · " : ""}
                   {agoLabel(c.completedAt)}
                 </span>
+                <Remove action={deleteCompletion} id={c.id} what={c.label} />
               </li>
             ))}
           </ul>
@@ -161,6 +185,27 @@ export default async function RecordsPage() {
                         {events.length > 7 ? " · …" : ""}
                       </p>
                     )}
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs text-slate-500 underline-offset-4 hover:underline">
+                        Fix a mistake
+                      </summary>
+                      <p className="mt-2 text-xs text-slate-600">
+                        Removing a tap takes it out of this record. It doesn&rsquo;t move the job&rsquo;s due date — change
+                        that on <a href="/#upkeep" className="underline underline-offset-4">House</a>.
+                      </p>
+                      <ul className="mt-1 divide-y divide-edge">
+                        {events.map((e, j) =>
+                          e.id ? (
+                            <li key={e.id} className="flex items-center justify-between gap-3 py-1">
+                              <span className="text-sm text-slate-300">{dateFmt.format(new Date(e.at))}</span>
+                              <Remove action={deleteTap} id={e.id} what={`${tag.label} on ${dateFmt.format(new Date(e.at))}`} />
+                            </li>
+                          ) : (
+                            <li key={j} className="py-1 text-sm text-slate-500">{dateFmt.format(new Date(e.at))}</li>
+                          )
+                        )}
+                      </ul>
+                    </details>
                   </>
                 )}
               </li>
